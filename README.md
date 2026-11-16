@@ -11,7 +11,8 @@ backend/            FastAPI server (API + video streaming)
   app/main.py       routes: /api/dashboard, /api/demo/config, /api/tracks/{cam}, /videos/{cam}
   app/pipeline/     one stub per model / step (detector, tracker, liveness, recognizer, emotion, matcher, attendance)
   app/db/schema.sql SQLite tables (not wired yet)
-frontend/           React + Vite web app (Home page built, other pages placeholders)
+frontend/           Vue 3 + Vite web app (Home page built, other pages placeholders)
+  src/pages.js      page registry: add one entry to get a route + sidebar item
 data/
   mock/             mock data: students.csv + courses.csv (from the team metadata sheet), session.json, tracks/
   video_config.json which recording each camera plays in the demo
