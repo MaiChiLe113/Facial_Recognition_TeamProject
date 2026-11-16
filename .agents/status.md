@@ -2,22 +2,20 @@
 
 Last updated: 2026-11-16. Update this file at the end of every step.
 
-## Branches
+## Branch
 
-| Branch | From | Contents | State |
-| --- | --- | --- | --- |
-| `main` | | Original template (React frontend, single `main.py`) | |
-| `feature/vue-frontend` | `main` | React → Vue 3 migration; README line updated | Done, not pushed, not merged |
-| `feature/backend-structure` | `main` | `main.py` split into `api/`; plug-in `core/` (stages, event bus, engine); example feature; this `.agents/` folder | Done, not pushed, not merged |
+All work happens on **one branch: `feature/backend-structure`**. It holds the Vue migration, the backend restructure and this `.agents/` folder. Commit every step there.
 
-The two feature branches are independent and merge cleanly in either order (checked with `git merge-tree`).
+- Do not create other branches.
+- Do not merge into `main` or push unless the user asks.
+- `main` stays as the original template (React frontend, single `main.py`).
 
 ## Task list from the user (in order)
 
 | # | Task | State |
 | --- | --- | --- |
-| 0a | Frontend: React → Vue 3 + npm | Done (`feature/vue-frontend`) |
-| 0b | Backend: scalable structure, features plug into the pipeline without breaking others | Done (`feature/backend-structure`) |
+| 0a | Frontend: React → Vue 3 + npm | Done |
+| 0b | Backend: scalable structure, features plug into the pipeline without breaking others | Done |
 | 1 | SQLite with SQLAlchemy from `backend/app/db/schema.sql`; seed script for `data/mock/students.csv` and `courses.csv` (a `courses` value like `"[1,2]"` becomes `enrollments` rows); `GET /api/dashboard` reads students and courses from the DB while attendance, events and map still come from `data/mock/session.json` | **Next.** Plan approved in principle, not started |
 | 2 | Add person page + `POST /api/students`: name, Student ID (VN, e.g. `SWH02701`), Student ID (AU), year, course checkboxes, 10–20 photos saved to `data/photos/<student_id_vn>/` (git-ignored). Leave a TODO where `recognizer.embed` computes embeddings; do not implement embeddings | Not started |
 | 3 | Class page: course table per session (name, student ID, status, check-in, entry, exit, total time, "Logs" link to that student's events); reuse `ClassRoster` | Not started |
