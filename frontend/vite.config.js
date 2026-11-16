@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [vue()],
   server: {
     port: 5173,
     // The backend runs on :8000 (uvicorn). These paths are forwarded to it.
