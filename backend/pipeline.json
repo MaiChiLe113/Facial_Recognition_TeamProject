@@ -1,0 +1,18 @@
+{
+  "_note": "Which stages run on each camera, in order, and which features are on. Stage and feature names come from @register_stage / @register_feature. Unknown names are reported in GET /api/pipeline/status, not crashed on.",
+  "cameras": {
+    "cam_1": "outside",
+    "cam_2": "inside",
+    "attendance_cam": "attendance"
+  },
+  "roles": {
+    "outside":    ["detect_people", "track", "match", "emit_events"],
+    "inside":     ["detect_people", "track", "match", "emit_events"],
+    "attendance": ["detect_faces", "liveness", "recognize", "emotion", "emit_events"]
+  },
+  "options": {
+    "liveness":  { "frames": 10 },
+    "recognize": { "threshold": null }
+  },
+  "features": {}
+}
