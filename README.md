@@ -8,7 +8,9 @@ COS30082 Applied Machine Learning team project. Three cameras (corridor, classro
 
 ```
 backend/            FastAPI server (API + video streaming)
-  app/main.py       routes: /api/dashboard, /api/demo/config, /api/tracks/{cam}, /videos/{cam}
+  app/main.py       builds the app; routes live in app/api/ (one file per area)
+  app/core/         plug-in pipeline: stage registry, event bus, runner (configured by backend/pipeline.json)
+  app/features/     one folder per innovation feature; see app/features/README.md
   app/pipeline/     one stub per model / step (detector, tracker, liveness, recognizer, emotion, matcher, attendance)
   app/db/schema.sql SQLite tables (not wired yet)
 frontend/           Vue 3 + Vite web app (Home page built, other pages placeholders)
@@ -40,6 +42,18 @@ npm run dev                   # http://localhost:5173
 ```
 
 Press **Run demo videos** on the Home page. The three videos stream from the backend and play in sync. No backend? Use **Load from computer** and pick one file per camera.
+
+## Adding to the pipeline
+
+`backend/pipeline.json` lists the stages each camera runs, in order, and which features are on. To add a per-frame step, write a stage in `app/core/stages/`. To react to events (check-in, spoof, in/out), write a feature in `app/features/`. Neither needs changes to anyone else's file. A part that fails is skipped and reported; the rest keeps running.
+
+`GET /api/pipeline/status` shows every stage, subscriber and feature as `ready`, `not_ready` (still a stub), `failed` or `disabled`. Run the tests from `backend/` before a pull request:
+
+```bash
+python -m unittest discover -s tests -t .
+```
+
+Step-by-step guide: [`backend/app/features/README.md`](backend/app/features/README.md).
 
 ## Demo videos
 

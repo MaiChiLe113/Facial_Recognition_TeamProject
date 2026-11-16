@@ -14,5 +14,7 @@
     "liveness":  { "frames": 10 },
     "recognize": { "threshold": null }
   },
-  "features": {}
+  "features": {
+    "event_counter": true
+  }
 }
