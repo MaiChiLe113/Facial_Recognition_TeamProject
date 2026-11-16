@@ -1,0 +1,9 @@
+{
+  "cam_id": "attendance_cam",
+  "source": "mock",
+  "_note": "PLACEHOLDER face box. Replace with the face detector output (written to data/tracks/attendance_cam.json).",
+  "tracks": [
+    { "global_id": 11, "name": "Do Trinh Thuan Minh",
+      "keyframes": [ { "t": 0, "box": [0.38, 0.12, 0.26, 0.42] }, { "t": 30, "box": [0.40, 0.14, 0.26, 0.42] } ] }
+  ]
+}

@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+backend/.env
+
+# Node
+node_modules/
+frontend/dist/
+
+# Data and models (keep them on Drive, not in git)
+*.webm
+*.mp4
+*.pt
+*.pth
+*.onnx
+data/videos/
+data/tracks/
+data/raw/
+*.sqlite3
+
+.DS_Store

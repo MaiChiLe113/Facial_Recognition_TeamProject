@@ -1,0 +1,9 @@
+{
+  "cam_id": "cam_1",
+  "source": "mock",
+  "_note": "PLACEHOLDER boxes so the overlay can be tested. Replace with ml/tracking/precompute_tracks.py output (written to data/tracks/cam_1.json).",
+  "tracks": [
+    { "global_id": 12, "name": null,
+      "keyframes": [ { "t": 0, "box": [0.20, 0.18, 0.22, 0.78] }, { "t": 15, "box": [0.45, 0.18, 0.22, 0.78] }, { "t": 30, "box": [0.62, 0.20, 0.20, 0.76] } ] }
+  ]
+}

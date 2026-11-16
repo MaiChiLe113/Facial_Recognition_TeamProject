@@ -1,0 +1,50 @@
+{
+  "_note": "MOCK DATA. Replace with real values from the attendance logic (backend/app/pipeline/attendance.py) once it runs.",
+  "session": {
+    "course_key": 1,
+    "room": "204",
+    "date": "2026-11-18",
+    "start": "08:00",
+    "end": "12:00"
+  },
+  "attendance": [
+    { "student_id_vn": "SWH02378", "global_id": 3,  "status": "in_class",   "check_in": "08:31", "entry": "08:32", "exit": null,    "minutes": 28 },
+    { "student_id_vn": "SWH02701", "global_id": 7,  "status": "left",       "check_in": "08:33", "entry": "08:34", "exit": "08:52", "minutes": 18 },
+    { "student_id_vn": "SWH02803", "global_id": 11, "status": "checked_in", "check_in": "08:37", "entry": null,    "exit": null,    "minutes": null },
+    { "student_id_vn": "SWH02486", "global_id": null, "status": "not_seen", "check_in": null,    "entry": null,    "exit": null,    "minutes": null }
+  ],
+  "placeholder_students": [
+    { "student_name": "Minh Thành", "note": "Not in the metadata sheet yet" }
+  ],
+  "events": [
+    { "time": "08:52", "event": "Nguyen Duc Manh left class",     "source": "cam_2" },
+    { "time": "08:38", "event": "ID 12 detected (unknown)",        "source": "cam_1" },
+    { "time": "08:37", "event": "Do Trinh Thuan Minh checked in",  "source": "attendance_cam" },
+    { "time": "08:34", "event": "Nguyen Duc Manh entered class",   "source": "cam_2" },
+    { "time": "08:33", "event": "Nguyen Duc Manh checked in",      "source": "attendance_cam" },
+    { "time": "08:32", "event": "Le Mai Chi entered class",        "source": "cam_2" },
+    { "time": "08:31", "event": "Le Mai Chi checked in",           "source": "attendance_cam" }
+  ],
+  "attendance_cam_status": {
+    "global_id": 11,
+    "name": "Do Trinh Thuan Minh",
+    "identity_verified": true,
+    "liveness": "live",
+    "liveness_score": null,
+    "emotion": "neutral"
+  },
+  "map": {
+    "_note": "Positions are fractions of the map (x: 0 left -> 1 right, y: 0 top -> 1 bottom). The corridor is x < 0.3. Real positions come from the homography step (matcher.py, T1).",
+    "door": { "x": 0.3, "y": 0.35 },
+    "cameras": [
+      { "cam_id": "cam_1",          "x": 0.04, "y": 0.06 },
+      { "cam_id": "attendance_cam", "x": 0.27, "y": 0.22 },
+      { "cam_id": "cam_2",          "x": 0.96, "y": 0.06 }
+    ],
+    "people": [
+      { "global_id": 12, "label": "ID 12",      "x": 0.10, "y": 0.45 },
+      { "global_id": 11, "label": "Thuan Minh", "x": 0.24, "y": 0.38 },
+      { "global_id": 3,  "label": "Mai Chi",    "x": 0.70, "y": 0.55 }
+    ]
+  }
+}

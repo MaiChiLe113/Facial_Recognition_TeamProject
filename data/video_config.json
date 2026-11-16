@@ -1,0 +1,20 @@
+{
+  "_note": "Which recording each camera plays in the demo. Files sit in HAWKEYE_VIDEO_ROOT/<folder>/. Takes are matched across cameras by take number (recorded together). The CAM 2 device clock is ~23.4 s ahead in every take, so do not sync by the filename timestamp; use offset_s to fine-tune (positive = skip that many seconds at the start).",
+  "take": 4,
+  "cameras": [
+    { "cam_id": "cam_1",          "label": "CAM 1",             "place": "Corridor",  "folder": "cam_1",          "stream_id": "sCi8Jvd", "offset_s": 0 },
+    { "cam_id": "cam_2",          "label": "CAM 2",             "place": "Classroom", "folder": "cam_2",          "stream_id": "pDHjQPf", "offset_s": 0 },
+    { "cam_id": "attendance_cam", "label": "Attendance camera", "place": "Doorway",   "folder": "attendance_cam", "stream_id": "2SiEwN8", "offset_s": 0 }
+  ],
+  "takes": [
+    { "take": 1, "approx_seconds": 108, "scenario": "TBC", "files": { "cam_1": "sCi8Jvd_1794809010750.webm", "cam_2": "pDHjQPf_1794809034295.webm", "attendance_cam": "2SiEwN8_1794809010568.webm" } },
+    { "take": 2, "approx_seconds": 78,  "scenario": "TBC", "files": { "cam_1": "sCi8Jvd_1794809171451.webm", "cam_2": "pDHjQPf_1794809194988.webm", "attendance_cam": "2SiEwN8_1794809171205.webm" } },
+    { "take": 3, "approx_seconds": 13,  "scenario": "TBC", "files": { "cam_1": "sCi8Jvd_1794809307122.webm", "cam_2": "pDHjQPf_1794809330658.webm", "attendance_cam": "2SiEwN8_1794809306872.webm" } },
+    { "take": 4, "approx_seconds": 31,  "scenario": "TBC", "files": { "cam_1": "sCi8Jvd_1794809385941.webm", "cam_2": "pDHjQPf_1794809409481.webm", "attendance_cam": "2SiEwN8_1794809386098.webm" } },
+    { "take": 5, "approx_seconds": 31,  "scenario": "TBC", "files": { "cam_1": "sCi8Jvd_1794809460592.webm", "cam_2": "pDHjQPf_1794809484130.webm", "attendance_cam": "2SiEwN8_1794809460341.webm" } },
+    { "take": 6, "approx_seconds": 14,  "scenario": "TBC", "files": { "cam_1": "sCi8Jvd_1794809551763.webm", "cam_2": "pDHjQPf_1794809575290.webm", "attendance_cam": "2SiEwN8_1794809551507.webm" } },
+    { "take": 7, "approx_seconds": 12,  "scenario": "TBC", "files": { "cam_1": "sCi8Jvd_1794809592514.webm", "cam_2": "pDHjQPf_1794809616036.webm", "attendance_cam": "2SiEwN8_1794809592266.webm" } },
+    { "take": 8, "approx_seconds": 14,  "scenario": "TBC", "files": { "cam_1": "sCi8Jvd_1794809627995.webm", "cam_2": "pDHjQPf_1794809651522.webm", "attendance_cam": "2SiEwN8_1794809627740.webm" } },
+    { "take": 9, "approx_seconds": 13,  "scenario": "TBC", "files": { "cam_1": "sCi8Jvd_1794809670730.webm", "cam_2": "pDHjQPf_1794809694251.webm", "attendance_cam": "2SiEwN8_1794809670473.webm" } }
+  ]
+}

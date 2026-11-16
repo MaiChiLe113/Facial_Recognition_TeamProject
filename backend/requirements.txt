@@ -1,0 +1,5 @@
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-dotenv>=1.0
+# Add when the models are wired in:
+# torch, torchvision, ultralytics, opencv-python, numpy, scikit-learn
