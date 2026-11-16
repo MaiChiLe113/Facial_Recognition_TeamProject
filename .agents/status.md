@@ -16,6 +16,7 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 | --- | --- | --- |
 | 0a | Frontend: React → Vue 3 + npm | Done |
 | 0b | Backend: scalable structure, features plug into the pipeline without breaking others | Done |
+| 0c | Frontend pages: Attend Course, Class, History, Demo and Add person, in the Home page style, following the Chi document's UI section. They run on mock data (`src/mock/sessions.js` plus `data/mock`) through `api.js` fallbacks; the backend routes they expect are listed at the top of the pages section in `api.js` | Done (frontend only) |
 | 1 | SQLite with SQLAlchemy from `backend/app/db/schema.sql`; seed script for `data/mock/students.csv` and `courses.csv` (a `courses` value like `"[1,2]"` becomes `enrollments` rows); `GET /api/dashboard` reads students and courses from the DB while attendance, events and map still come from `data/mock/session.json` | **Next.** Plan approved in principle, not started |
 | 2 | Add person page + `POST /api/students`: name, Student ID (VN, e.g. `SWH02701`), Student ID (AU), year, course checkboxes, 10–20 photos saved to `data/photos/<student_id_vn>/` (git-ignored). Leave a TODO where `recognizer.embed` computes embeddings; do not implement embeddings | Not started |
 | 3 | Class page: course table per session (name, student ID, status, check-in, entry, exit, total time, "Logs" link to that student's events); reuse `ClassRoster` | Not started |

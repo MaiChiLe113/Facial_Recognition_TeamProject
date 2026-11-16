@@ -1,18 +1,12 @@
 <script setup>
 import { computed } from 'vue'
+import { STATUS, attended, dash, initials, minutes } from '../format.js'
 
-const props = defineProps({ roster: { type: Array, required: true } })
-
-const STATUS = {
-  in_class: 'In class',
-  left: 'Left',
-  checked_in: 'Checked in',
-  not_seen: 'Not seen',
-  placeholder: 'TBC',
-}
-
-const initials = (name) => name.split(' ').filter(Boolean).slice(-2).map((w) => w[0]).join('').toUpperCase()
-const dash = (v) => v ?? '—'
+const props = defineProps({
+  roster: { type: Array, required: true },
+  title: { type: String, default: 'Class roster' },
+  showAttended: { type: Boolean, default: false },   // Class page: adds the Attended yes/no column
+})
 
 const enrolled = computed(() => props.roster.filter((r) => r.enrolled).length)
 const inClass = computed(() => props.roster.filter((r) => r.status === 'in_class').length)
@@ -21,13 +15,13 @@ const inClass = computed(() => props.roster.filter((r) => r.status === 'in_class
 <template>
   <section class="card roster">
     <header class="card-head">
-      <h2>Class roster</h2>
+      <h2>{{ title }}</h2>
       <span class="muted">{{ enrolled }} enrolled · {{ inClass }} in class</span>
     </header>
     <table>
       <thead>
         <tr>
-          <th>Student</th><th>Student ID</th><th>Status</th><th>Check-in</th>
+          <th>Student</th><th>Student ID</th><th v-if="showAttended">Attended</th><th>Status</th><th>Check-in</th>
           <th>Entry</th><th>Exit</th><th>Duration</th><th></th>
         </tr>
       </thead>
@@ -43,12 +37,15 @@ const inClass = computed(() => props.roster.filter((r) => r.status === 'in_class
             </span>
           </td>
           <td>{{ dash(r.student_id) }}</td>
+          <td v-if="showAttended"><span class="yesno" :class="attended(r) ? 'yes' : 'no'">{{ attended(r) ? 'Yes' : 'No' }}</span></td>
           <td><span class="status" :class="r.status">{{ STATUS[r.status] ?? r.status }}</span></td>
           <td>{{ dash(r.check_in) }}</td>
           <td>{{ dash(r.entry) }}</td>
           <td>{{ dash(r.exit) }}</td>
-          <td>{{ r.minutes != null ? `${r.minutes} min` : '—' }}</td>
-          <td><a href="#" title="TODO: per-student log page" @click.prevent>Logs</a></td>
+          <td>{{ minutes(r.minutes) }}</td>
+          <td>
+            <RouterLink v-if="r.student_id" :to="{ path: '/history', query: { student: r.student_id } }">Logs</RouterLink>
+          </td>
         </tr>
       </tbody>
     </table>

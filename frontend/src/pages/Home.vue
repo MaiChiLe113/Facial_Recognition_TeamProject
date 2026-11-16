@@ -143,7 +143,8 @@ const capitalise = (s) => s[0].toUpperCase() + s.slice(1)
         :highlight="cam.cam_id === 'attendance_cam'">
         <!-- TODO: live values from liveness.py / recognizer.py / emotion.py (currently mock) -->
         <ul v-if="cam.cam_id === 'attendance_cam'" class="checks">
-          <li :class="st.identity_verified ? 'ok' : 'bad'">{{ st.identity_verified ? `Identity verified · ${st.name}` : 'Unknown — please register' }}</li>
+          <li v-if="st.identity_verified" class="ok">Identity verified · {{ st.name }}</li>
+          <li v-else class="bad">Unknown — <RouterLink to="/add">please register</RouterLink></li>
           <li :class="st.liveness === 'live' ? 'ok' : 'bad'">{{ st.liveness === 'live' ? 'Liveness passed' : 'Spoof detected' }}</li>
           <li class="ok">Emotion: {{ capitalise(st.emotion) }}</li>
         </ul>
