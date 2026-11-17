@@ -73,31 +73,50 @@ keyframe every 3rd frame (`--every-n 3`), tracks with fewer than 5 keyframes dro
 fractions of the frame with `x, y` the top-left corner. `global_id` is the camera-local ByteTrack
 ID until cross-camera matching replaces it. `attendance_cam` uses the same person detector for now.
 
-### Tracker choice (E1 baseline, take 4)
+### Tracker choice (E1 baseline)
 
-The committed `data/tracks/` files come from **`configs/bytetrack_long.yaml`**: Ultralytics'
-`bytetrack.yaml` with `track_buffer: 90` instead of 30, so a lost person is kept alive for ~3 s
-at 30 fps instead of ~1 s.
+The committed `data/tracks/` files (take 4, the demo take) come from
+**`configs/bytetrack_long.yaml`**: Ultralytics' `bytetrack.yaml` with `track_buffer: 90` instead of
+30, so a lost person is kept alive for ~3 s at 30 fps instead of ~1 s.
 
-| cam_id | tracker | IDs before filtering | IDs kept | real people |
-| --- | --- | --- | --- | --- |
-| cam_1 | bytetrack | 20 | 16 | 4 |
-| cam_1 | bytetrack_long | 17 | 13 | 4 |
-| cam_2 | bytetrack | 24 | 15 | 4 |
-| cam_2 | bytetrack_long | 20 | 14 | 4 |
-| attendance_cam | bytetrack | 5 | 4 | 3 |
-| attendance_cam | bytetrack_long | 5 | 4 | 3 |
+| take | cam_id | tracker | IDs before filtering | IDs kept | real people |
+| --- | --- | --- | --- | --- | --- |
+| 4 | cam_1 | bytetrack | 20 | 16 | 4 |
+| 4 | cam_1 | bytetrack_long | 17 | 13 | 4 |
+| 4 | cam_2 | bytetrack | 24 | 15 | 4 |
+| 4 | cam_2 | bytetrack_long | 20 | 14 | 4 |
+| 4 | attendance_cam | bytetrack | 5 | 4 | 3 |
+| 4 | attendance_cam | bytetrack_long | 5 | 4 | 3 |
+| 2 | cam_1 | bytetrack | 22 | 15 | 4 |
+| 2 | cam_1 | bytetrack_long | 16 | 11 | 4 |
+| 2 | cam_2 | bytetrack | 17 | 7 | 4 |
+| 2 | cam_2 | bytetrack_long | 17 | 7 | 4 |
+| 2 | attendance_cam | bytetrack | 4 | 4 | 4 |
+| 2 | attendance_cam | bytetrack_long | 4 | 4 | 4 |
 
 Why `bytetrack_long`: with no frame-level ground truth yet, ID switches cannot be measured
 directly. The proxy used is extra IDs = IDs kept − real people (same people, fewer IDs = fewer
-switches): cam_1 12 → 9, cam_2 11 → 10, attendance_cam 1 → 1 (`bytetrack` → `bytetrack_long`).
-Real people per camera come from `data/ground_truth/take4.csv` (cam_1 and cam_2: three students
-plus one person seated in the classroom the whole time; attendance_cam: the three students).
-Both trackers still split people into several IDs, partly because cam_1 and cam_2 also see people
-through the corridor glass: cross-camera matching / Re-ID has to merge them.
+switches). `bytetrack` → `bytetrack_long`: take 4 cam_1 12 → 9, cam_2 11 → 10, attendance_cam 1 → 1;
+take 2 cam_1 11 → 7, cam_2 3 → 3, attendance_cam 0 → 0. It is never worse. Real people per camera
+come from `data/ground_truth/take<N>.csv`.
 
-Full numbers incl. processing fps: `data/eval/tracking_baseline.csv`. Reproduce with
-`--out-dir runs/compare/<name> --eval-csv data/eval/tracking_baseline.csv --real-people cam_1=4 cam_2=4 attendance_cam=3`.
+Where the extra IDs come from (take 2 tracks lined up against `take2.csv` by time):
+
+- **attendance_cam** is clean: one track per person, start/end within ~0.2 s of the ground truth.
+- **cam_1 corridor** is clean too: one track per person while they walk to the door (e.g. P4
+  3.8–7.3 s vs 3.5–7.0 s in the ground truth).
+- **cam_1 extra IDs** are (a) people seen through the glass inside the classroom, and (b) a false
+  positive: the poster of a man in a suit on the classroom wall (left of the window) is detected as a
+  person in every frame of both takes (take 4: cam_1 track 3).
+- **cam_2** loses people while they sit behind P4 or a table and gives them a new ID when they
+  reappear (P1, P2 get 2–3 IDs each in take 2).
+
+Processing fps in the CSV is the wall-clock rate of that run on MPS; the take-2 runs (29–36 fps)
+were slower than the take-4 runs (59–81 fps) on the same laptop, so treat fps as rough until the
+B9 benchmark measures it under controlled conditions.
+
+Full numbers: `data/eval/tracking_baseline.csv` (column `take`). Reproduce with
+`--take <N> --out-dir runs/compare/<name> --eval-csv data/eval/tracking_baseline.csv --real-people cam_1=4 cam_2=4 attendance_cam=<3 for take 4, 4 for take 2>`.
 
 ## 5. Check the backend
 

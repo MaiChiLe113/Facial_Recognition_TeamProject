@@ -104,18 +104,18 @@ def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_ke
     return stats
 
 
-def append_eval_rows(csv_path, rows, real_people):
+def append_eval_rows(csv_path, rows, real_people, take):
     """Append one row per camera to the E1 baseline CSV (keeps existing rows)."""
     csv_path = Path(csv_path)
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     new = not csv_path.exists()
     with csv_path.open("a", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         if new:
-            w.writerow(["cam_id", "tracker", "ids_raw", "ids_kept", "real_people", "fps"])
+            w.writerow(["cam_id", "tracker", "ids_raw", "ids_kept", "real_people", "fps", "take"])
         for s in rows:
             w.writerow([s["cam_id"], s["tracker"], s["ids_raw"], s["ids_kept"], real_people.get(s["cam_id"], ""),
-                        s["proc_fps"]])
+                        s["proc_fps"], take])
 
 
 if __name__ == "__main__":
@@ -142,5 +142,5 @@ if __name__ == "__main__":
                  for cam in cams]
     if a.eval_csv:
         real = {k: int(v) for k, v in (x.split("=", 1) for x in a.real_people)}
-        append_eval_rows(a.eval_csv, all_stats, real)
+        append_eval_rows(a.eval_csv, all_stats, real, take)
         print(f"Appended {len(all_stats)} rows to {a.eval_csv}")

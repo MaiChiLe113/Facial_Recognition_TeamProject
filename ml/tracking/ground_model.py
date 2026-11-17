@@ -26,7 +26,9 @@ DOOR_C_M = np.array([WALL_X_M, MAP["door"]["centre"][1] / SY])
 # Pixel position of the floor at the two door jambs (picked by eye on data/calibration/<cam>_frame.png).
 DOOR_JAMBS = {"cam_1": [(722, 582), (872, 547)],   # left (north) jamb, right (south) jamb
               "cam_2": [(432, 590), (245, 585)]}   # right (north) jamb, left (south) jamb
-FIT_WINDOWS = {"cam_1": ((7.5, 24.0), {1, 3}),     # (time range, track ids to skip: seated person behind glass)
+# (time range, take-4 track ids to skip): cam_1 1 = P4 seated behind the glass, 3 = poster of a man on the
+# classroom wall (false positive); cam_2 1 = P4 seated.
+FIT_WINDOWS = {"cam_1": ((7.5, 24.0), {1, 3}),
                "cam_2": ((10.5, 27.0), {1})}
 
 
