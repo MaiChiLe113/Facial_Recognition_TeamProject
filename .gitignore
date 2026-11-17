@@ -19,4 +19,13 @@ data/tracks/
 data/raw/
 *.sqlite3
 
+# ML environment, outputs and checkpoints
+ml/.venv/
+runs/
+.ipynb_checkpoints/
+*.ckpt
+*.safetensors
+*.pth.tar
+*.onnx.data
+
 .DS_Store

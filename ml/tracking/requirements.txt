@@ -1,0 +1,7 @@
+# Tracking pipeline (Phase A). Install into ml/.venv:
+#   python3.12 -m venv ml/.venv && ml/.venv/bin/pip install -r ml/tracking/requirements.txt
+ultralytics
+opencv-python
+python-dotenv
+pandas
+jupyter
