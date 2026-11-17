@@ -40,10 +40,21 @@ def configured_take():
     return video_config()["take"]
 
 
-def video_path(cam_id, take=None):
+CONVERTED_DIR = REPO / "data" / "raw" / "converted"
+
+
+def converted_path(cam_id, take=None):
+    """Where the constant-30-fps MP4 of this recording lives (see notebooks/01_explore.ipynb)."""
+    take = configured_take() if take is None else int(take)
+    return CONVERTED_DIR / f"{cam_id}_take{take}.mp4"
+
+
+def video_path(cam_id, take=None, prefer_converted=True):
     """Path of the recording for cam_id in `take` (default: the configured take).
 
-    Raises ValueError for an unknown camera or take. Does not check that the file exists.
+    Returns data/raw/converted/<cam_id>_take<N>.mp4 when it exists and prefer_converted is True:
+    the browser .webm originals report 1000 fps and no duration, so tracking uses the MP4.
+    Raises ValueError for an unknown camera or take. Does not check that the original exists.
     """
     cfg = video_config()
     cam = next((c for c in cfg["cameras"] if c["cam_id"] == cam_id), None)
@@ -56,6 +67,8 @@ def video_path(cam_id, take=None):
     filename = entry["files"].get(cam_id)
     if not filename:
         raise ValueError(f"Take {take} has no file for camera {cam_id!r} in {VIDEO_CONFIG}")
+    if prefer_converted and converted_path(cam_id, take).exists():
+        return converted_path(cam_id, take)
     return video_root() / cam["folder"] / filename
 
 
@@ -69,6 +82,8 @@ if __name__ == "__main__":
     print(f"Video root: {video_root()} (exists: {video_root().exists()})")
     print(f"Take: {take}" + (" (configured)" if a.take is None else ""))
     for cam_id in camera_ids():
-        path = video_path(cam_id, take)
-        size = f", {path.stat().st_size / 1e6:.1f} MB" if path.exists() else ""
-        print(f"  {cam_id:15s} exists={path.exists()}{size}  {path}")
+        for label, path in (("original", video_path(cam_id, take, prefer_converted=False)),
+                            ("converted", converted_path(cam_id, take))):
+            size = f", {path.stat().st_size / 1e6:.1f} MB" if path.exists() else ""
+            print(f"  {cam_id:15s} {label:9s} exists={path.exists()}{size}  {path}")
+        print(f"  {cam_id:15s} -> uses {video_path(cam_id, take).name}")

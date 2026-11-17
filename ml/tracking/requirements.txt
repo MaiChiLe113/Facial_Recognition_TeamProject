@@ -5,3 +5,4 @@ opencv-python
 python-dotenv
 pandas
 jupyter
+lap>=0.5.12          # ByteTrack association; Ultralytics otherwise auto-installs it at runtime
