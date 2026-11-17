@@ -83,20 +83,21 @@ at 30 fps instead of ~1 s.
 | --- | --- | --- | --- | --- |
 | cam_1 | bytetrack | 20 | 16 | 4 |
 | cam_1 | bytetrack_long | 17 | 13 | 4 |
-| cam_2 | bytetrack | 24 | 15 | not counted |
-| cam_2 | bytetrack_long | 20 | 14 | not counted |
-| attendance_cam | bytetrack | 5 | 4 | not counted |
-| attendance_cam | bytetrack_long | 5 | 4 | not counted |
+| cam_2 | bytetrack | 24 | 15 | 4 |
+| cam_2 | bytetrack_long | 20 | 14 | 4 |
+| attendance_cam | bytetrack | 5 | 4 | 3 |
+| attendance_cam | bytetrack_long | 5 | 4 | 3 |
 
 Why `bytetrack_long`: with no frame-level ground truth yet, ID switches cannot be measured
 directly. The proxy used is extra IDs = IDs kept − real people (same people, fewer IDs = fewer
-switches). On cam_1 (4 people, counted by watching the annotated video) that is 12 for
-`bytetrack` and 9 for `bytetrack_long`; it also produces fewer IDs on cam_2 and the same on
-attendance_cam. Both are still far above 4, so each person is split into several IDs:
-cross-camera matching / Re-ID has to merge them.
+switches): cam_1 12 → 9, cam_2 11 → 10, attendance_cam 1 → 1 (`bytetrack` → `bytetrack_long`).
+Real people per camera come from `data/ground_truth/take4.csv` (cam_1 and cam_2: three students
+plus one person seated in the classroom the whole time; attendance_cam: the three students).
+Both trackers still split people into several IDs, partly because cam_1 and cam_2 also see people
+through the corridor glass: cross-camera matching / Re-ID has to merge them.
 
 Full numbers incl. processing fps: `data/eval/tracking_baseline.csv`. Reproduce with
-`--out-dir runs/compare/<name> --eval-csv data/eval/tracking_baseline.csv --real-people cam_1=4`.
+`--out-dir runs/compare/<name> --eval-csv data/eval/tracking_baseline.csv --real-people cam_1=4 cam_2=4 attendance_cam=3`.
 
 ## 5. Check the backend
 
@@ -111,7 +112,10 @@ its real duration matches the converted MP4 within 0.05 s, so the `t` values lin
 
 ## 6. Ground truth: `data/ground_truth/take<N>.csv`
 
-One file per take, header only until someone annotates it by watching the videos:
+One file per take. `take4.csv` is an **AI draft** made from frames sampled every 0.5 s (0.1–0.2 s
+around entries and exits): every row says `AI draft` in `notes` and must be checked by a person
+watching the videos before it is used for evaluation. People in take 4: `P1` red jersey, `P2` grey
+T-shirt, `P3` navy jersey #27 with glasses, `P4` the person seated in the classroom. Columns:
 
 ```
 person,cam_id,appear_s,disappear_s,event,notes
@@ -145,12 +149,7 @@ Timing conventions:
 - Visible = at least about a quarter of the body on screen. If unsure, write it in `notes`.
 - One row per (person, camera, visit) for `seen`; one row per event otherwise.
 
-Example (illustrative only, not real annotations):
-
-```
-P1,cam_1,2.0,9.5,seen,
-P1,attendance_cam,10.8,10.8,check_in,
-```
+When you have checked a row, delete `AI draft` from its `notes`.
 
 ## 7. Floor-map calibration
 
@@ -160,3 +159,10 @@ image) and the same four points on the Room 204 map (normalised to `[0, 1]`; the
 `x < 0.3`), put them in `image_points` / `map_points`, and rerun: it writes
 `data/calibration/<cam_id>_homography.json`. `foot_to_map(box, H)` maps a track box's bottom-centre
 (the feet) onto the map.
+
+Take 4 status (AI check of the first frames): no camera has four fixed floor landmarks without three
+on one line. cam_1 and cam_2 each show only the corridor-wall base (candidate points are listed in the
+notebook); attendance_cam shows no floor at all, so it cannot be calibrated from its view. The mock
+map in `data/mock/session.json` is a placeholder layout, so it was not used to guess `map_points`.
+Next step: put four tape crosses on the floor where cam_1 and cam_2 can see them, measure where they
+are relative to the door, and use them as the point pairs.
