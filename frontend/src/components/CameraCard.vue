@@ -13,6 +13,9 @@ const props = defineProps({
 
 const video = ref(null)
 const canvas = ref(null)
+// The frame takes the video's own shape (no black bars); 16:9 until a video has loaded (all recordings are 1280x720).
+const ratio = ref('16 / 9')
+const onMeta = () => { const v = video.value; if (v?.videoWidth) ratio.value = `${v.videoWidth} / ${v.videoHeight}` }
 defineExpose({ video })   // the Home page plays, pauses and syncs the videos
 
 // Box for one track at time t: linear interpolation between keyframes,
@@ -30,7 +33,10 @@ function boxAt(track, t) {
   return k[k.length - 1].box
 }
 
-const labelOf = (tr) => (tr.name ? `ID ${tr.global_id} · ${tr.name.split(' ').slice(-1)[0]}` : `ID ${tr.global_id} · Unknown`)
+// Name shown once the track is recognised (name_from = check-in time, if given); "Le Mai Chi" -> "Mai Chi".
+const nameAt = (tr, t) => (tr.name && (tr.name_from == null || t >= tr.name_from) ? tr.name : null)
+const shortName = (name) => (name.split(' ').length > 2 ? name.split(' ').slice(1).join(' ') : name)
+const labelOf = (tr, t) => { const n = nameAt(tr, t); return `ID ${tr.global_id} · ${n ? shortName(n) : 'Unknown'}` }
 
 // Draws the track boxes on the canvas laid over the <video>, once per animation frame.
 // The video uses object-fit: contain, so we compute where the picture actually sits.
@@ -52,11 +58,11 @@ function draw() {
     const b = boxAt(tr, v.currentTime)
     if (!b) continue
     const [x, y, w, h] = [ox + b[0] * pw, oy + b[1] * ph, b[2] * pw, b[3] * ph]
-    const color = tr.name ? '#3fbf4f' : '#f2b233'
+    const color = nameAt(tr, v.currentTime) ? '#3fbf4f' : '#f2b233'
     ctx.strokeStyle = color
     ctx.lineWidth = 2
     ctx.strokeRect(x, y, w, h)
-    const text = labelOf(tr)
+    const text = labelOf(tr, v.currentTime)
     ctx.font = '600 13px system-ui, sans-serif'
     const tw = ctx.measureText(text).width + 12
     ctx.fillStyle = 'rgba(30,30,30,0.85)'
@@ -80,8 +86,8 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
       </div>
       <span v-if="tracks?.source === 'mock' && showBoxes && src" class="badge small">mock boxes</span>
     </header>
-    <div class="cam-view">
-      <video ref="video" :src="src || undefined" muted playsinline preload="auto" />
+    <div class="cam-view" :style="{ aspectRatio: ratio }">
+      <video ref="video" :src="src || undefined" muted playsinline preload="auto" @loadedmetadata="onMeta" />
       <canvas ref="canvas" class="cam-overlay" />
       <div v-if="!src" class="cam-empty">
         <div>No video loaded</div>

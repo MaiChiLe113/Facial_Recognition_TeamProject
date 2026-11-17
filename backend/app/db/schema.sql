@@ -6,6 +6,7 @@ CREATE TABLE students (
   name          TEXT NOT NULL,
   year          TEXT,
   photo_folder  TEXT,
+  student_card  TEXT,                  -- path of the scanned student ID card (also an enrolment face)
   created_at    TEXT DEFAULT CURRENT_TIMESTAMP
 );
 

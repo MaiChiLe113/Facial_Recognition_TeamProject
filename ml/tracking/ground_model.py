@@ -12,6 +12,8 @@ from pathlib import Path
 
 import numpy as np
 
+from paths import configured_take
+
 REPO = Path(__file__).resolve().parents[2]
 FRAME_W, FRAME_H = 1280, 720
 PERSON_H = 1.7          # m, assumed height of a standing person
@@ -26,17 +28,17 @@ DOOR_C_M = np.array([WALL_X_M, MAP["door"]["centre"][1] / SY])
 # Pixel position of the floor at the two door jambs (picked by eye on data/calibration/<cam>_frame.png).
 DOOR_JAMBS = {"cam_1": [(722, 582), (872, 547)],   # left (north) jamb, right (south) jamb
               "cam_2": [(432, 590), (245, 585)]}   # right (north) jamb, left (south) jamb
-# (time range, take-4 track ids to skip): cam_1 1 = P4 seated behind the glass, 3 = poster of a man on the
+# (time range, take-3 track ids to skip): cam_1 1 = P4 seated behind the glass, 3 = poster of a man on the
 # classroom wall (false positive); cam_2 1 = P4 seated.
 FIT_WINDOWS = {"cam_1": ((7.5, 24.0), {1, 3}),
                "cam_2": ((10.5, 27.0), {1})}
 
 
 def fit_height_horizon(cam):
-    """(horizon_row, camera_height_m, n_boxes) from upright, unclipped person boxes in data/tracks/<cam>.json."""
+    """(horizon_row, camera_height_m, n_boxes) from upright, unclipped person boxes in data/tracks/take<N>/<cam>.json (the demo take)."""
     (t0, t1), skip = FIT_WINDOWS[cam]
     rows = []
-    for tr in json.loads((REPO / "data" / "tracks" / f"{cam}.json").read_text(encoding="utf-8"))["tracks"]:
+    for tr in json.loads((REPO / "data" / "tracks" / f"take{configured_take()}" / f"{cam}.json").read_text(encoding="utf-8"))["tracks"]:
         if tr["global_id"] in skip:
             continue
         for k in tr["keyframes"]:

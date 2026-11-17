@@ -15,7 +15,6 @@ const srcs = ref({})
 const playing = ref(false)
 const showBoxes = ref(true)
 const message = ref('')
-const fileInput = ref(null)
 
 const cards = {}                                   // cam_id -> CameraCard instance
 const videoOf = (camId) => cards[camId]?.video     // the <video> element of that camera
@@ -80,28 +79,13 @@ function runDemo() {
   const ready = cameras.value.filter((c) => c.available)
   if (!ready.length) {
     message.value = demo.value.offline
-      ? 'Backend is not running, so videos cannot stream. Start uvicorn, or use "Load from computer".'
-      : 'Backend cannot find the videos. Set HAWKEYE_VIDEO_ROOT in backend/.env, or use "Load from computer".'
+      ? 'Backend is not running, so videos cannot stream. Start uvicorn.'
+      : 'Backend cannot find the videos. Set HAWKEYE_VIDEO_ROOT in backend/.env.'
     return
   }
   message.value = ready.length < cameras.value.length ? `Only ${ready.length} of ${cameras.value.length} videos found.` : `Playing take ${demo.value.take}.`
   srcs.value = Object.fromEntries(ready.map((c) => [c.cam_id, c.url]))
   startAll(srcs.value)
-}
-
-// Match picked files to cameras by the stream ID at the start of the filename (e.g. sCi8Jvd_....webm)
-function loadLocal(e) {
-  const files = [...e.target.files]
-  const next = {}
-  for (const c of cameras.value) {
-    const f = files.find((file) => file.name.startsWith(c.stream_id)) || files.find((file) => file.name.includes(c.cam_id))
-    if (f) next[c.cam_id] = URL.createObjectURL(f)
-  }
-  const n = Object.keys(next).length
-  message.value = n ? `Loaded ${n} of ${cameras.value.length} cameras from your computer.` : 'No file matched a camera stream ID (sCi8Jvd, pDHjQPf, 2SiEwN8).'
-  srcs.value = next
-  startAll(next)
-  e.target.value = ''
 }
 
 function togglePause() {
@@ -122,8 +106,6 @@ const capitalise = (s) => s[0].toUpperCase() + s.slice(1)
       <div class="topbar-right">
         <div class="demo-controls">
           <button class="btn primary" @click="runDemo">▶ Run demo videos</button>
-          <button class="btn" @click="fileInput.click()">Load from computer</button>
-          <input ref="fileInput" type="file" accept="video/*" multiple hidden @change="loadLocal" />
           <button v-if="hasVideo" class="btn" @click="togglePause">{{ playing ? 'Pause' : 'Play' }}</button>
           <button v-if="hasVideo" class="btn" @click="restart">Restart</button>
           <label class="toggle"><input v-model="showBoxes" type="checkbox" /> Boxes</label>

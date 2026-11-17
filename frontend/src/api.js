@@ -25,22 +25,25 @@ export async function fetchDashboard() {
   }
 }
 
-export async function fetchDemoConfig() {
+// take: optional take number; without it the backend uses the take selected in data/video_config.json.
+export async function fetchDemoConfig(take) {
   try {
-    return { ...(await getJson('/api/demo/config')), offline: false }
+    return { ...(await getJson(take == null ? '/api/demo/config' : `/api/demo/config?take=${take}`)), offline: false }
   } catch {
     return {
       offline: true,
-      take: videoConfig.take,
+      take: take ?? videoConfig.take,
       cameras: videoConfig.cameras.map((c) => ({ ...c, available: false, url: null })),
     }
   }
 }
 
-export async function fetchTracks(camId) {
+export async function fetchTracks(camId, take) {
   try {
-    return await getJson(`/api/tracks/${camId}`)
+    return await getJson(take == null ? `/api/tracks/${camId}` : `/api/tracks/${camId}?take=${take}`)
   } catch {
+    // The mock boxes only make sense for the selected take.
+    if (take != null && take !== videoConfig.take) return { cam_id: camId, source: 'none', tracks: [] }
     return MOCK_TRACKS[camId] ?? { cam_id: camId, source: 'none', tracks: [] }
   }
 }
@@ -78,7 +81,7 @@ export async function fetchSessions() {
   }
 }
 
-// All recorded takes (data/video_config.json). The backend only streams the selected take for now.
+// All recorded takes (data/video_config.json); the backend streams any of them with ?take=N.
 export function demoTakes() {
   return { take: videoConfig.take, takes: videoConfig.takes }
 }

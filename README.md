@@ -41,7 +41,7 @@ npm install
 npm run dev                   # http://localhost:5173
 ```
 
-Press **Run demo videos** on the Home page. The three videos stream from the backend and play in sync. No backend? Use **Load from computer** and pick one file per camera.
+Press **Run demo videos** on the Home page. The three videos stream from the backend and play in sync.
 
 ## Adding to the pipeline
 
@@ -65,7 +65,7 @@ The recordings live in the team Google Drive folder `AppliedML/video data/` (one
 | Classroom | `cam_2` | `pDHjQPf` | CAM 2 |
 | Doorway | `attendance_cam` | `2SiEwN8` | Attendance camera |
 
-`data/video_config.json` lists all 9 synced takes and which take the demo plays (`"take"`). Change that number to play another take. Files are matched across cameras by take number, not by the timestamp in the filename: the CAM 2 device clock runs about 23.4 s ahead of the others in every take. Use `offset_s` per camera to fine-tune sync.
+`data/video_config.json` lists all 8 synced takes and which take the Home page plays (`"take"`, currently 3). The Demo page plays any take: pick it in the table and press Play. Files are matched across cameras by take number, not by the timestamp in the filename: the CAM 2 device clock runs about 23.4 s ahead of the others in every take. Use `offset_s` per camera to fine-tune sync.
 
 ## Who owns what
 
@@ -79,7 +79,7 @@ The recordings live in the team Google Drive folder `AppliedML/video data/` (one
 
 ## Data contract for bounding boxes
 
-The frontend draws boxes from `GET /api/tracks/{cam_id}`. The backend serves `data/tracks/<cam_id>.json` if it exists (real output), else `data/mock/tracks/<cam_id>.json`.
+The frontend draws boxes from `GET /api/tracks/{cam_id}?take=N` (no `take` = the take in `data/video_config.json`). The backend serves `data/tracks/take<N>/<cam_id>.json` if it exists (real output, made by `ml/tracking/precompute_tracks.py`); for the default take it falls back to `data/mock/tracks/<cam_id>.json`. Videos stream from `GET /videos/{cam_id}?take=N`.
 
 ```json
 {

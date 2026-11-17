@@ -1,6 +1,6 @@
 """Precompute person boxes + track IDs for one recorded video.  Owner: Mai Chi
 
-Output: data/tracks/<cam_id>.json in the format the frontend already draws
+Output: data/tracks/take<N>/<cam_id>.json in the format the frontend already draws
 (see the README "Data contract for bounding boxes"). The backend serves it
 automatically instead of the mock file once it exists.
 
@@ -41,11 +41,12 @@ def to_box(cx, cy, w, h, frame_w, frame_h):
     return [round(x0 / frame_w, 4), round(y0 / frame_h, 4), round((x1 - x0) / frame_w, 4), round((y1 - y0) / frame_h, 4)]
 
 
-# A track is "static" when, over its whole life, its box centre stays within these fractions of the box
-# width/height and its height varies less than STATIC_MAX_SIZE. Measured on takes 2 and 4: the poster of
-# a man on the classroom wall (cam_1) moves <= 0.017 / 0.030 with size change <= 0.040; the stillest real
-# person (seated behind the glass) still changes size by >= 0.062.
-STATIC_MAX_MOVE_X, STATIC_MAX_MOVE_Y, STATIC_MAX_SIZE = 0.025, 0.035, 0.05
+# A track is "static" when, over its whole life (95th - 5th percentile), its box centre moves less than
+# these fractions of the box width/height and both its width and height vary less than STATIC_MAX_SIZE.
+# Measured on takes 1-4: the poster of a man on the classroom wall (cam_1) moves <= 0.019 / 0.030 and
+# changes size <= 0.041; the stillest real people (P2 seated for all of take 4 in cam_2, P1 seated behind
+# the glass in take 1) move >= 0.024 sideways or change width/height by >= 0.062.
+STATIC_MAX_MOVE_X, STATIC_MAX_MOVE_Y, STATIC_MAX_SIZE = 0.022, 0.035, 0.05
 
 
 def is_static(track):
@@ -55,11 +56,12 @@ def is_static(track):
     spread = lambda v: np.percentile(v, 95) - np.percentile(v, 5)   # robust to a few jumpy boxes
     return (spread(b[:, 0] + b[:, 2] / 2) / w < STATIC_MAX_MOVE_X
             and spread(b[:, 1] + b[:, 3] / 2) / h < STATIC_MAX_MOVE_Y
+            and spread(b[:, 2]) / w < STATIC_MAX_SIZE
             and spread(b[:, 3]) / h < STATIC_MAX_SIZE)
 
 
 def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_keyframes=5,
-        tracker="bytetrack.yaml", out_dir=None, device=None, drop_static=True):
+        tracker="bytetrack.yaml", out_dir=REPO / "data" / "tracks", device=None, drop_static=True):
     tracks = {}  # track_id -> {"global_id": ..., "name": None, "keyframes": [...]}
 
     # TODO 1: load a small person detector.
@@ -107,7 +109,7 @@ def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_ke
     times = [kf["t"] for tr in kept for kf in tr["keyframes"]]
 
     out = {"cam_id": cam_id, "source": SOURCE, "tracks": kept}
-    out_path = Path(out_dir or REPO / "data" / "tracks") / f"{cam_id}.json"
+    out_path = Path(out_dir) / f"{cam_id}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(out, indent=1), encoding="utf-8")
 
@@ -152,7 +154,7 @@ if __name__ == "__main__":
                    help="Ultralytics tracker name or YAML path, e.g. ml/tracking/configs/bytetrack_long.yaml")
     p.add_argument("--keep-static", action="store_true",
                    help="keep tracks that never move (by default they are dropped, e.g. a poster detected as a person)")
-    p.add_argument("--out-dir", default=None, help="where to write <cam_id>.json (default: data/tracks/)")
+    p.add_argument("--out-dir", default=None, help="where to write <cam_id>.json (default: data/tracks/take<N>/)")
     p.add_argument("--eval-csv", default=None, help="append per-camera counts to this CSV (e.g. data/eval/tracking_baseline.csv)")
     p.add_argument("--real-people", nargs="*", default=[], metavar="CAM=N",
                    help="human-counted people per camera for --eval-csv, e.g. cam_1=4")
@@ -162,7 +164,8 @@ if __name__ == "__main__":
     cams = camera_ids() if a.cam == "all" else [a.cam]
     print(f"take {take}, tracker {a.tracker}, model {a.model}, conf {a.conf}, every_n {a.every_n}, "
           f"min_keyframes {a.min_keyframes}, drop_static {not a.keep_static}")
-    all_stats = [run(cam, video_path(cam, take), a.every_n, a.model, a.conf, a.min_keyframes, a.tracker, a.out_dir,
+    out_dir = a.out_dir or REPO / "data" / "tracks" / f"take{take}"
+    all_stats = [run(cam, video_path(cam, take), a.every_n, a.model, a.conf, a.min_keyframes, a.tracker, out_dir,
                      drop_static=not a.keep_static)
                  for cam in cams]
     if a.eval_csv:
