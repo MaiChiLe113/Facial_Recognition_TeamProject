@@ -29,5 +29,5 @@ ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all
 - **Result (takes 1–8):** take 1 track 1 (Mai Chi walking in) matched in 27/27 face crops (best cosine
   0.72), named from 6.4 s (ground-truth check-in 7.0 s). No other track matched: 0 of 293 face crops on
   every other track (P1–P3 and the people in takes 3–8) passed the threshold.
-- **Not yet:** the name stays on the attendance camera; showing it on cam_1 / cam_2 needs the
-  cross-camera matcher (`backend/app/pipeline/matcher.py`).
+- **cam_1 / cam_2:** `ml/tracking/link_names.py` carries the name to the track that is at the door at
+  check-in (door handoff); see `ml/tracking/README.md` section 4.

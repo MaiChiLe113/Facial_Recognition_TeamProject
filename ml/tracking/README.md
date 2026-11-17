@@ -79,9 +79,18 @@ and Demo pages draw them). Then name the people on the attendance camera (it rew
 
 ```bash
 ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all
+ml/.venv/bin/python ml/tracking/link_names.py --take all
 ```
 
-See `ml/face_recognition/README.md`.
+`name_tracks.py` names attendance-camera tracks from enrolment photos (see
+`ml/face_recognition/README.md`). `link_names.py` carries each name to cam_1 and cam_2: the track whose
+feet are at the classroom door (floor map, section 7) while the named person is on the attendance
+camera gets the same name, from the check-in time on. It names only one track per camera and skips
+ambiguous cases (two people at the door). Take 1: Mai Chi is named on cam_1 ID 5 and cam_2 ID 5 from
+6.4 s; face matching run directly on cam_2 agrees (52 of 116 face crops of ID 5 match her, no other
+cam_2 track matches more than once). Not covered yet: later tracks of the same person (after an
+occlusion, or seen through the glass by cam_1) and one shared ID number across cameras; both need
+the Re-ID matcher (Phase B).
 Defaults: `yolo11n.pt` (pre-trained, not fine-tuned), class 0 (person), `--conf 0.4`,
 keyframe every 3rd frame (`--every-n 3`), tracks with fewer than 5 keyframes dropped
 (`--min-keyframes 5`), and static tracks dropped (a box that never moves or changes size over its whole
