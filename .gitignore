@@ -15,7 +15,8 @@ frontend/dist/
 *.pth
 *.onnx
 data/videos/
-data/tracks/
+data/tracks/*
+!data/tracks/*.json
 data/raw/
 *.sqlite3
 
