@@ -77,4 +77,5 @@ To add a page, add one entry in `pages.js`. The Vite dev server proxies `/api` a
 ## Data contracts
 
 - **Dashboard:** `GET /api/dashboard` returns `{source, course, session, roster[], events[], attendance_cam_status, map}`. `api.js` `buildMockDashboard()` builds the same shape offline.
-- **Boxes:** `GET /api/tracks/{cam_id}` returns `{cam_id, source, tracks:[{global_id, name, keyframes:[{t, box:[x,y,w,h]}]}]}`, with each box as fractions 0–1 of the frame and `t` in seconds of that camera's video. The data comes from `data/tracks/` if present, else `data/mock/tracks/`.
+- **Boxes:** `GET /api/tracks/{cam_id}?take=N` returns `{cam_id, source, tracks:[{global_id, name, keyframes:[{t, box:[x,y,w,h]}]}]}`, with each box as fractions 0–1 of the frame and `t` in seconds of that camera's video. Optional per-track fields: `name_from` (show `name` from this time on) and `name_source`. The data comes from `data/tracks/take<N>/`; for the default take, `data/tracks/<cam>.json` and then `data/mock/tracks/` are fallbacks.
+- **Demo:** `GET /api/demo/config?take=N` returns `{take, default_take, cameras:[{..., file, available, url}]}`; `url` is `/videos/{cam_id}?take=N`.

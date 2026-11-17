@@ -4,6 +4,12 @@ Newest first. Add a line when the user decides something; do not reopen a decisi
 
 | Date | Decision | Why |
 | --- | --- | --- |
+| 2026-11-17 | Keep CSV (`data/mock/`) as the data store for now; SQLite step 1 on hold | User request (Mai Chi) |
+| 2026-11-17 | Old take 1 deleted (failed recording); takes renumbered 1–8, demo take 4 → 3 | User request (Mai Chi) |
+| 2026-11-17 | Boxes are precomputed per take in `data/tracks/take<N>/` and committed; the Demo page plays every take | The demo needs them; small JSON files |
+| 2026-11-17 | A name is assigned only at check-in (attendance camera) and carried to cam_1 / cam_2 by a door handoff; the label shows it from `name_from` | Matches the design: recognition only on the attendance camera |
+| 2026-11-17 | Face naming uses OpenCV YuNet + SFace as a baseline until the trained face model is ready | Needed now for the demo; no training required |
+| 2026-11-17 | No video upload in the frontend ("Load from computer" removed) | User request (Mai Chi) |
 | 2026-11-16 | Work on a single branch, `feature/backend-structure`; never merge into `main` or push unless asked | User request |
 | 2026-11-16 | No AI co-author or "Generated with" lines in commit messages | User request |
 | 2026-11-16 | Agent notes live in `.agents/` | User request: future agents follow what is going on |

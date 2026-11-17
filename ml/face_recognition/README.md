@@ -12,12 +12,17 @@ Results: _TBC_
 
 Until the models above are trained, the demo names people with OpenCV's pre-trained **YuNet** (face
 detection) + **SFace** (128-d embedding, cosine similarity, threshold 0.363 as recommended by OpenCV).
-Weights go in `ml/face_recognition/models/` (git-ignored), from `github.com/opencv/opencv_zoo`:
-`face_detection_yunet_2023mar.onnx`, `face_recognition_sface_2021dec.onnx`.
+Weights go in `ml/face_recognition/models/` (git-ignored), from `github.com/opencv/opencv_zoo`
+(~0.2 MB and ~37 MB):
 
 ```bash
+mkdir -p ml/face_recognition/models
+curl -L -o ml/face_recognition/models/face_detection_yunet_2023mar.onnx https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+curl -L -o ml/face_recognition/models/face_recognition_sface_2021dec.onnx https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx
 ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all
 ```
+
+The Drive folder is found from `HAWKEYE_VIDEO_ROOT` in `backend/.env` (two levels up from `video data/`).
 
 - **Enrolment:** every student in `data/mock/students.csv` with photos: the files in `photo_folder` and the
   `student_card` image (paths relative to the Drive folder that holds `AppliedML/`; HEIC is converted

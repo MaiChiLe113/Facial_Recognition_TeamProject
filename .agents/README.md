@@ -21,7 +21,7 @@ Hawkeye is a COS30082 (Applied Machine Learning) team project: a multi-camera cl
 The stack runs locally:
 - Backend: FastAPI (Python 3.10+) in `backend/`.
 - Frontend: Vue 3 + Vite (npm) in `frontend/`.
-- Database: SQLite (being wired up).
+- Database: SQLite planned (`backend/app/db/schema.sql`), on hold; data lives in CSV under `data/mock/` for now.
 
 The team design doc is the source of truth for scope and marking. It is a Claude Docs document named "Project Plan" (tabs: Project Brief, Tasks and Codebase, Meeting Notes, Chi document). Ask the user for the link if you need it.
 

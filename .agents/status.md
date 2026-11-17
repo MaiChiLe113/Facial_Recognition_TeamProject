@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-16. Update this file at the end of every step.
+Last updated: 2026-11-17. Update this file at the end of every step.
 
 ## Branch
 
@@ -10,6 +10,42 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
 
+## 2026-11-17: tracking and naming work (Mai Chi)
+
+Done on Mai Chi's machine, on top of `main` after PR #1 was merged. Full detail: `ml/tracking/README.md`
+and `ml/face_recognition/README.md`.
+
+**New (Mai Chi's area, `ml/` and data):**
+- `ml/tracking/`: `paths.py` (video paths), `precompute_tracks.py` (YOLO11n + ByteTrack, static-object
+  filter), `configs/bytetrack_long.yaml`, `ground_model.py` + `notebooks/02_homography.ipynb` (approximate
+  floor-map homographies for cam_1 / cam_2), `link_names.py` (name handoff at the door),
+  `notebooks/01_explore.ipynb` (video checks, 30 fps conversion).
+- `ml/face_recognition/name_tracks.py`: baseline face naming with OpenCV YuNet + SFace until Thuận Minh's
+  model exists. Only Le Mai Chi has enrolment photos; she is named from 6.4 s in take 1 on all cameras.
+- Data: `data/tracks/take1..8/` (committed boxes), `data/ground_truth/take1.csv` (draft, not yet checked) and `take3.csv`
+  (checked), `data/calibration/` (frames, `room204_map.json`, homographies), `data/eval/tracking_baseline.csv`.
+
+**Changed in Đức Mạnh's files (please review):**
+- `backend/app/api/demo.py`, `services/videos.py`: `/api/demo/config`, `/videos/{cam}` and
+  `/api/tracks/{cam}` take an optional `?take=N` (default: `"take"` in `data/video_config.json`). Tracks are
+  read from `data/tracks/take<N>/`; the old `data/tracks/<cam>.json` and the mock are fallbacks for the
+  default take only. Responses only gained fields (`default_take`, `?take=` in video URLs).
+- `frontend/src/pages/Demo.vue`: plays any take with its boxes; Source column removed.
+  `Demo.vue` and `Home.vue`: "Load from computer" (video upload) removed at the user's request.
+- `frontend/src/components/CameraCard.vue`: the frame follows the video's aspect ratio (no black bars);
+  labels honour the optional `name_from` and show the given name ("Mai Chi").
+- `frontend/src/api.js`: `fetchDemoConfig(take)` and `fetchTracks(camId, take)`; offline fallback kept.
+- `data/mock/students.csv` + `backend/app/db/schema.sql`: new `student_card` column; Thuận Minh and Hồng
+  Minh get course `[1]`, as in the metadata sheet.
+- `data/video_config.json`: the failed old take 1 removed (its videos deleted from Drive), takes
+  renumbered 1–8, default take 4 → 3, measured lengths.
+
+Checks run: backend `unittest` (13 OK), `npm run build`, every take plays in the Demo page with boxes,
+Mai Chi's label changes from Unknown to her name at check-in on all three cameras.
+
+**Next for this workstream:** Re-ID (Phase B) for one shared ID per person across cameras and for
+tracks after occlusion or seen through the glass; enrolment photos for the other students.
+
 ## Task list from the user (in order)
 
 | # | Task | State |
@@ -17,7 +53,7 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 | 0a | Frontend: React → Vue 3 + npm | Done |
 | 0b | Backend: scalable structure, features plug into the pipeline without breaking others | Done |
 | 0c | Frontend pages: Attend Course, Class, History, Demo and Add person, in the Home page style, following the Chi document's UI section. They run on mock data (`src/mock/sessions.js` plus `data/mock`) through `api.js` fallbacks; the backend routes they expect are listed at the top of the pages section in `api.js` | Done (frontend only) |
-| 1 | SQLite with SQLAlchemy from `backend/app/db/schema.sql`; seed script for `data/mock/students.csv` and `courses.csv` (a `courses` value like `"[1,2]"` becomes `enrollments` rows); `GET /api/dashboard` reads students and courses from the DB while attendance, events and map still come from `data/mock/session.json` | **Next.** Plan approved in principle, not started |
+| 1 | SQLite with SQLAlchemy from `backend/app/db/schema.sql`; seed script for `data/mock/students.csv` and `courses.csv` (a `courses` value like `"[1,2]"` becomes `enrollments` rows); `GET /api/dashboard` reads students and courses from the DB while attendance, events and map still come from `data/mock/session.json` | **On hold** (2026-11-17: keep CSV for now). Plan approved in principle, not started |
 | 2 | Add person page + `POST /api/students`: name, Student ID (VN, e.g. `SWH02701`), Student ID (AU), year, course checkboxes, 10–20 photos saved to `data/photos/<student_id_vn>/` (git-ignored). Leave a TODO where `recognizer.embed` computes embeddings; do not implement embeddings | Not started |
 | 3 | Class page: course table per session (name, student ID, status, check-in, entry, exit, total time, "Logs" link to that student's events); reuse `ClassRoster` | Not started |
 | 4 | History page: past sessions + event log, filter by student and date | Not started |

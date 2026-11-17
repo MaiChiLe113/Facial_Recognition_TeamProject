@@ -19,6 +19,19 @@ python3.12 -m venv ml/.venv
 ml/.venv/bin/pip install -r ml/tracking/requirements.txt
 ```
 
+On Windows (the team's machines):
+
+```bash
+winget install Gyan.FFmpeg                # or download from ffmpeg.org; ffmpeg/ffprobe must be on PATH
+py -3.12 -m venv ml/.venv
+ml/.venv/Scripts/python -m pip install -r ml/tracking/requirements.txt
+```
+
+and write `ml/.venv/Scripts/python` wherever this file says `ml/.venv/bin/python`. The scripts pick
+Apple MPS when available, otherwise CPU, so Windows runs on CPU: slower, but fine for these short takes. One macOS-only
+part: `name_tracks.py` converts HEIC photos with macOS `sips`; on Windows, export HEIC photos as JPEG
+first (or skip them, the JPEGs are enough).
+
 `ml/.venv/`, `runs/`, `data/raw/` and weight files (`*.pt`, …) are git-ignored.
 `yolo11n.pt` is downloaded once to `ml/tracking/yolo11n.pt` on first use. On Apple Silicon the
 scripts run on PyTorch MPS, else CPU.
@@ -173,12 +186,12 @@ its real duration matches the converted MP4 within 0.05 s, so the `t` values lin
 
 ## 6. Ground truth: `data/ground_truth/take<N>.csv`
 
-One file per take, drafted by AI from frames sampled every 0.5 s (0.1–0.2 s around entries and
+One file per take, drafted from frames sampled every 0.5 s (0.1–0.2 s around entries and
 exits in take 3):
 
 | file | scenario | status |
 | --- | --- | --- |
-| `take1.csv` | simple case: P4, P1, P2, P3 walk in one at a time (~4 s, 17 s, 29 s, 39 s), each checks in and sits down | `AI draft`, not yet checked |
+| `take1.csv` | simple case: P4, P1, P2, P3 walk in one at a time (~4 s, 17 s, 29 s, 39 s), each checks in and sits down | draft, not yet checked by the team |
 | `take3.csv` | P1, P2, P3 walk in together and check in as a group; P4 is already seated | checked by the team (2026-11-17) |
 
 People (same labels in every take): `P1` red jersey, `P2` grey T-shirt, `P3` navy jersey #27 with
@@ -221,7 +234,7 @@ Timing conventions:
 - Visible = at least about a quarter of the body on screen. If unsure, write it in `notes`.
 - One row per (person, camera, visit) for `seen`; one row per event otherwise.
 
-When you have checked a row, replace `AI draft` in its `notes` with `AI-drafted and user-confirmed (<date>)`.
+When `take1.csv` has been checked against the videos, update its status in the table above.
 
 ## 7. Floor-map calibration
 

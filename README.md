@@ -2,7 +2,7 @@
 
 COS30082 Applied Machine Learning team project. Three cameras (corridor, classroom, doorway) track every person with a numeric ID; the doorway **attendance camera** checks liveness, recognises the face and reads emotion, then the ID becomes `ID n · Name` on every camera. Hawkeye logs check-in, entry, exit and total time in class.
 
-> Status: **template**. The Home page runs on mock data and plays the recorded demo videos. Every model is a stub marked `TODO` with its owner.
+> Status: the Home page runs on mock data for the roster and events. The Home and Demo pages play the recorded takes with **real person boxes** (YOLO11n + ByteTrack, precomputed), and **Le Mai Chi is recognised at check-in** on the attendance camera and named on all three cameras. The live per-frame pipeline is still a set of stubs marked `TODO` with their owners.
 
 ## Repo layout
 
@@ -18,7 +18,11 @@ frontend/           Vue 3 + Vite web app (Home page built, other pages placehold
 data/
   mock/             mock data: students.csv + courses.csv (from the team metadata sheet), session.json, tracks/
   video_config.json which recording each camera plays in the demo
-ml/                 training code per model (placeholders + the tracking precompute script)
+  tracks/take<N>/   real boxes per take and camera (made by ml/tracking, served by /api/tracks)
+  ground_truth/     who appears when, per take (take1.csv, take3.csv), for evaluation
+  calibration/      first frames, Room 204 floor map, camera -> map homographies
+  eval/             experiment results (tracking_baseline.csv)
+ml/                 training code per model; ml/tracking/ = detection, tracking, naming (see its README)
 ```
 
 ## Run it
@@ -67,6 +71,26 @@ The recordings live in the team Google Drive folder `AppliedML/video data/` (one
 
 `data/video_config.json` lists all 8 synced takes and which take the Home page plays (`"take"`, currently 3). The Demo page plays any take: pick it in the table and press Play. Files are matched across cameras by take number, not by the timestamp in the filename: the CAM 2 device clock runs about 23.4 s ahead of the others in every take. Use `offset_s` per camera to fine-tune sync.
 
+## Tracking and naming (Mai Chi)
+
+The boxes and names you see in the demo are precomputed from the recordings. Full guide: [`ml/tracking/README.md`](ml/tracking/README.md). Quick version (macOS paths; on Windows use `ml/.venv/Scripts/python`):
+
+```bash
+python3.12 -m venv ml/.venv && ml/.venv/bin/pip install -r ml/tracking/requirements.txt   # once; also install FFmpeg
+for t in 1 2 3 4 5 6 7 8; do
+  ml/.venv/bin/python ml/tracking/precompute_tracks.py --cam all --take $t --tracker ml/tracking/configs/bytetrack_long.yaml
+done
+ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all     # always after precompute: it resets names
+```
+
+`name_tracks.py` needs two small OpenCV face models in `ml/face_recognition/models/` (download commands in [`ml/face_recognition/README.md`](ml/face_recognition/README.md)).
+
+1. **Tracking** (`precompute_tracks.py`): YOLO11n (pre-trained) + ByteTrack with a 3 s buffer, people only, every 3rd frame kept, short tracks and objects that never move (a poster on the classroom wall) dropped. Output: `data/tracks/take<N>/<cam_id>.json`.
+2. **Naming at check-in** (`ml/face_recognition/name_tracks.py`): a baseline until Thuận Minh's model is trained. OpenCV YuNet + SFace compare faces on the attendance camera with each student's enrolment photos (`photo_folder`) and student card (`student_card`) from `data/mock/students.csv`. Only Le Mai Chi has photos so far; add photos to your Drive folder (`AppliedML/<your name>/`) and rerun to be recognised too.
+3. **Name on every camera** (`ml/tracking/link_names.py`, run by step 2): the cam_1 / cam_2 track standing at the classroom door while that person checks in gets the same name, from the check-in time on.
+
+Takes: the old take 1 was a failed recording and was deleted from the Drive folder on 2026-11-17; the other takes were renumbered (old 2–9 → 1–8, the old demo take 4 is now **take 3**). `data/video_config.json` already uses the new numbers.
+
 ## Who owns what
 
 | Part | Owner | Files |
@@ -93,3 +117,12 @@ The frontend draws boxes from `GET /api/tracks/{cam_id}?take=N` (no `take` = the
 ```
 
 `t` = seconds from the start of that camera's video. `box` = `[x, y, w, h]` as fractions of the frame (0–1). The frontend interpolates between keyframes, so a detector can write every frame or every few frames.
+
+Real output has `"source": "yolo11n+bytetrack"`. Optional track fields, added for naming (old readers can ignore them):
+
+| field | meaning |
+| --- | --- |
+| `name_from` | seconds; show `name` only from this time on (the check-in moment). Before it the box reads `ID n · Unknown` |
+| `name_source` | where the name came from, e.g. `attendance_cam ID 1 (door handoff)` |
+
+`global_id` is still the per-camera ByteTrack ID: the same person can have different numbers on different cameras until the Re-ID matcher (Phase B) assigns one shared ID.
