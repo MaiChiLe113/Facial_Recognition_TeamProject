@@ -69,14 +69,16 @@ ml/.venv/bin/python ml/tracking/precompute_tracks.py --cam all \
 Writes `data/tracks/{cam_1,cam_2,attendance_cam}.json` (committed; the demo needs them).
 Defaults: `yolo11n.pt` (pre-trained, not fine-tuned), class 0 (person), `--conf 0.4`,
 keyframe every 3rd frame (`--every-n 3`), tracks with fewer than 5 keyframes dropped
-(`--min-keyframes 5`). `t = frame_index / fps` of the processed file; `box = [x, y, w, h]` as
+(`--min-keyframes 5`), and static tracks dropped (a box that never moves or changes size over its whole
+life, e.g. the poster of a man on the classroom wall that YOLO detects as a person; `--keep-static`
+turns this off; thresholds and how they were measured are in `is_static()`). `t = frame_index / fps` of the processed file; `box = [x, y, w, h]` as
 fractions of the frame with `x, y` the top-left corner. `global_id` is the camera-local ByteTrack
 ID until cross-camera matching replaces it. `attendance_cam` uses the same person detector for now.
 
 ### Tracker choice (E1 baseline)
 
 The committed `data/tracks/` files (take 4, the demo take) come from
-**`configs/bytetrack_long.yaml`**: Ultralytics' `bytetrack.yaml` with `track_buffer: 90` instead of
+**`configs/bytetrack_long.yaml`** plus the static filter. That config is Ultralytics' `bytetrack.yaml` with `track_buffer: 90` instead of
 30, so a lost person is kept alive for ~3 s at 30 fps instead of ~1 s.
 
 | take | cam_id | tracker | IDs before filtering | IDs kept | real people |
@@ -94,6 +96,18 @@ The committed `data/tracks/` files (take 4, the demo take) come from
 | 2 | attendance_cam | bytetrack | 4 | 4 | 4 |
 | 2 | attendance_cam | bytetrack_long | 4 | 4 | 4 |
 
+With the static filter (`+static_filter`, now the default) only the poster tracks are removed:
+
+| take | cam_id | tracker | IDs kept | real people | static tracks removed |
+| --- | --- | --- | --- | --- | --- |
+| 4 | cam_1 | bytetrack | 14 | 4 | 2 (poster, split in two) |
+| 4 | cam_1 | bytetrack_long | **12** | 4 | 1 (poster) |
+| 2 | cam_1 | bytetrack | 11 | 4 | 4 (poster fragments) |
+| 2 | cam_1 | bytetrack_long | **9** | 4 | 2 (poster fragments) |
+
+cam_2 and attendance_cam are unchanged (no static tracks). The committed `data/tracks/` files are
+`bytetrack_long` + static filter.
+
 Why `bytetrack_long`: with no frame-level ground truth yet, ID switches cannot be measured
 directly. The proxy used is extra IDs = IDs kept − real people (same people, fewer IDs = fewer
 switches). `bytetrack` → `bytetrack_long`: take 4 cam_1 12 → 9, cam_2 11 → 10, attendance_cam 1 → 1;
@@ -107,7 +121,7 @@ Where the extra IDs come from (take 2 tracks lined up against `take2.csv` by tim
   3.8–7.3 s vs 3.5–7.0 s in the ground truth).
 - **cam_1 extra IDs** are (a) people seen through the glass inside the classroom, and (b) a false
   positive: the poster of a man in a suit on the classroom wall (left of the window) is detected as a
-  person in every frame of both takes (take 4: cam_1 track 3).
+  person in every frame of both takes (take 4: cam_1 track 3). The static filter now removes it.
 - **cam_2** loses people while they sit behind P4 or a table and gives them a new ID when they
   reappear (P1, P2 get 2–3 IDs each in take 2).
 

@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 from paths import camera_ids, configured_take, video_path
 
@@ -40,8 +41,25 @@ def to_box(cx, cy, w, h, frame_w, frame_h):
     return [round(x0 / frame_w, 4), round(y0 / frame_h, 4), round((x1 - x0) / frame_w, 4), round((y1 - y0) / frame_h, 4)]
 
 
+# A track is "static" when, over its whole life, its box centre stays within these fractions of the box
+# width/height and its height varies less than STATIC_MAX_SIZE. Measured on takes 2 and 4: the poster of
+# a man on the classroom wall (cam_1) moves <= 0.017 / 0.030 with size change <= 0.040; the stillest real
+# person (seated behind the glass) still changes size by >= 0.062.
+STATIC_MAX_MOVE_X, STATIC_MAX_MOVE_Y, STATIC_MAX_SIZE = 0.025, 0.035, 0.05
+
+
+def is_static(track):
+    """True for a track that never moves or changes size: a picture or object, not a person."""
+    b = np.array([k["box"] for k in track["keyframes"]])
+    w, h = np.median(b[:, 2]), np.median(b[:, 3])
+    spread = lambda v: np.percentile(v, 95) - np.percentile(v, 5)   # robust to a few jumpy boxes
+    return (spread(b[:, 0] + b[:, 2] / 2) / w < STATIC_MAX_MOVE_X
+            and spread(b[:, 1] + b[:, 3] / 2) / h < STATIC_MAX_MOVE_Y
+            and spread(b[:, 3]) / h < STATIC_MAX_SIZE)
+
+
 def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_keyframes=5,
-        tracker="bytetrack.yaml", out_dir=None, device=None):
+        tracker="bytetrack.yaml", out_dir=None, device=None, drop_static=True):
     tracks = {}  # track_id -> {"global_id": ..., "name": None, "keyframes": [...]}
 
     # TODO 1: load a small person detector.
@@ -82,6 +100,8 @@ def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_ke
     frames = frame_index + 1
 
     kept = [tr for tr in tracks.values() if len(tr["keyframes"]) >= min_keyframes]
+    static = [tr["global_id"] for tr in kept if is_static(tr)] if drop_static else []
+    kept = [tr for tr in kept if tr["global_id"] not in static]
     kept.sort(key=lambda tr: (tr["keyframes"][0]["t"], tr["global_id"]))
     keyframes = sum(len(tr["keyframes"]) for tr in kept)
     times = [kf["t"] for tr in kept for kf in tr["keyframes"]]
@@ -92,13 +112,15 @@ def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_ke
     out_path.write_text(json.dumps(out, indent=1), encoding="utf-8")
 
     stats = {
-        "cam_id": cam_id, "tracker": Path(tracker).stem, "video": Path(video_path).name, "device": device,
+        "cam_id": cam_id, "tracker": Path(tracker).stem + ("+static_filter" if drop_static else ""),
+        "ids_static": len(static), "static_ids": static, "video": Path(video_path).name, "device": device,
         "frames": frames, "fps_video": fps, "ids_raw": len(raw_ids),
         "ids_with_keyframes": len(tracks), "ids_kept": len(kept), "ids_dropped": len(raw_ids) - len(kept),
         "keyframes": keyframes, "t_min": min(times, default=None), "t_max": max(times, default=None),
         "proc_fps": round(frames / elapsed, 1) if elapsed else None, "out": out_path,
     }
-    print(f"{cam_id}: {stats['ids_raw']} raw IDs -> kept {len(kept)} (dropped {stats['ids_dropped']}), "
+    print(f"{cam_id}: {stats['ids_raw']} raw IDs -> kept {len(kept)} (dropped {stats['ids_dropped']}, "
+          f"of which static {static}), "
           f"{keyframes} keyframes, t {stats['t_min']}-{stats['t_max']} s, {frames} frames at {stats['proc_fps']} fps "
           f"on {device} -> {out_path.relative_to(REPO) if out_path.is_relative_to(REPO) else out_path}")
     return stats
@@ -128,6 +150,8 @@ if __name__ == "__main__":
     p.add_argument("--min-keyframes", type=int, default=5, help="drop tracks with fewer keyframes")
     p.add_argument("--tracker", default="bytetrack.yaml",
                    help="Ultralytics tracker name or YAML path, e.g. ml/tracking/configs/bytetrack_long.yaml")
+    p.add_argument("--keep-static", action="store_true",
+                   help="keep tracks that never move (by default they are dropped, e.g. a poster detected as a person)")
     p.add_argument("--out-dir", default=None, help="where to write <cam_id>.json (default: data/tracks/)")
     p.add_argument("--eval-csv", default=None, help="append per-camera counts to this CSV (e.g. data/eval/tracking_baseline.csv)")
     p.add_argument("--real-people", nargs="*", default=[], metavar="CAM=N",
@@ -137,8 +161,9 @@ if __name__ == "__main__":
     take = configured_take() if a.take is None else a.take
     cams = camera_ids() if a.cam == "all" else [a.cam]
     print(f"take {take}, tracker {a.tracker}, model {a.model}, conf {a.conf}, every_n {a.every_n}, "
-          f"min_keyframes {a.min_keyframes}")
-    all_stats = [run(cam, video_path(cam, take), a.every_n, a.model, a.conf, a.min_keyframes, a.tracker, a.out_dir)
+          f"min_keyframes {a.min_keyframes}, drop_static {not a.keep_static}")
+    all_stats = [run(cam, video_path(cam, take), a.every_n, a.model, a.conf, a.min_keyframes, a.tracker, a.out_dir,
+                     drop_static=not a.keep_static)
                  for cam in cams]
     if a.eval_csv:
         real = {k: int(v) for k, v in (x.split("=", 1) for x in a.real_people)}

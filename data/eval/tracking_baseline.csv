@@ -11,3 +11,15 @@ attendance_cam,bytetrack,4,4,4,32.1,2
 cam_1,bytetrack_long,16,11,4,29.3,2
 cam_2,bytetrack_long,17,7,4,29.4,2
 attendance_cam,bytetrack_long,4,4,4,36.3,2
+cam_1,bytetrack_long+static_filter,17,12,4,35.5,4
+cam_2,bytetrack_long+static_filter,20,14,4,41.0,4
+attendance_cam,bytetrack_long+static_filter,5,4,3,44.7,4
+cam_1,bytetrack+static_filter,20,14,4,37.6,4
+cam_2,bytetrack+static_filter,24,15,4,41.7,4
+attendance_cam,bytetrack+static_filter,5,4,3,43.5,4
+cam_1,bytetrack+static_filter,22,11,4,40.7,2
+cam_2,bytetrack+static_filter,17,7,4,42.0,2
+attendance_cam,bytetrack+static_filter,4,4,4,45.1,2
+cam_1,bytetrack_long+static_filter,16,9,4,40.0,2
+cam_2,bytetrack_long+static_filter,17,7,4,42.5,2
+attendance_cam,bytetrack_long+static_filter,4,4,4,45.2,2
