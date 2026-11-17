@@ -1,25 +1,25 @@
 person,cam_id,appear_s,disappear_s,event,notes
-P4,cam_1,0.0,31.4,seen,AI draft; seated in the classroom; seen through the corridor glass for the whole video
-P2,cam_1,7.8,23.9,seen,AI draft; grey T-shirt; walks in from the left; waits in the doorway from ~12.1
-P1,cam_1,8.3,11.9,seen,AI draft; red jersey; walks in from the left; disappears into the doorway at ~11.9
-P3,cam_1,9.4,22.6,seen,AI draft; navy jersey #27 with glasses; waits in the doorway; bends to the attendance camera ~15-21
-P1,cam_1,23.0,24.2,seen,AI draft; only partly visible in the doorway
-P3,cam_1,23.4,31.4,seen,AI draft; inside the classroom; seen through the glass
-P2,cam_1,24.4,31.4,seen,AI draft; inside the classroom; seen through the glass
-P1,cam_1,24.9,26.8,seen,AI draft; inside the classroom; seen through the glass until he walks out of the window view
-P4,cam_2,0.0,31.4,seen,AI draft; seated at the front-left desk for the whole video
-P2,cam_2,7.6,9.2,seen,AI draft; small figure in the corridor through the back window; times approximate
-P1,cam_2,7.8,9.6,seen,AI draft; small figure in the corridor through the back window; times approximate
-P3,cam_2,9.0,9.8,seen,AI draft; small figure in the corridor through the back window; times approximate
-P2,cam_2,10.7,31.4,seen,AI draft; stands just inside the doorway until ~24 then sits at a middle desk
-P1,cam_2,10.9,31.4,seen,AI draft; stands just inside the doorway until ~24 then goes to the back-right
-P3,cam_2,12.5,31.4,seen,AI draft; mostly hidden behind P1/P2 in the doorway until ~21.6; then walks to the front-right desk
-P1,attendance_cam,10.6,24.9,seen,AI draft
-P2,attendance_cam,10.7,24.2,seen,AI draft
-P3,attendance_cam,12.0,22.8,seen,AI draft
-P2,attendance_cam,11.0,11.0,check_in,AI draft; first frame with the face clearly visible; the three face the camera together until ~21.0
-P1,attendance_cam,11.1,11.1,check_in,AI draft; first frame with the face clearly visible
-P3,attendance_cam,12.5,12.5,check_in,AI draft; first frame with the face clearly visible
-P3,attendance_cam,22.4,22.4,enter_class,AI draft; walks past the attendance camera into the room (was standing in the doorway)
-P2,attendance_cam,23.8,23.8,enter_class,AI draft; walks past the attendance camera into the room
-P1,attendance_cam,24.4,24.4,enter_class,AI draft; walks past the attendance camera into the room
+P4,cam_1,0.0,31.4,seen,AI-drafted and user-confirmed (2026-11-17); seated in the classroom; seen through the corridor glass for the whole video
+P2,cam_1,7.8,23.9,seen,AI-drafted and user-confirmed (2026-11-17); grey T-shirt; walks in from the left; waits in the doorway from ~12.1
+P1,cam_1,8.3,11.9,seen,AI-drafted and user-confirmed (2026-11-17); red jersey; walks in from the left; disappears into the doorway at ~11.9
+P3,cam_1,9.4,22.6,seen,AI-drafted and user-confirmed (2026-11-17); navy jersey #27 with glasses; waits in the doorway; bends to the attendance camera ~15-21
+P1,cam_1,23.0,24.2,seen,AI-drafted and user-confirmed (2026-11-17); only partly visible in the doorway
+P3,cam_1,23.4,31.4,seen,AI-drafted and user-confirmed (2026-11-17); inside the classroom; seen through the glass
+P2,cam_1,24.4,31.4,seen,AI-drafted and user-confirmed (2026-11-17); inside the classroom; seen through the glass
+P1,cam_1,24.9,26.8,seen,AI-drafted and user-confirmed (2026-11-17); inside the classroom; seen through the glass until he walks out of the window view
+P4,cam_2,0.0,31.4,seen,AI-drafted and user-confirmed (2026-11-17); seated at the front-left desk for the whole video
+P2,cam_2,7.6,9.2,seen,AI-drafted and user-confirmed (2026-11-17); small figure in the corridor through the back window; times approximate
+P1,cam_2,7.8,9.6,seen,AI-drafted and user-confirmed (2026-11-17); small figure in the corridor through the back window; times approximate
+P3,cam_2,9.0,9.8,seen,AI-drafted and user-confirmed (2026-11-17); small figure in the corridor through the back window; times approximate
+P2,cam_2,10.7,31.4,seen,AI-drafted and user-confirmed (2026-11-17); stands just inside the doorway until ~24 then sits at a middle desk
+P1,cam_2,10.9,31.4,seen,AI-drafted and user-confirmed (2026-11-17); stands just inside the doorway until ~24 then goes to the back-right
+P3,cam_2,12.5,31.4,seen,AI-drafted and user-confirmed (2026-11-17); mostly hidden behind P1/P2 in the doorway until ~21.6; then walks to the front-right desk
+P1,attendance_cam,10.6,24.9,seen,AI-drafted and user-confirmed (2026-11-17)
+P2,attendance_cam,10.7,24.2,seen,AI-drafted and user-confirmed (2026-11-17)
+P3,attendance_cam,12.0,22.8,seen,AI-drafted and user-confirmed (2026-11-17)
+P2,attendance_cam,11.0,11.0,check_in,AI-drafted and user-confirmed (2026-11-17); first frame with the face clearly visible; the three face the camera together until ~21.0
+P1,attendance_cam,11.1,11.1,check_in,AI-drafted and user-confirmed (2026-11-17); first frame with the face clearly visible
+P3,attendance_cam,12.5,12.5,check_in,AI-drafted and user-confirmed (2026-11-17); first frame with the face clearly visible
+P3,attendance_cam,22.4,22.4,enter_class,AI-drafted and user-confirmed (2026-11-17); walks past the attendance camera into the room (was standing in the doorway)
+P2,attendance_cam,23.8,23.8,enter_class,AI-drafted and user-confirmed (2026-11-17); walks past the attendance camera into the room
+P1,attendance_cam,24.4,24.4,enter_class,AI-drafted and user-confirmed (2026-11-17); walks past the attendance camera into the room

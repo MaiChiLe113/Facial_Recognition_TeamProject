@@ -112,10 +112,18 @@ its real duration matches the converted MP4 within 0.05 s, so the `t` values lin
 
 ## 6. Ground truth: `data/ground_truth/take<N>.csv`
 
-One file per take. `take4.csv` is an **AI draft** made from frames sampled every 0.5 s (0.1–0.2 s
-around entries and exits): every row says `AI draft` in `notes` and must be checked by a person
-watching the videos before it is used for evaluation. People in take 4: `P1` red jersey, `P2` grey
-T-shirt, `P3` navy jersey #27 with glasses, `P4` the person seated in the classroom. Columns:
+One file per take, drafted by AI from frames sampled every 0.5 s (0.1–0.2 s around entries and
+exits in take 4):
+
+| file | scenario | status |
+| --- | --- | --- |
+| `take2.csv` | simple case: P4, P1, P2, P3 walk in one at a time (~4 s, 17 s, 29 s, 39 s), each checks in and sits down | `AI draft`, not yet checked |
+| `take4.csv` | P1, P2, P3 walk in together and check in as a group; P4 is already seated | checked by the team (2026-11-17) |
+
+People (same labels in every take): `P1` red jersey, `P2` grey T-shirt, `P3` navy jersey #27 with
+glasses, `P4` the person with red hair and a grey shirt (seated in take 4, walks in first in take 2).
+cam_1 and cam_2 also see people through the glass between the corridor and the room; those
+sightings have their own `seen` rows. Columns:
 
 ```
 person,cam_id,appear_s,disappear_s,event,notes
@@ -149,20 +157,41 @@ Timing conventions:
 - Visible = at least about a quarter of the body on screen. If unsure, write it in `notes`.
 - One row per (person, camera, visit) for `seen`; one row per event otherwise.
 
-When you have checked a row, delete `AI draft` from its `notes`.
+When you have checked a row, replace `AI draft` in its `notes` with `AI-drafted and user-confirmed (<date>)`.
 
 ## 7. Floor-map calibration
 
-`notebooks/02_homography.ipynb` saves each camera's first frame to
-`data/calibration/<cam_id>_frame.png`. Pick four floor points per camera (pixel `(x, y)` in that
-image) and the same four points on the Room 204 map (normalised to `[0, 1]`; the corridor is
-`x < 0.3`), put them in `image_points` / `map_points`, and rerun: it writes
-`data/calibration/<cam_id>_homography.json`. `foot_to_map(box, H)` maps a track box's bottom-centre
-(the feet) onto the map.
+`data/calibration/room204_map.json` is a simple top-down model of the corridor + Room 204 (not
+measured): corridor `x < 0.3`, classroom door on the corridor wall at `y` 0.79–0.96, glass window at
+`y` 0.40–0.76, map scale about 3.4 m per 0.3 in `x` and 7 m per 1.0 in `y`.
 
-Take 4 status (AI check of the first frames): no camera has four fixed floor landmarks without three
-on one line. cam_1 and cam_2 each show only the corridor-wall base (candidate points are listed in the
-notebook); attendance_cam shows no floor at all, so it cannot be calibrated from its view. The mock
-map in `data/mock/session.json` is a placeholder layout, so it was not used to guess `map_points`.
-Next step: put four tape crosses on the floor where cam_1 and cam_2 can see them, measure where they
-are relative to the door, and use them as the point pairs.
+`notebooks/02_homography.ipynb` saves each camera's first frame to
+`data/calibration/<cam_id>_frame.png`, builds four image/map point pairs per camera, writes
+`data/calibration/<cam_id>_homography.json`, and checks the result against the take-4 tracks.
+`foot_to_map(box, H)` maps a box's bottom-centre (the feet) to the map; `box_to_map(cam, box, H)`
+also handles the cases below.
+
+There are no floor markers in the recordings, and each view only shows the corridor-wall base, so
+the pairs come from `ground_model.py` (an estimate):
+
+1. Each camera is a pinhole camera with an assumed 70° horizontal field of view.
+2. Its height and horizon row are fitted from the tracked people, assuming a standing person is
+   1.7 m tall (feet row = horizon + height / 1.7 × box height): cam_1 ≈ 0.85 m, cam_2 ≈ 1.13 m.
+3. The two door jambs (floor pixels picked on the frame PNGs) fix the camera's direction and its
+   position on the map: cam_1 ≈ (0.07, 0.27) facing south-east, cam_2 ≈ (0.79, 0.49) facing west.
+4. Four floor pixels are projected with this model and fed to `cv2.findHomography`.
+
+Check on take 4 (people's feet on visible floor): cam_1 corridor walk 91 % in the corridor, people at
+the door 100 % at the door; cam_2 people at the door 98 %, people in the room 98 % inside the room.
+Both cameras put the people waiting at the door at `y` ≈ 0.79.
+
+Limits:
+
+- `attendance_cam` sees faces, not feet, so it has no homography: a person it detects is placed at
+  the door (`cameras.attendance_cam` in the map file).
+- A box touching the bottom edge has no feet in view, and a seated person behind a table (cam_2) or
+  someone seen through the glass (cam_1) has the box bottom on the table or the wall, not the floor.
+  `box_to_map` returns `None` for boxes touching the bottom edge; the other two cases still need to be
+  filtered by whoever uses the positions (e.g. ignore cam_1 points with `x > 0.3`).
+- Positions are approximate (roughly ±0.5 m). For accurate positions, put four tape crosses on the
+  floor, measure them on the map, and replace the pairs in `CALIB`.
