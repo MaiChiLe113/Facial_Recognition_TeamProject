@@ -11,7 +11,9 @@ OpenCV's pre-trained YuNet (face detection) + SFace (128-d face embedding, cosin
    matching frame, i.e. when the check-in is confident (the UI shows "Unknown" before it). Tracks that match
    nobody keep name = null.
 
-Run after precompute_tracks.py (it rewrites the track files):
+3. Carry each name to cam_1 / cam_2 (ml/tracking/link_names.py, door handoff).
+
+Run after precompute_tracks.py (it rewrites the track files and resets every name):
     ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all
 
 Models (git-ignored, ml/face_recognition/models/), from github.com/opencv/opencv_zoo:
@@ -29,6 +31,7 @@ import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "ml" / "tracking"))
+from link_names import link_take  # noqa: E402
 from paths import configured_take, video_config, video_path, video_root  # noqa: E402
 
 MODELS = Path(__file__).resolve().parent / "models"
@@ -158,3 +161,5 @@ if __name__ == "__main__":
             print(f"take {s['take']} attendance_cam track {s['track']}: {s['face_crops']} face crops, "
                   f"matches {s['matches']}, best {s['best_sim']} -> {s['name'] or 'unknown'}"
                   + (f" from t={s['name_from']} s" if s["name_from"] is not None else ""))
+        for line in link_take(t):
+            print(line)

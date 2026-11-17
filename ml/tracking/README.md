@@ -79,11 +79,11 @@ and Demo pages draw them). Then name the people on the attendance camera (it rew
 
 ```bash
 ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all
-ml/.venv/bin/python ml/tracking/link_names.py --take all
 ```
 
 `name_tracks.py` names attendance-camera tracks from enrolment photos (see
-`ml/face_recognition/README.md`). `link_names.py` carries each name to cam_1 and cam_2: the track whose
+`ml/face_recognition/README.md`) and then runs `link_names.py` (it can also be run on its own), which
+carries each name to cam_1 and cam_2: the track whose
 feet are at the classroom door (floor map, section 7) while the named person is on the attendance
 camera gets the same name, from the check-in time on. It names only one track per camera and skips
 ambiguous cases (two people at the door). Take 1: Mai Chi is named on cam_1 ID 5 and cam_2 ID 5 from
