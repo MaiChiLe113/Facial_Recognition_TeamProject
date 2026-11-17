@@ -1,0 +1,64 @@
+{
+ "_note": "Simple top-down model of the corridor + Room 204 (not measured). Coordinates are fractions of the map: x 0 left -> 1 right, y 0 top -> 1 bottom, same convention as RoomMap.vue. scale_per_m is an assumption (corridor 0-0.3 ~ 3.4 m, map height ~ 7 m). cam_1/cam_2 positions are derived by ml/tracking/ground_model.py. Replace with measurements when available.",
+ "corridor": {
+  "x": [
+   0.0,
+   0.3
+  ],
+  "y": [
+   0.0,
+   1.0
+  ]
+ },
+ "room": {
+  "x": [
+   0.3,
+   1.0
+  ],
+  "y": [
+   0.0,
+   1.0
+  ]
+ },
+ "corridor_wall_x": 0.3,
+ "door": {
+  "x": 0.3,
+  "y": [
+   0.789,
+   0.961
+  ],
+  "centre": [
+   0.3,
+   0.875
+  ],
+  "_note": "opening ~1.2 m (estimated from cam_2), ~0.3 m from the south wall (y = 1)"
+ },
+ "glass_window": {
+  "x": 0.3,
+  "y": [
+   0.4,
+   0.76
+  ]
+ },
+ "cameras": {
+  "cam_1": {
+   "x": 0.066,
+   "y": 0.269,
+   "_note": "derived by ground_model.py: in the corridor, ~0.85 m high, facing south-east at the corridor wall"
+  },
+  "cam_2": {
+   "x": 0.791,
+   "y": 0.485,
+   "_note": "derived by ground_model.py: inside Room 204, ~1.13 m high, facing west at the corridor wall"
+  },
+  "attendance_cam": {
+   "x": 0.32,
+   "y": 0.875,
+   "_note": "low, just inside the door, looking up at the door frame; sees faces, not feet"
+  }
+ },
+ "scale_per_m": {
+  "x": 0.0875,
+  "y": 0.143
+ }
+}
