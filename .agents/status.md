@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-17. Update this file at the end of every step.
+Last updated: 2026-11-18. Update this file at the end of every step.
 
 ## Branch
 
@@ -9,6 +9,33 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not create other branches.
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
+
+## 2026-11-18: SQLite wired (task 1, Đức Mạnh)
+
+- `backend/app/db/`: `schema.sql` (tables now `IF NOT EXISTS`; added `placeholder_students`; `attendance` gained
+  `global_id`, `entry_at`, `exit_at`, `minutes`, `attended` override; `events` gained `session_id`, `message`),
+  `__init__.py` (`connect`, `init_db`), `seed.py`, `queries.py`. `mock_store.py` removed.
+- On startup `init_db()` creates `data/hawkeye.sqlite3` and seeds it from `students.csv`, `courses.csv`,
+  `session.json`, `past_sessions.json` (moved from `frontend/src/mock/sessions.js`) and `video_config.json`.
+  Re-seed: `python -m app.db.seed --reset` (from `backend/`).
+- Routes from SQLite: `/api/dashboard` (newest session), `/api/students`, `/api/courses`, `/api/sessions`,
+  `PATCH /api/sessions/{id}/attendance/{student_id}` (History edits are saved), `/photos/{id}`.
+  Attendance-cam status and map positions still come from `session.json`.
+- `sqlalchemy>=2.0` added to `requirements.txt`. Tests: 19 OK (`tests/test_db.py` new).
+
+## 2026-11-18: UI changes (Đức Mạnh)
+
+- Home is the live view: each of the 3 camera frames has a "+" box that asks for this device's camera
+  (`CameraCard` prop `live`, `getUserMedia`, device picker when several). "Run demo videos" and the Boxes
+  tick removed. Frames are not sent to the backend yet (task 5).
+- Demo: Boxes tick removed (boxes always on); adds Event log, Room map and Class roster (mock dashboard).
+- "offline · mock data" badge removed on every page.
+- Class page merged into History (`/class` redirects). History shows the roster of the picked (or newest)
+  session; Attended and Status are editable in the page only (TODO: PATCH route to save).
+- Roster photos: student card image from the Drive (`student_card` column) via `GET /photos/{student_id}`
+  (`backend/app/api/photos.py`, `HAWKEYE_DRIVE_ROOT`, default two levels above `HAWKEYE_VIDEO_ROOT`).
+  `manh.pdf` page 1 converted to `student_card_image/manh.png` on the Drive and the PDF deleted. Others
+  without a card show initials.
 
 ## 2026-11-17: tracking and naming work (Mai Chi)
 
@@ -53,9 +80,9 @@ tracks after occlusion or seen through the glass; enrolment photos for the other
 | 0a | Frontend: React → Vue 3 + npm | Done |
 | 0b | Backend: scalable structure, features plug into the pipeline without breaking others | Done |
 | 0c | Frontend pages: Attend Course, Class, History, Demo and Add person, in the Home page style, following the Chi document's UI section. They run on mock data (`src/mock/sessions.js` plus `data/mock`) through `api.js` fallbacks; the backend routes they expect are listed at the top of the pages section in `api.js` | Done (frontend only) |
-| 1 | SQLite with SQLAlchemy from `backend/app/db/schema.sql`; seed script for `data/mock/students.csv` and `courses.csv` (a `courses` value like `"[1,2]"` becomes `enrollments` rows); `GET /api/dashboard` reads students and courses from the DB while attendance, events and map still come from `data/mock/session.json` | **On hold** (2026-11-17: keep CSV for now). Plan approved in principle, not started |
+| 1 | ~~SQLite with SQLAlchemy from `backend/app/db/schema.sql`; seed script for `data/mock/students.csv` and `courses.csv` (a `courses` value like `"[1,2]"` becomes `enrollments` rows); `GET /api/dashboard` reads students and courses from the DB while attendance, events and map still come from `data/mock/session.json` ~~ | Done 2026-11-18 (see above) |
 | 2 | Add person page + `POST /api/students`: name, Student ID (VN, e.g. `SWH02701`), Student ID (AU), year, course checkboxes, 10–20 photos saved to `data/photos/<student_id_vn>/` (git-ignored). Leave a TODO where `recognizer.embed` computes embeddings; do not implement embeddings | Not started |
-| 3 | Class page: course table per session (name, student ID, status, check-in, entry, exit, total time, "Logs" link to that student's events); reuse `ClassRoster` | Not started |
+| 3 | ~~Class page: course table per session (name, student ID, status, check-in, entry, exit, total time, "Logs" link to that student's events); reuse `ClassRoster`~~ | Merged into History 2026-11-18 |
 | 4 | History page: past sessions + event log, filter by student and date | Not started |
 | 5 | Camera page `/camera/<cam_id>`: `getUserMedia`, JPEG frames at ~10 fps over WebSocket to `/ws/camera/{cam_id}`; the backend only counts frames for now; Home shows that camera as live. WebRTC (aiortc) comes later | Not started |
 

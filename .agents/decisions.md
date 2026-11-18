@@ -4,6 +4,7 @@ Newest first. Add a line when the user decides something; do not reopen a decisi
 
 | Date | Decision | Why |
 | --- | --- | --- |
+| 2026-11-18 | SQLite is the data store (`data/hawkeye.sqlite3`, git-ignored, seeded from `data/mock/`); CSV/JSON in `data/mock/` stay as seed data and the frontend's offline fallback. Attendance-cam status and map positions stay in `session.json` (live state) | User request (Đức Mạnh); lifts the 2026-11-17 hold |
 | 2026-11-17 | Keep CSV (`data/mock/`) as the data store for now; SQLite step 1 on hold | User request (Mai Chi) |
 | 2026-11-17 | Old take 1 deleted (failed recording); takes renumbered 1–8, demo take 4 → 3 | User request (Mai Chi) |
 | 2026-11-17 | Boxes are precomputed per take in `data/tracks/take<N>/` and committed; the Demo page plays every take | The demo needs them; small JSON files |

@@ -4,10 +4,12 @@
 
 ```
 main.py            builds the app, includes routers, starts the Engine in the lifespan
-api/               one router per area: system, dashboard, demo, pipeline (ROUTERS list in __init__.py)
+api/               one router per area: system, dashboard, demo, pipeline, photos, records (ROUTERS in __init__.py)
 services/          plain functions the routes call (videos.py; dashboard builder moves here with the DB)
-mock_store.py      builds /api/dashboard from data/mock/ (to be replaced by DB queries, same JSON)
-db/schema.sql      SQLite tables (not wired yet; step 1)
+db/__init__.py     SQLite via SQLAlchemy Core: connect(), init_db() (tables from schema.sql; seeds a new DB)
+db/schema.sql      SQLite tables
+db/seed.py         fills the DB from data/mock/ (python -m app.db.seed [--reset])
+db/queries.py      students, courses, sessions, dashboard, update_attendance (frontend JSON shapes)
 core/              plug-in pipeline
   types.py         FrameContext (one frame through the stages), Event, EVENT_TYPES
   registry.py      @register_stage(name) / @register_feature(name); duplicate names raise

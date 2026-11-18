@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api import ROUTERS
 from .core.engine import Engine
+from .db import init_db
 
 log = logging.getLogger("hawkeye")
 
@@ -20,6 +21,9 @@ log = logging.getLogger("hawkeye")
 @asynccontextmanager
 async def lifespan(app):
     # If the pipeline cannot start, keep serving the dashboard and demo; /api/pipeline/status says why.
+    # SQLite: create the tables; a new database is seeded from data/mock/.
+    if init_db():
+        log.info("Seeded the database from data/mock/")
     app.state.engine, app.state.engine_error = None, None
     try:
         engine = Engine.load().start()

@@ -6,7 +6,34 @@ import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 export function useSyncedPlayback(cameras, videoOf) {
   const srcs = ref({})          // cam_id -> video URL
   const playing = ref(false)
-  let timer
+  const position = ref(0)       // take time in seconds (lead video time minus its offset)
+  const duration = ref(0)       // longest take time over the loaded videos
+  let timer, posTimer
+
+  const loaded = () => cameras.value.filter((c) => srcs.value[c.cam_id] && videoOf(c.cam_id))
+
+  // Playback line: read the lead video's time ~10x a second.
+  function readPosition() {
+    const cams = loaded()
+    if (!cams.length) { position.value = 0; duration.value = 0; return }
+    const lv = videoOf(cams[0].cam_id)
+    position.value = Math.max(0, lv.currentTime - (cams[0].offset_s || 0))
+    duration.value = Math.max(0, ...cams.map((c) => (videoOf(c.cam_id).duration || 0) - (c.offset_s || 0)))
+  }
+  watch(srcs, (s) => {
+    clearInterval(posTimer)
+    if (Object.keys(s).length) posTimer = setInterval(readPosition, 100)
+    else readPosition()
+  })
+
+  // Jump every video to take time t (each with its own offset).
+  function seek(t) {
+    for (const c of loaded()) {
+      const v = videoOf(c.cam_id)
+      v.currentTime = Math.min(t + (c.offset_s || 0), v.duration || Infinity)
+    }
+    position.value = t
+  }
 
   // Follow the first loaded camera; correct drift above 0.3 s.
   function sync() {
@@ -25,7 +52,7 @@ export function useSyncedPlayback(cameras, videoOf) {
     clearInterval(timer)
     if (on) timer = setInterval(sync, 500)
   })
-  onBeforeUnmount(() => clearInterval(timer))
+  onBeforeUnmount(() => { clearInterval(timer); clearInterval(posTimer) })
 
   async function play(sources) {
     srcs.value = sources
@@ -59,5 +86,5 @@ export function useSyncedPlayback(cameras, videoOf) {
     srcs.value = {}
   }
 
-  return { srcs, playing, play, togglePause, restart: () => play(srcs.value), stop }
+  return { srcs, playing, position, duration, seek, play, togglePause, restart: () => play(srcs.value), stop }
 }

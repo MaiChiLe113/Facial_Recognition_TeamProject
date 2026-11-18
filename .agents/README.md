@@ -30,7 +30,7 @@ The team design doc is the source of truth for scope and marking. It is a Claude
 1. **Ownership.** Only edit files the current user owns. The user is Đức Mạnh, who owns:
    - `frontend/`
    - `backend/app/main.py`, `backend/app/api/`, `backend/app/services/`, `backend/app/core/`
-   - `backend/app/mock_store.py`, `backend/app/db/`
+   - `backend/app/db/`
    - `backend/app/pipeline/attendance.py` (shared with Mai Chi)
 
    Never edit:

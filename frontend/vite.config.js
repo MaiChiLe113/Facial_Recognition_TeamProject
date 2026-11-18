@@ -9,6 +9,7 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8000',
       '/videos': 'http://localhost:8000',
+      '/photos': 'http://localhost:8000',
     },
     // Allows importing the shared mock files from ../data as an offline fallback.
     fs: { allow: ['..'] },

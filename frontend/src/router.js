@@ -8,6 +8,7 @@ const routes = PAGES.map((p) => ({
   component: p.component ?? Placeholder,
   props: p.component ? false : { label: p.label, todo: p.todo, owner: p.owner },
 }))
+routes.push({ path: '/class', redirect: '/history' })   // Class was merged into History
 routes.push({ path: '/:pathMatch(.*)*', redirect: '/' })
 
 export default createRouter({ history: createWebHistory(), routes })

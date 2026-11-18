@@ -131,8 +131,7 @@ const courseName = (key) => courses.value?.find((c) => c.key_id === key)?.course
       </div>
     </header>
 
-    <div v-if="offline || result" class="notice">
-      <span v-if="offline" class="badge">offline · mock data</span>
+    <div v-if="result" class="notice">
       <span v-if="result" :class="result.ok ? 'ok-text' : 'error'">{{ result.message }}</span>
     </div>
 

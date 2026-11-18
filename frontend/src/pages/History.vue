@@ -1,8 +1,9 @@
 <script setup>
-// Past sessions and their logs, filtered by student and date. ?student=<id> preselects a student (Logs links).
+// Past sessions, the class roster of one session (Attended / Status editable) and their logs, filtered by student and date. ?student=<id> preselects a student (Logs links).
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { buildRoster, fetchCourses, fetchSessions, fetchStudents } from '../api.js'
+import ClassRoster from '../components/ClassRoster.vue'
 import EventLog from '../components/EventLog.vue'
 import { attended, formatDate, initials } from '../format.js'
 
@@ -74,6 +75,22 @@ function reset() {
   filters.value = { student: '', course: '', from: '', to: '' }
   sessionId.value = null
 }
+// Class roster: the picked session, else the newest one in the list.
+const rosterSession = computed(() => shownSessions.value.find((s) => s.id === sessionId.value) ?? shownSessions.value[0] ?? null)
+const roster = computed(() => (rosterSession.value ? buildRoster(students.value, rosterSession.value).filter((r) => r.enrolled) : []))
+const rosterTitle = computed(() => {
+  const s = rosterSession.value
+  return s ? `${courseOf(s.course_key)?.course_id} · ${formatDate(s.date)} · ${s.start}–${s.end} · Room ${s.room}` : ''
+})
+
+// Keep the loaded session in step with a saved change, so the Sessions table and the summary update too.
+function onSaved({ studentId, row }) {
+  const s = rosterSession.value
+  const i = s.attendance.findIndex((a) => a.student_id_vn === studentId)
+  if (i >= 0) s.attendance[i] = row
+  else s.attendance.push(row)
+}
+
 const toggleSession = (id) => { sessionId.value = sessionId.value === id ? null : id }
 </script>
 
@@ -99,7 +116,6 @@ const toggleSession = (id) => { sessionId.value = sessionId.value === id ? null 
       </div>
     </header>
 
-    <div v-if="offline" class="notice"><span class="badge">offline · mock data</span></div>
 
     <section v-if="student" class="card panel active-session">
       <span class="avatar">{{ initials(student.name) }}</span>
@@ -112,6 +128,9 @@ const toggleSession = (id) => { sessionId.value = sessionId.value === id ? null 
         <div><strong>{{ summary.minutes }} min</strong><span class="muted">time in class</span></div>
       </div>
     </section>
+
+    <ClassRoster v-if="rosterSession" :key="rosterSession.id" :roster="roster" :title="rosterTitle" :session-id="rosterSession.id"
+      show-attended editable @saved="onSaved" />
 
     <div class="page-grid history-grid">
       <section class="card roster">

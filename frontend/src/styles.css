@@ -204,3 +204,29 @@ tr.selected, tr.selected:hover { background: var(--yellow-soft); }
 @media (max-width: 700px) {
   .field-row, .stats, .demo-grid { grid-template-columns: 1fr; }
 }
+
+/* Roster photo (student card image) and hand-editable cells */
+.avatar.photo { width: 60px; height: 80px; object-fit: cover; object-position: center 40%; background: #eee; padding: 0; }
+select.pick { border: 1px solid transparent; cursor: pointer; font: inherit; font-size: 12px; background-color: transparent; }
+select.pick:hover { border-color: #cfc8bc; }
+select.status.pick { padding: 2px 4px; border-radius: 6px; }
+
+/* Home: "+" box that turns on a device camera */
+.cam-add { position: absolute; inset: 0; display: grid; place-content: center; gap: 6px; text-align: center;
+  background: none; border: 2px dashed #555; border-radius: 6px; cursor: pointer; color: #ddd; font: inherit; }
+.cam-add:hover { border-color: var(--green); }
+.cam-add .plus { font-size: 44px; line-height: 1; font-weight: 300; }
+.cam-stop { position: absolute; top: 8px; right: 8px; z-index: 2; }
+
+/* Event log pagination */
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 4px 2px; font-size: 13px; }
+.pager .btn:disabled { opacity: 0.4; cursor: default; }
+
+/* Demo playback line */
+.timeline { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
+.timeline input[type=range] { flex: 1; accent-color: var(--green); cursor: pointer; }
+.save-error { color: #b3392e; }
+.timeline.off { opacity: 0.5; }
+.timeline .btn:disabled, .timeline input:disabled { cursor: default; }
+/* Demo event log: room for a full page (8 rows + pager), so it does not shrink when a take is chosen */
+.event-log.demo-log { min-height: 440px; }

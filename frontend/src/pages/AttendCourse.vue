@@ -65,8 +65,7 @@ function stop() {
       </div>
     </header>
 
-    <div v-if="offline || message" class="notice">
-      <span v-if="offline" class="badge">offline · mock data</span>
+    <div v-if="message" class="notice">
       <span v-if="message">{{ message }}</span>
     </div>
 
