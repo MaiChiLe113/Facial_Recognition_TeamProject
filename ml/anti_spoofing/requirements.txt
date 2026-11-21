@@ -1,0 +1,9 @@
+torch>=2.2
+torchvision>=0.17
+scikit-learn
+matplotlib
+pillow
+numpy
+# only for try_liveness.py (iPhone .HEIC photos and face cropping):
+pillow-heif
+opencv-python<5

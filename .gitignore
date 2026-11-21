@@ -31,3 +31,11 @@ runs/
 *.onnx.data
 
 .DS_Store
+
+/weights/
+/results/
+/fake_lcc/
+/test_faces/
+/test_crops/
+/test_spoof*/
+/ml.zip
