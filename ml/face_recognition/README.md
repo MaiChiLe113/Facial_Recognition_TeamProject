@@ -40,8 +40,9 @@ The Drive folder is found from `HAWKEYE_VIDEO_ROOT` in `backend/.env` (two level
   `ID n · Mai Chi` after it.
 - **All five members enrolled (2026-11-21, full Drive folders, photos + card):** Mai Chi 16 faces / 16
   files, Đức Mạnh 15/15, Thuận Minh 24/24 (incl. his card `TMinh.jpg`), Hồng Minh 9/12 (no face in 3 HEIC
-  photos), Minh Thành 24/28 (no face in 4 webcam photos). Minh Thành is **not in `students.csv`** (no
-  student ID in the metadata sheet), so he was enrolled from a separate roster file with `--students`.
+  photos), Minh Thành 24/28 (no face in 4 webcam photos). For this run Minh Thành
+  was enrolled from a separate roster file with `--students`; since 2026-11-21 he is in `students.csv`
+  (Do Minh Thanh), so the default run enrols him too.
   He is not in any of the recorded takes, and he was correctly not named on any track (at most 1 face
   crop per track matched him), so his enrolment caused no false names.
 - **Result, takes 1–8 (2026-11-21, run with all five enrolled):**
