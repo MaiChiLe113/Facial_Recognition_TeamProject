@@ -38,7 +38,7 @@ class DbTest(unittest.TestCase):
         d = queries.build_dashboard(self.db)
         for key in ["course", "session", "roster", "events", "attendance_cam_status", "map"]:
             self.assertIn(key, d)
-        self.assertTrue(any(r["status"] == "placeholder" for r in d["roster"]))
+        self.assertTrue(any(r["student_id"] == "SWH01234" for r in d["roster"]))   # Minh Thành, no longer a placeholder
 
     def test_manual_attendance_change_is_saved(self):
         sid = queries.list_sessions(self.db)[0]["id"]

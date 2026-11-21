@@ -34,7 +34,8 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
   eye on the Demo page. Take 3 checked (correct; ID 5 = Đức Mạnh after a tracker ID switch from ID 1).
   Take 1 checked (all attendance names and cam_1 / cam_2 handoffs correct; seated people later get new
   unnamed IDs on cam_2). Takes 4 and 8 still to check.
-- Minh Thành is not in `students.csv` (no student ID in the metadata sheet). He is not in any recorded
+- Minh Thành was added to `students.csv` as Do Minh Thanh (105550306 / SWH01234) and removed from the
+  placeholder list in `data/mock/session.json`; `backend/tests/test_db.py` now checks he is on the roster. He is not in any recorded
   take, and he was correctly not named on any track (at most 1 crop per track matched him).
 - Seen, not fixed: the Demo page shows `Infinity:NaN` as the duration for `.webm` videos (frontend, Đức Mạnh).
 
