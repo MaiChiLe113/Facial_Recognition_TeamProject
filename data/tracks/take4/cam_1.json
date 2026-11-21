@@ -4045,7 +4045,7 @@
   },
   {
    "global_id": 4,
-   "name": null,
+   "name": "Nguyen Hong Minh",
    "keyframes": [
     {
      "t": 5.1,
@@ -5658,7 +5658,9 @@
       0.3726
      ]
     }
-   ]
+   ],
+   "name_from": 9.4,
+   "name_source": "attendance_cam ID 1 (door handoff)"
   },
   {
    "global_id": 6,

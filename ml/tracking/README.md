@@ -99,7 +99,10 @@ ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all
 carries each name to cam_1 and cam_2: the track whose
 feet are at the classroom door (floor map, section 7) while the named person is on the attendance
 camera gets the same name, from the check-in time on. It names only one track per camera and skips
-ambiguous cases (two people at the door). Take 1: Mai Chi is named on cam_1 ID 5 and cam_2 ID 5 from
+ambiguous cases (two people at the door). Rerun 2026-11-21 with all five enrolled: take 1 names all four people on both cameras (cam_1 IDs 5, 7, 12, 17;
+cam_2 IDs 5, 6, 16, 25), take 4 Hồng Minh on cam_1 ID 4 / cam_2 ID 11, take 8 Hồng Minh on cam_1 ID 7 / cam_2
+ID 6 from 5.4 s. Take 3 is skipped: three people stand at the door together.
+Take 1: Mai Chi is named on cam_1 ID 5 and cam_2 ID 5 from
 6.4 s; face matching run directly on cam_2 agrees (52 of 116 face crops of ID 5 match her, no other
 cam_2 track matches more than once). Not covered yet: later tracks of the same person (after an
 occlusion, or seen through the glass by cam_1) and one shared ID number across cameras; both need

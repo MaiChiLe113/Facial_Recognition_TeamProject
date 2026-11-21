@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-18. Update this file at the end of every step.
+Last updated: 2026-11-21. Update this file at the end of every step.
 
 ## Branch
 
@@ -9,6 +9,41 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not create other branches.
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
+
+## 2026-11-21: multi-person naming + progress check (Mai Chi, not committed yet)
+
+**New from teammates since 2026-11-18:**
+- Thuận Minh: `ml/face_recognition/01_train_classification.ipynb`, `02_train_triplet.ipynb`,
+  `03_evaluate_verification.ipynb`. Selected model: triplet + cosine, threshold ≥ 0.5254, holdout AUC 0.954,
+  TAR 54.1 % at FAR 2.0 %. `backend/app/pipeline/recognizer.py` is still a stub; weights are on his machine.
+- Everyone uploaded enrolment photos to their Drive folder (Đức Mạnh 14, Hồng Minh 12 HEIC, Thuận Minh 23,
+  Minh Thành 30). Thuận Minh's card is on the Drive as `student_card_image/TMinh.jpg`.
+
+**Changed (Mai Chi's area unless noted):**
+- `ml/face_recognition/name_tracks.py`: a face crop votes only for its best-matching student; enrolment
+  retries smaller sizes when no face is found (phone close-ups); HEIC via `pillow-heif` when `sips` is
+  missing (Windows); `--students <csv>` option.
+- `data/mock/students.csv` (shared): Thuận Minh's `student_card` = `AppliedML/student_card_image/TMinh.jpg`.
+- `data/tracks/take{1,3,4,8}/*.json`: names from the full rerun below.
+- Docs: root `README.md` status, `ml/face_recognition/README.md`, `ml/tracking/README.md`.
+- Rerun locally on all 8 takes (2026-11-21, all five enrolled, Minh Thành from a scratch roster with
+  `--students`): take 1 all four named (Mai Chi, Thuận Minh, Đức Mạnh, Hồng Minh) on all three cameras;
+  take 3 Đức Mạnh, Thuận Minh, Hồng Minh on attendance_cam only (crowded door, no handoff) plus a short
+  second Đức Mạnh track (ID 5); takes 4 and 8 Hồng Minh on all three cameras; takes 2, 5, 6, 7 unknown
+  (no usable face). Per-track counts in `ml/face_recognition/README.md`. **Next:** check the labels by
+  eye on the Demo page. Take 3 checked (correct; ID 5 = Đức Mạnh after a tracker ID switch from ID 1).
+  Take 1 checked (all attendance names and cam_1 / cam_2 handoffs correct; seated people later get new
+  unnamed IDs on cam_2). Takes 4 and 8 still to check.
+- Minh Thành is not in `students.csv` (no student ID in the metadata sheet). He is not in any recorded
+  take, and he was correctly not named on any track (at most 1 crop per track matched him).
+- Seen, not fixed: the Demo page shows `Infinity:NaN` as the duration for `.webm` videos (frontend, Đức Mạnh).
+
+**Progress of Mai Chi's parts (tracking + multi-camera):**
+
+| Part | Done | Not done |
+| --- | --- | --- |
+| Detection + ByteTrack (Phase A) | YOLO11n + ByteTrack precomputed for all 8 takes; `bytetrack_long` (3 s buffer) chosen; static-object filter; E1 ID-count baseline on takes 1 and 3 (`data/eval/tracking_baseline.csv`) | MOT metrics vs ground truth (ID switches, IDF1); take 1 ground truth still a draft, takes 2 and 4–8 have none; YOLO is not fine-tuned (brief: no fully pre-trained model without further training); live `detector.py` / `tracker.py` stubs raise `NotImplementedError` |
+| Multi-camera (Phase B) | T1 approximate floor-map homographies for cam_1 / cam_2; T2 door handoff of names (`link_names.py`), working on takes 1 and 8 | T3 appearance Re-ID (OSNet) and T4 face check on cam_2; one shared global ID across cameras (`GlobalMatcher` in `matcher.py` is a stub); in/out time error vs ground truth |
 
 ## 2026-11-18: SQLite wired (task 1, Đức Mạnh)
 

@@ -515,7 +515,7 @@
   },
   {
    "global_id": 2,
-   "name": null,
+   "name": "Do Trinh Thuan Minh",
    "keyframes": [
     {
      "t": 20.5,
@@ -994,11 +994,12 @@
       0.9788
      ]
     }
-   ]
+   ],
+   "name_from": 20.9
   },
   {
    "global_id": 3,
-   "name": null,
+   "name": "Nguyen Duc Manh",
    "keyframes": [
     {
      "t": 31.4,
@@ -1405,11 +1406,12 @@
       0.743
      ]
     }
-   ]
+   ],
+   "name_from": 31.8
   },
   {
    "global_id": 4,
-   "name": null,
+   "name": "Nguyen Hong Minh",
    "keyframes": [
     {
      "t": 42.1,
@@ -1834,7 +1836,8 @@
       0.939
      ]
     }
-   ]
+   ],
+   "name_from": 42.5
   }
  ]
 }
