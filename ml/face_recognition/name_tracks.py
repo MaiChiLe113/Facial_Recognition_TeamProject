@@ -22,6 +22,7 @@ Models (git-ignored, ml/face_recognition/models/), from github.com/opencv/opencv
 import argparse
 import csv
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -39,6 +40,7 @@ ENROL_CACHE = REPO / "data" / "raw" / "enrol"          # HEIC -> JPEG copies (gi
 MATCH_THRESHOLD = 0.363       # SFace cosine threshold recommended by OpenCV (LFW, FAR ~ 1e-3)
 MIN_MATCHED_FRAMES = 3        # a track is named only if at least this many of its face crops match
 MIN_FACE_PX = 40              # ignore faces smaller than this (too blurry to embed)
+ENROL_SIDES = (1600, 960, 640, 480, 320)   # enrolment photo sizes tried, largest first
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".heic"}
 
 
@@ -61,13 +63,24 @@ class FaceModel:
         return feat / np.linalg.norm(feat)
 
 
+def heic_to_jpeg(src, out):
+    """Convert one HEIC photo: macOS `sips` if present, else pillow-heif (pip install pillow-heif)."""
+    if shutil.which("sips"):
+        subprocess.run(["sips", "-s", "format", "jpeg", str(src), "--out", str(out)], check=True, capture_output=True)
+        return
+    from PIL import Image, ImageOps
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    ImageOps.exif_transpose(Image.open(src)).convert("RGB").save(out, "JPEG", quality=95)
+
+
 def read_image(path):
-    """cv2 image; HEIC photos are converted once with macOS `sips` into data/raw/enrol/."""
+    """cv2 image; HEIC photos are converted once into data/raw/enrol/ (see heic_to_jpeg)."""
     if path.suffix.lower() == ".heic":
         out = ENROL_CACHE / path.parent.name / (path.stem + ".jpg")
         if not out.exists():
             out.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run(["sips", "-s", "format", "jpeg", str(path), "--out", str(out)], check=True, capture_output=True)
+            heic_to_jpeg(path, out)
         path = out
     img = cv2.imread(str(path))
     if img is not None and max(img.shape[:2]) > 1600:          # phone photos: faster detection, same result
@@ -76,11 +89,14 @@ def read_image(path):
     return img
 
 
-def enrol(model):
+STUDENTS_CSV = REPO / "data" / "mock" / "students.csv"
+
+
+def enrol(model, students_csv=STUDENTS_CSV):
     """{student_id_vn: {"name", "embeddings": [n, 128], "sources": [...]}} for students with photos."""
     drive = video_root().parent.parent           # .../My Drive (holds AppliedML/)
     gallery = {}
-    for s in csv.DictReader((REPO / "data" / "mock" / "students.csv").open(encoding="utf-8")):
+    for s in csv.DictReader(Path(students_csv).open(encoding="utf-8")):
         files = []
         folder = drive / s["photo_folder"] if s.get("photo_folder") else None
         if folder and folder.is_dir():
@@ -90,7 +106,14 @@ def enrol(model):
         embs, used = [], []
         for f in files:
             img = read_image(f) if f.exists() else None
-            found = model.faces(img) if img is not None else []
+            found = []
+            for side in ENROL_SIDES:              # YuNet misses faces that fill a close-up: retry smaller
+                if img is None or found:
+                    break
+                if max(img.shape[:2]) > side:
+                    s_ = side / max(img.shape[:2])
+                    img = cv2.resize(img, None, fx=s_, fy=s_)
+                found = model.faces(img)
             if not found:
                 print(f"  {s['student_name']}: no face in {f.name}")
                 continue
@@ -128,10 +151,11 @@ def name_take(model, gallery, take, every=2):
                     continue
                 crops += 1
                 e = model.embed(frame, face)
-                for sid, g in gallery.items():
-                    sim = float(np.max(g["embeddings"] @ e.T))
-                    if sim >= MATCH_THRESHOLD:
-                        votes.setdefault(sid, []).append((kf["t"], sim))
+                # with several students enrolled, a crop votes only for the student it matches best
+                sims = {sid: float(np.max(g["embeddings"] @ e.T)) for sid, g in gallery.items()}
+                sid = max(sims, key=sims.get, default=None)
+                if sid is not None and sims[sid] >= MATCH_THRESHOLD:
+                    votes.setdefault(sid, []).append((kf["t"], sims[sid]))
                 break                                # one face per box
         best = max(votes, key=lambda k: len(votes[k]), default=None)
         name = gallery[best]["name"] if best and len(votes[best]) >= MIN_MATCHED_FRAMES else None
@@ -151,11 +175,12 @@ def name_take(model, gallery, take, every=2):
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--take", default=None, help="take number or 'all' (default: the configured take)")
+    p.add_argument("--students", default=str(STUDENTS_CSV), help="roster CSV (default: data/mock/students.csv)")
     a = p.parse_args()
     takes = ([t["take"] for t in video_config()["takes"]] if a.take == "all"
              else [configured_take() if a.take is None else int(a.take)])
     model = FaceModel()
-    gallery = enrol(model)
+    gallery = enrol(model, a.students)
     for t in takes:
         for s in name_take(model, gallery, t):
             print(f"take {s['take']} attendance_cam track {s['track']}: {s['face_crops']} face crops, "

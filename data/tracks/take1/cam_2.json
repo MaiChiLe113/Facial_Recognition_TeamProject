@@ -3927,7 +3927,7 @@
   },
   {
    "global_id": 6,
-   "name": null,
+   "name": "Do Trinh Thuan Minh",
    "keyframes": [
     {
      "t": 20.0,
@@ -4532,11 +4532,13 @@
       0.2159
      ]
     }
-   ]
+   ],
+   "name_from": 20.9,
+   "name_source": "attendance_cam ID 2 (door handoff)"
   },
   {
    "global_id": 16,
-   "name": null,
+   "name": "Nguyen Duc Manh",
    "keyframes": [
     {
      "t": 31.1,
@@ -4961,7 +4963,9 @@
       0.4157
      ]
     }
-   ]
+   ],
+   "name_from": 31.8,
+   "name_source": "attendance_cam ID 3 (door handoff)"
   },
   {
    "global_id": 17,
@@ -7170,7 +7174,7 @@
   },
   {
    "global_id": 25,
-   "name": null,
+   "name": "Nguyen Hong Minh",
    "keyframes": [
     {
      "t": 41.6,
@@ -7721,7 +7725,9 @@
       0.2476
      ]
     }
-   ]
+   ],
+   "name_from": 42.5,
+   "name_source": "attendance_cam ID 4 (door handoff)"
   }
  ]
 }
