@@ -50,7 +50,7 @@ _load_info = {}      # {"root", "seconds", "cached", "computed"} of the last loa
 _load_lock = threading.Lock()
 EMBEDDING_CACHE = DATA_DIR / "raw" / "face_embeddings.npz"
 LOG_DIR = REPO_DIR / "logs"          # root/logs/, git-ignored
-LOG_COLUMNS = ["time", "client", "features", "face", "name", "student_id", "similarity", "live", "liveness_score",
+LOG_COLUMNS = ["time", "client", "features", "face", "name", "student_id", "similarity", "threshold", "live", "liveness_score", "liveness_threshold",
                "emotion", "emotion_score", "box_x", "box_y", "box_w", "box_h", "frame_ms", "errors"]
 _log_lock = threading.Lock()
 _live_buffers = {}   # client id -> deque of recent crops of the main face
@@ -100,6 +100,23 @@ def decode(jpeg_bytes):
     return image
 
 
+def _default_threshold(feature):
+    """The threshold saved inside the weights file (loads the model on first use)."""
+    infer = load_infer(feature)
+    if feature == "face_recognition":
+        return float(infer.threshold())
+    return float(infer._load()["threshold"])    # anti_spoofing has no public accessor; ml/ is not ours to edit
+
+
+def _live_confidence(is_live, score, threshold):
+    """How sure the Live / Spoof label is, 0.5..1: 0.5 right at the threshold, 1.0 at the far end of that side.
+    (The raw score is P(live); this is the confidence of the label that is shown, so one number reads the same
+    for both labels. It is a distance to the decision boundary, not a calibrated probability.)"""
+    span = (1.0 - threshold) if is_live else threshold
+    frac = (abs(score - threshold) / span) if span > 0 else 1.0
+    return round(0.5 + 0.5 * min(1.0, frac), 4)
+
+
 def status():
     """Per feature: are the weights where the app looks for them, and is the code importable."""
     out = []
@@ -112,12 +129,20 @@ def status():
             info["code"] = False
             info["error"] = f"{type(e).__name__}: {e}"
         info["registered_faces"] = len(_gallery) if feature == "face_recognition" else None
+        info["threshold"] = None
+        if feature in ("face_recognition", "anti_spoofing") and info["code"] and info["found"]:
+            try:
+                info["threshold"] = _default_threshold(feature)     # the value saved in the weights
+            except Exception as e:  # noqa: BLE001
+                info["error"] = f"{type(e).__name__}: {e}"
         out.append(info)
     return out
 
 
-def analyze(image, features, client="default"):
-    """Run the selected features on one BGR frame. Returns {"faces": [...], "errors": {...}, "ms": ...}."""
+def analyze(image, features, client="default", threshold=None, liveness_threshold=None):
+    """Run the selected features on one BGR frame. Returns {"faces": [...], "errors": {...}, "ms": ...}.
+    threshold: cosine threshold for face recognition; liveness_threshold: minimum live score (0..1) for
+    anti-spoofing. None = the one saved in the weights."""
     start = time.perf_counter()
     height, width = image.shape[:2]
     boxes = _find_faces(image)
@@ -128,7 +153,10 @@ def analyze(image, features, client="default"):
         try:
             fn(load_infer(feature))
         except Exception as e:  # noqa: BLE001 - a missing model must not stop the others
-            errors[feature] = f"{type(e).__name__}: {e}"
+            if isinstance(e, FileNotFoundError) and not weights_status(feature)["found"]:
+                errors[feature] = "Missing model weights"
+            else:
+                errors[feature] = f"{type(e).__name__}: {e}"
 
     if "anti_spoofing" in features:
         def live(infer):
@@ -140,7 +168,16 @@ def analyze(image, features, client="default"):
                 buffer.append(_crop(image, boxes[0], MARGIN["anti_spoofing"]))
                 crops = list(buffer)
             result = infer.check(crops)           # the largest face; smoothed over the last frames
-            faces[0].update(live=bool(result["live"]), liveness_score=result.get("score"))
+            score = result.get("score")
+            if liveness_threshold is None or score is None:
+                is_live = bool(result["live"])
+            else:                                 # custom threshold; a 0.0 score means "no usable crop": never live
+                is_live = score > 0.0 and score >= liveness_threshold
+            confidence = None
+            if score is not None:
+                limit = liveness_threshold if liveness_threshold is not None else _default_threshold("anti_spoofing")
+                confidence = _live_confidence(is_live, score, limit)
+            faces[0].update(live=is_live, liveness_score=score, liveness_confidence=confidence)
         run("anti_spoofing", live)
 
     if "face_recognition" in features and boxes:
@@ -153,7 +190,7 @@ def analyze(image, features, client="default"):
             with _lock:
                 gallery = {sid: list(vectors) for sid, vectors in _gallery.items()}
             for face, box in zip(faces, boxes):
-                student_id, similarity = infer.identify(_crop(image, box, MARGIN["face_recognition"]), gallery, None)
+                student_id, similarity = infer.identify(_crop(image, box, MARGIN["face_recognition"]), gallery, threshold)
                 face.update(student_id=student_id, name=_people[student_id]["name"] if student_id else None,
                             similarity=similarity, registered=bool(gallery))
         run("face_recognition", recognise)
@@ -168,7 +205,19 @@ def analyze(image, features, client="default"):
                 face.update(emotion=result["label"], emotion_score=result.get("score"))
         run("emotion", feel)
 
-    return {"faces": faces, "errors": errors, "ms": round((time.perf_counter() - start) * 1000, 1)}
+    result = {"faces": faces, "errors": errors, "ms": round((time.perf_counter() - start) * 1000, 1)}
+    if "face_recognition" in features:
+        try:                                 # the value actually used: the custom one, else the weights' own
+            result["threshold"] = threshold if threshold is not None else float(load_infer("face_recognition").threshold())
+        except Exception:  # noqa: BLE001 - the model error is already in errors
+            result["threshold"] = threshold
+    if "anti_spoofing" in features:
+        try:
+            result["liveness_threshold"] = (liveness_threshold if liveness_threshold is not None
+                                            else _default_threshold("anti_spoofing"))
+        except Exception:  # noqa: BLE001 - the model error is already in errors
+            result["liveness_threshold"] = liveness_threshold
+    return result
 
 
 def _enrolment_root():
@@ -361,8 +410,10 @@ def frame_log_rows(result, features, client):
     for i, f in enumerate(result.get("faces", []), 1):
         x, y, w, h = f["box"]
         rows.append({**base, "face": i, "name": cell(f.get("name")), "student_id": cell(f.get("student_id")),
-                     "similarity": cell(f.get("similarity"), 4), "live": cell(f.get("live")),
-                     "liveness_score": cell(f.get("liveness_score"), 4), "emotion": cell(f.get("emotion")),
+                     "similarity": cell(f.get("similarity"), 4),
+                     "threshold": cell(result.get("threshold"), 4) if "similarity" in f else "", "live": cell(f.get("live")),
+                     "liveness_score": cell(f.get("liveness_score"), 4),
+                     "liveness_threshold": cell(result.get("liveness_threshold"), 4) if "live" in f else "", "emotion": cell(f.get("emotion")),
                      "emotion_score": cell(f.get("emotion_score"), 4),
                      "box_x": round(x, 4), "box_y": round(y, 4), "box_w": round(w, 4), "box_h": round(h, 4)})
     return rows or [{**base, "face": 0}]

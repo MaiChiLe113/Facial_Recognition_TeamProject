@@ -24,6 +24,9 @@ data/raw/
 # ML environment, outputs and checkpoints
 ml/.venv/
 runs/**
+# presence verification: trained model and generated outputs (ml/presence_verification/train.py, evaluate.py)
+*.joblib
+ml/presence_verification/outputs/
 
 # Keep caches, logs and training/recovery checkpoints ignored; allow final face exports.
 !runs/face_recognition/

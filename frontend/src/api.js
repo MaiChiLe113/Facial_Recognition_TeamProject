@@ -50,6 +50,23 @@ export async function fetchTracks(camId, take) {
   }
 }
 
+// ---- Presence verification + door audit (backend/app/features/presence_verification/) --------------------
+// The model runs on the backend only. Without it this answers { offline: true } (backend down) or
+// { unavailable: true, message } (feature switched off or model not trained), and the page hides the panel.
+export async function fetchPresence(take) {
+  try {
+    const res = await fetch(`/api/features/presence_verification/take/${take}`)
+    if (res.ok) return { ...(await res.json()), offline: false }
+    const body = await res.json().catch(() => null)
+    return { unavailable: true, offline: false,
+      message: res.status === 404 && !body?.detail?.startsWith?.('No data')
+        ? 'Presence verification is not running. Train the model (ml/presence_verification/train.py), then restart the backend.'
+        : (body?.detail ?? `The backend answered ${res.status}.`) }
+  } catch {
+    return { offline: true }
+  }
+}
+
 // ---- pages beyond Home --------------------------------------------------------------
 // Served from SQLite by backend/app/api/records.py. Without the backend, each call falls back to data/mock.
 // Shapes:
@@ -131,10 +148,14 @@ export async function fetchFeatureStatus() {
 }
 
 // blob: one JPEG frame; features: ['face_recognition', 'anti_spoofing', 'emotion']; client: id of this page
+// threshold: optional face-recognition cosine threshold; livenessThreshold: optional anti-spoofing score
+// threshold (0..1). null = the one saved in the weights.
 // The answer carries log_rows: the frame's lines for the session log shown on the page.
-export async function inferFrame(blob, features, client) {
+export async function inferFrame(blob, features, client, threshold = null, livenessThreshold = null) {
   try {
-    const res = await fetch(`/api/features-demo/infer?features=${features.join(',')}&client=${client}`,
+    const extra = (threshold == null ? '' : `&threshold=${threshold}`)
+      + (livenessThreshold == null ? '' : `&liveness_threshold=${livenessThreshold}`)
+    const res = await fetch(`/api/features-demo/infer?features=${features.join(',')}&client=${client}${extra}`,
       { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob })
     if (!res.ok) return { faces: [], errors: { backend: `answered ${res.status}` }, offline: false }
     return { ...(await res.json()), offline: false }

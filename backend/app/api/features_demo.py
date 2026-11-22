@@ -1,8 +1,12 @@
 """Features demo page: try face recognition, anti-spoofing and emotion on webcam frames.
 
     GET    /api/features-demo/status                 weights found? code importable? (per feature)
-    POST   /api/features-demo/infer?features=a,b&client=x   body = one JPEG frame -> faces, errors and the frame's
-                                                     log_rows (the page collects them as the session log)
+    POST   /api/features-demo/infer?features=a,b&client=x[&threshold=0.4]   body = one JPEG frame -> faces, errors
+                                                     and the frame's log_rows (the page collects them as the session
+                                                     log). threshold: face-recognition cosine threshold in [-1, 1];
+                                                     left out = the one saved in the weights (shown in /status).
+                                                     liveness_threshold: minimum anti-spoofing score in [0, 1],
+                                                     same rule
     POST   /api/features-demo/log                    body = {started, rows}: save a finished camera session to
                                                      logs/features_demo_<start>.csv (repo root)
     GET    /api/features-demo/gallery[?reload=true]  the registered students: the enrolment photos on the
@@ -34,12 +38,17 @@ def status():
 
 
 @router.post("/infer")
-async def infer(request: Request, features: str = ",".join(FEATURES), client: str = "default"):
+async def infer(request: Request, features: str = ",".join(FEATURES), client: str = "default",
+                threshold: float | None = None, liveness_threshold: float | None = None):
     chosen = [f for f in features.split(",") if f]
     unknown = [f for f in chosen if f not in FEATURES]
     if unknown:
         raise HTTPException(400, f"Unknown feature(s): {', '.join(unknown)}. Known: {', '.join(FEATURES)}")
-    result = demo.analyze(await _image(request), chosen, client)
+    if threshold is not None and not -1.0 <= threshold <= 1.0:    # also rejects nan
+        raise HTTPException(400, "threshold must be a number between -1 and 1.")
+    if liveness_threshold is not None and not 0.0 <= liveness_threshold <= 1.0:
+        raise HTTPException(400, "liveness_threshold must be a number between 0 and 1.")
+    result = demo.analyze(await _image(request), chosen, client, threshold, liveness_threshold)
     result["log_rows"] = demo.frame_log_rows(result, chosen, client)
     return result
 

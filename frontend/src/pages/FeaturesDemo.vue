@@ -39,12 +39,35 @@ function showToast(ok, text) {
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => { toast.value = null }, ok ? 4000 : 7000)
 }
+// Adjustable thresholds. custom = null means "use the model's own (calibrated) value", saved in the weights.
+// Face recognition: cosine similarity in [-1, 1]. Anti-spoofing: live score in [0, 1].
+function makeThreshold(feature, storageKey, lo, hi, fallback) {
+  const custom = ref(null)
+  try {
+    const saved = parseFloat(localStorage.getItem(storageKey))
+    if (Number.isFinite(saved) && saved >= lo && saved <= hi) custom.value = saved
+  } catch { /* storage blocked: keep the default */ }
+  const def = computed(() => status.value[feature]?.threshold ?? null)
+  const shown = computed(() => custom.value ?? def.value ?? fallback)
+  function set(v) {
+    const n = v == null || v === '' ? NaN : Number(v)
+    custom.value = Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : null
+    try {
+      if (custom.value == null) localStorage.removeItem(storageKey)
+      else localStorage.setItem(storageKey, String(custom.value))
+    } catch { /* ignore */ }
+  }
+  return { custom, def, shown, set, lo, hi }
+}
+const recTh = makeThreshold('face_recognition', 'hawkeye.faceThreshold', -1, 1, 0.5)
+const liveTh = makeThreshold('anti_spoofing', 'hawkeye.livenessThreshold', 0, 1, 0.5)
 const registered = ref(null)       // null while loading, then { people, skipped, error, drive_root_exists }
 
 const clientId = Math.random().toString(36).slice(2)
 let stream = null
 let timer = null
 let busy = false
+let cameraRun = 0        // +1 each time the camera turns on or off: a reply from an earlier run is dropped
 let alive = true
 const grab = document.createElement('canvas')
 
@@ -86,6 +109,7 @@ function readiness(key) {
 // ---- camera ----
 async function startCamera() {
   camError.value = ''
+  cameraRun++
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false })
     camOn.value = true
@@ -102,12 +126,15 @@ async function startCamera() {
 }
 async function stopCamera() {
   const wasOn = camOn.value
+  cameraRun++                                    // a frame still being analysed must not draw after this
   clearInterval(timer)
   timer = null
   stream?.getTracks().forEach((t) => t.stop())
   stream = null
   camOn.value = false
   faces.value = []
+  errors.value = {}
+  latency.value = null
   if (!wasOn) return
   sessionEnd.value = new Date()
   if (!saveLog.value) { saved.value = { ok: true, text: 'Not saved (the "Save log" box was off).' }; return }
@@ -138,10 +165,12 @@ function frameBlob() {
 async function tick() {
   if (busy || !chosen.value.length) return
   busy = true
+  const run = cameraRun
   try {
     const blob = await frameBlob()
-    if (!blob) return
-    const r = await inferFrame(blob, chosen.value, clientId)
+    if (!blob || run !== cameraRun) return
+    const r = await inferFrame(blob, chosen.value, clientId, recTh.custom.value, liveTh.custom.value)
+    if (run !== cameraRun) return                // the camera was turned off (or on again) while waiting: drop it
     backendUp.value = !r.offline
     faces.value = r.faces || []
     errors.value = r.errors || {}
@@ -183,7 +212,10 @@ const pct = (v) => (v == null ? '' : ` ${Math.round(v * 100)}%`)
 
 function lines(f) {
   const out = []
-  if ('live' in f) out.push({ cls: f.live ? 'ok' : 'bad', text: f.live ? `Live${pct(f.liveness_score)}` : `Spoof${pct(f.liveness_score)}` })
+  if ('live' in f) {
+    const sure = f.liveness_confidence ?? f.liveness_score          // how sure the label is (falls back to the raw score)
+    out.push({ cls: f.live ? 'ok' : 'bad', text: `${f.live ? 'Live' : 'Spoof'}${pct(sure)}` })
+  }
   if (f.loading) out.push({ cls: 'bad', text: 'Loading registered faces…' })
   else if ('similarity' in f) {
     if (f.name) out.push({ cls: 'ok', text: `${f.name} (${f.similarity.toFixed(2)})` })
@@ -239,6 +271,34 @@ function lines(f) {
             </span>
             <span v-if="!readiness(f.key).ok" class="tag fd-bad">{{ readiness(f.key).text }}</span>
           </label>
+          <div v-if="selected.face_recognition" class="fd-option fd-threshold">
+            <span class="grow">
+              <strong>Recognition threshold: {{ recTh.shown.value.toFixed(2) }}
+                <span class="muted small">{{ recTh.custom.value == null ? '(model default)' : '(custom)' }}</span></strong>
+              <small class="muted">A face is named only when its similarity is at least this. Higher = stricter (fewer wrong names, more
+                "Unknown"); lower = more lenient (more wrong names).
+                <template v-if="recTh.def.value != null">Model default: {{ recTh.def.value.toFixed(2) }}.</template></small>
+              <span class="fd-slider">
+                <input type="range" :min="recTh.lo" :max="recTh.hi" step="0.01" :value="recTh.shown.value" @input="recTh.set($event.target.value)" />
+                <input type="number" :min="recTh.lo" :max="recTh.hi" step="0.01" :value="recTh.shown.value.toFixed(2)" @change="recTh.set($event.target.value)" />
+                <button class="btn" type="button" :disabled="recTh.custom.value == null" @click="recTh.set(null)">Reset</button>
+              </span>
+            </span>
+          </div>
+          <div v-if="selected.anti_spoofing" class="fd-option fd-threshold">
+            <span class="grow">
+              <strong>Liveness threshold: {{ liveTh.shown.value.toFixed(3) }}
+                <span class="muted small">{{ liveTh.custom.value == null ? '(model default)' : '(custom)' }}</span></strong>
+              <small class="muted">A face counts as live only when its live score is at least this. Higher = stricter (fewer spoofs accepted,
+                more real faces rejected); lower = more lenient (printed photos and screens may pass).
+                <template v-if="liveTh.def.value != null">Model default: {{ liveTh.def.value.toFixed(3) }}.</template></small>
+              <span class="fd-slider">
+                <input type="range" :min="liveTh.lo" :max="liveTh.hi" step="0.001" :value="liveTh.shown.value" @input="liveTh.set($event.target.value)" />
+                <input type="number" :min="liveTh.lo" :max="liveTh.hi" step="0.001" :value="liveTh.shown.value.toFixed(3)" @change="liveTh.set($event.target.value)" />
+                <button class="btn" type="button" :disabled="liveTh.custom.value == null" @click="liveTh.set(null)">Reset</button>
+              </span>
+            </span>
+          </div>
           <label class="fd-option">
             <input type="checkbox" v-model="saveLog" />
             <span class="grow">
@@ -263,14 +323,16 @@ function lines(f) {
           <p v-else-if="camOn" class="muted small">{{ saveLog ? 'This session will be saved to logs/ when the camera turns off.' : 'This session will not be saved. Tick "Save log" to keep it.' }}</p>
           <div class="fd-log">
             <table v-if="shownRows.length">
-              <thead><tr><th>Time</th><th>Face</th><th>Name</th><th>Similarity</th><th>Liveness</th><th>Emotion</th></tr></thead>
+              <thead><tr><th>Time</th><th>Face</th><th>Name</th><th>Similarity</th><th>Threshold</th><th>Liveness</th><th>Live thr.</th><th>Emotion</th></tr></thead>
               <tbody>
                 <tr v-for="(r, i) in shownRows" :key="i">
                   <td class="mono">{{ clock(r.time) }}</td>
                   <td>{{ r.face }}</td>
                   <td>{{ r.name || (r.similarity === '' ? '' : 'Unknown') }}</td>
                   <td>{{ r.similarity }}</td>
+                  <td>{{ r.threshold }}</td>
                   <td :class="r.live === false ? 'error' : ''">{{ r.live === '' ? '' : (r.live ? 'Live' : 'Spoof') }} {{ r.liveness_score }}</td>
+                  <td>{{ r.liveness_threshold }}</td>
                   <td>{{ r.emotion }} {{ r.emotion_score }}</td>
                 </tr>
               </tbody>
@@ -331,6 +393,10 @@ function lines(f) {
 .fd-option:last-child { border-bottom: 0; }
 .fd-option .grow { display: flex; flex-direction: column; gap: 2px; }
 .fd-option input { margin-top: 4px; width: 16px; height: 16px; }
+.fd-threshold { cursor: default; }
+.fd-slider { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.fd-slider input[type=range] { flex: 1; }
+.fd-slider input[type=number] { width: 72px; }
 .fd-bad { background: #fbe3e0; color: #8a2b22; }
 .fd-people { list-style: none; margin: 0; padding: 0; }
 .fd-people li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }

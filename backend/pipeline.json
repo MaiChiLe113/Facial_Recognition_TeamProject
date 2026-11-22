@@ -15,6 +15,7 @@
     "recognize": { "threshold": null }
   },
   "features": {
-    "event_counter": true
+    "event_counter": true,
+    "presence_verification": true
   }
 }

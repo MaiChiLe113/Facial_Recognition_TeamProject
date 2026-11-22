@@ -7,7 +7,7 @@ Start here. These files tell an agent (Claude, Copilot, Cursor…) what the proj
 | `README.md` (this file) | Project in one minute, hard rules, how to run and verify |
 | [`assignment.md`](assignment.md) | The full official assignment brief and marking scheme (source of truth for requirements) |
 | [`status.md`](status.md) | Branches, what is done, what comes next |
-| [`architecture.md`](architecture.md) | How the backend pipeline and the frontend are put together |
+| [`architecture.md`](architecture.md) | How the backend pipeline and the frontend are put together, and what to do when a model `.pt` is replaced |
 | [`decisions.md`](decisions.md) | Decisions already made and why. Do not reopen them without asking |
 
 ## The project in one minute
@@ -33,11 +33,12 @@ The team design doc is the source of truth for scope and marking. It is a Claude
    - `backend/app/main.py`, `backend/app/api/`, `backend/app/services/`, `backend/app/core/`
    - `backend/app/db/`
    - `backend/app/pipeline/attendance.py` (shared with Mai Chi)
+   - `ml/presence_verification/` (Đức Mạnh's individual innovative feature: presence verification + door audit) and `backend/app/features/presence_verification/`
 
    Never edit:
    - `backend/app/pipeline/{detector,tracker,matcher}.py` (Mai Chi)
    - `ml/face_recognition/` (Thuận Minh), `ml/anti_spoofing/` (Hồng Minh), `ml/emotion/` (Minh Thành): each holds `infer.py` and the weights `<feature>.pt`; the app finds them through `backend/app/core/ml_models.py`
-   - anything else in `ml/`
+   - anything else in `ml/` (other than `ml/presence_verification/`)
    - never create a `runs/` folder outside `ml/`
 
    Shared files (`README.md`, `requirements.txt`, `data/`) need a reason, and the change must stay minimal.

@@ -10,6 +10,22 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
 
+## 2026-11-23: innovative feature built: door audit + presence verification (Đức Mạnh, not committed yet)
+
+- Code in `ml/presence_verification/` (see its `README.md`, manual tests in `TEST.md`, plan + deviations in `PLAN.md`):
+  `trajectories.py` (tracks → map, valid area per camera), `door_audit.py` (crossings, Δt model, Hungarian, pair
+  classifier, alerts D1/D2/D3), `presence.py` (features, rules R1–R5, model score), `simulate.py`, `train.py`,
+  `evaluate.py`, `infer.py` (API for the backend), `tests/` (19 unit tests).
+- Model file `presence_verification.joblib` and `outputs/` are git-ignored; rebuild with `train.py` (~2 min CPU).
+- Backend plug-in `backend/app/features/presence_verification/` (switched on in `pipeline.json`): `GET /api/features/presence_verification/take/{take}`,
+  `/model`, `/live`. Without the model file it shows `failed` in `/api/pipeline/status` and mounts no routes.
+- Frontend: `PresencePanel.vue` on the Demo (MultiCam) page, map trails on `RoomMap.vue` (optional `trails` prop; red = alert).
+- `RoomMap.vue` draws the 2D map from the team's FigJam design (board b8wiU877MrltPtUYAI4BiW, section node 19:6), copied into `frontend/src/roomLayout.js` (map pixels, 920 x 520). To change the map: edit it in Figma, then update that file. The Figma door gap is y 0.727 to 0.906; `data/calibration/room204_map.json` (used by the homographies and the presence trails) has it at 0.789 to 0.961, so the drawn door and the trails can differ slightly. The calibration file is Mai Chi's and was not changed. People dots and trails are still fractions of the map (x 920, y 520). The mock `door` / `cameras` fields of `session.json` are not drawn.
+- New deps in `requirements.txt`: `scikit-learn`, `scipy`, `joblib` (installed in the repo-root `.venv`); matplotlib only for figures.
+- Still open: tell Mai Chi (it reads `data/tracks/` and `link_names.py` names, never writes them), team OK for the new
+  deps, record scripted fraud takes (all recorded takes are normal). Known real failure: take 3 gives D3 + D1 because
+  the tracker switches IDs while three people stand in the doorway.
+
 ## 2026-11-22: models moved to `ml/`, Features demo page (Đức Mạnh, not committed yet)
 
 - `backend/app/pipeline/{liveness,recognizer,emotion}.py` are gone. Each basic model is now `ml/<feature>/infer.py` plus the weights
@@ -22,6 +38,7 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - New page **Features demo** (`/features-demo`, `frontend/src/pages/FeaturesDemo.vue`): tick face recognition / anti-spoofing / emotion,
   it streams webcam frames to `POST /api/features-demo/infer` (`backend/app/api/features_demo.py`, `services/features_demo.py`), draws the
   results. Recognition uses the registered students: the Drive enrolment photos (photo folder + student card) that MultiCam also uses, embedded on first use (`GET /api/features-demo/gallery`). Faces are found with OpenCV Haar (demo only); `pillow-heif` is needed for HEIC photos. A feature without weights shows a clear error.
+- Features demo page has a **Recognition threshold** slider (shown when face recognition is ticked). `POST /api/features-demo/infer` takes an optional `?threshold=` (cosine, -1..1, else 400); left out = the threshold saved in the weights, which `GET /api/features-demo/status` now returns as `threshold` on the face_recognition entry. The choice is kept in the browser (`localStorage`), per viewer, not on the server. The pipeline's `recognize` stage still reads `options.threshold` from `pipeline.json`. The threshold actually used (custom or the weights' own) is logged in a `threshold` column of the session log and the CSV, next to `similarity`, on rows where recognition ran. Anti-spoofing has the same: a **Liveness threshold** slider (0..1), `?liveness_threshold=` on `/infer` (else 400), `threshold` on the anti_spoofing entry of `/status`, and a `liveness_threshold` CSV column. It is applied in `services/features_demo.py` by comparing the returned score (`score > 0 and score >= threshold`), because `ml/anti_spoofing/` is not ours to edit; the default is read through `infer._load()["threshold"]` (private, no public accessor). The `liveness` pipeline stage still has no threshold option. The status line under the camera shows `Live 97%` / `Spoof 88%` = how sure the shown label is (`liveness_confidence` on the face, 0.5 at the threshold up to 1.0; a distance to the decision boundary, not a calibrated probability); the raw P(live) stays in `liveness_score` and in the log.
 - The Features demo page has a **Session log** panel (camera on to camera off, always shown). The "Save log (CSV)" box only decides
   whether that session is written to `logs/features_demo_<start time>.csv` (repo root, git-ignored, one row per face per frame) when the
   camera turns off (`POST /api/features-demo/log`; also sent with `sendBeacon` if the tab is closed while the camera is on).
