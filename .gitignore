@@ -8,7 +8,7 @@ backend/.env
 node_modules/
 frontend/dist/
 
-# Data and models (keep them on Drive, not in git)
+# Data and models (only the face-recognition exports below are allowed in Git)
 *.webm
 *.mp4
 *.pt
@@ -23,7 +23,18 @@ data/raw/
 
 # ML environment, outputs and checkpoints
 ml/.venv/
-runs/
+runs/**
+
+# Keep caches, logs and training/recovery checkpoints ignored; allow final face exports.
+!runs/face_recognition/
+!runs/face_recognition/classification_optimization_v1/
+!runs/face_recognition/classification_optimization_v1/resnet18_128/
+!runs/face_recognition/triplet_optimization_v1/
+!runs/face_recognition/triplet_optimization_v1/semi_hard/
+!runs/face_recognition/verification_fp32_v1/
+!runs/face_recognition/classification_optimization_v1/resnet18_128/inference.pt
+!runs/face_recognition/triplet_optimization_v1/semi_hard/inference.pt
+!runs/face_recognition/verification_fp32_v1/selected_model.pt
 .ipynb_checkpoints/
 *.ckpt
 *.safetensors
