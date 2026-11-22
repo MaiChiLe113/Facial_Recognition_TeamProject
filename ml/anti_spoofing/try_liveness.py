@@ -1,4 +1,4 @@
-"""Try backend/app/pipeline/liveness.py on face images.
+"""Try ml/anti_spoofing/infer.py (the runtime liveness check) on face images.
 
 Run from the repo root:
 
@@ -22,7 +22,7 @@ import numpy as np
 from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 EXT = {".jpg", ".jpeg", ".jfif", ".png", ".bmp", ".webp", ".heic", ".heif"}
 
@@ -89,7 +89,7 @@ def main():
     if a.save_crops:
         Path(a.save_crops).mkdir(parents=True, exist_ok=True)
 
-    from app.pipeline.liveness import _weights_path, check
+    from infer import _weights_path, check
 
     print("weights:", _weights_path())
     for f in files:

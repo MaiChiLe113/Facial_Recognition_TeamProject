@@ -120,6 +120,51 @@ export async function createStudent(form) {
   return { ok: false, message: body?.detail ? String(body.detail) : `The backend answered ${res.status}.` }
 }
 
+// ---- Features demo page (backend/app/api/features_demo.py) ----------------------------------------
+// The three basic models run on the backend; there is no offline fallback, so these report offline: true.
+export async function fetchFeatureStatus() {
+  try {
+    return { ...(await getJson('/api/features-demo/status')), offline: false }
+  } catch {
+    return { features: [], offline: true }
+  }
+}
+
+// blob: one JPEG frame; features: ['face_recognition', 'anti_spoofing', 'emotion']; client: id of this page
+// The answer carries log_rows: the frame's lines for the session log shown on the page.
+export async function inferFrame(blob, features, client) {
+  try {
+    const res = await fetch(`/api/features-demo/infer?features=${features.join(',')}&client=${client}`,
+      { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob })
+    if (!res.ok) return { faces: [], errors: { backend: `answered ${res.status}` }, offline: false }
+    return { ...(await res.json()), offline: false }
+  } catch {
+    return { faces: [], errors: {}, offline: true }
+  }
+}
+
+// Save a finished camera session (rows = the log rows collected from inferFrame) as logs/features_demo_<start>.csv.
+export async function saveSessionLog(rows, started) {
+  try {
+    const res = await fetch('/api/features-demo/log', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ started, rows }),
+    })
+    const body = await res.json().catch(() => null)
+    return res.ok ? { ok: true, ...body } : { ok: false, error: body?.detail ? String(body.detail) : `The backend answered ${res.status}.` }
+  } catch {
+    return { ok: false, error: 'The backend is not running, so the log was not saved.' }
+  }
+}
+
+// The registered students (Drive enrolment photos, embedded by the backend on first use; a few seconds).
+export async function fetchDemoGallery(reload = false) {
+  try {
+    return await getJson(`/api/features-demo/gallery${reload ? '?reload=true' : ''}`)
+  } catch {
+    return { people: [], skipped: [], error: 'The backend is not running.', drive_root_exists: true }
+  }
+}
+
 // One roster row per student for a session. Same row shape as the dashboard roster.
 export function buildRoster(students, session) {
   const byId = Object.fromEntries((session.attendance ?? []).map((a) => [a.student_id_vn, a]))

@@ -83,7 +83,7 @@ const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padSt
   <div v-if="!demo" class="loading">Loading demo…</div>
   <div v-else class="page">
     <header class="topbar">
-      <h1>Demo · <span style="color:#dd958f">Take {{ selected }} loaded</span></h1>
+      <h1>MultiCam · <span style="color:#dd958f">Take {{ selected }} loaded</span></h1>
       <div class="topbar-right">
         <div class="demo-controls">
           <!-- One button: loads and plays the take the first time, then pauses / resumes it. -->

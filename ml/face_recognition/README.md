@@ -4,14 +4,16 @@
 - [x] `01_train_classification.ipynb` — ResNet-18 → 512-d → softmax, cross-entropy (128×128 input selected, epoch 18)
 - [x] `02_train_triplet.ipynb` — same backbone, triplet loss, semi-hard mining selected (epoch 19 of 20)
 - [x] `03_evaluate_verification.ipynb` — ROC/AUC on the verification pairs, cosine vs Euclidean, threshold
-- [ ] Wire the exported model into `backend/app/pipeline/recognizer.py` (still a stub: `embed()` and
-      `identify()` raise `NotImplementedError`; the notebook says the recognizer is delivered separately)
+- [x] Inference code: `infer.py` (`embed()`, `identify()`), loaded by the backend and the Features demo page. The app reads
+      `ml/face_recognition/face_recognition.pt`, a copy of `verification_fp32_v1/selected_model.pt` (git-ignored)
 - [ ] Check the model on our own enrolment photos and attendance-camera faces
 
 Results (from `03_evaluate_verification.ipynb`, added 2026-11-21): **triplet + cosine** is the selected
 model, threshold cosine ≥ 0.5254 (Euclidean ≤ 0.9743). On 3,314 independent holdout pairs: AUC 0.954,
 true-match acceptance 54.1 %, false-match rate 2.0 %. The weights (`selected_model.pt`, ~45 MB) live on
-Thuận Minh's machine under `runs/face_recognition/verification_fp32_v1/`, not in git.
+`ml/face_recognition/verification_fp32_v1/` (committed). `face_recognition.pt` next to `infer.py` is the copy the app loads; nothing may be written to a repo-root `runs/` folder.
+
+The Features demo page (`backend/app/services/features_demo.py`) also uses the YuNet file below to find faces; without it, it falls back to OpenCV's Haar cascade and loads fewer enrolment photos.
 
 ## Baseline in use now: `name_tracks.py`
 

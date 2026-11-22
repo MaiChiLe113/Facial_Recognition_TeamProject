@@ -1,7 +1,7 @@
 """Evaluate a trained liveness checkpoint and write the numbers/plots for the report.
 
     python evaluate.py --data-root /kaggle/input/lcc-fasd \
-        --weights weights/liveness_mobilenetv2.pt --results results/antispoof
+        --weights ml/anti_spoofing/anti_spoofing.pt --results results/antispoof
 
 The decision threshold stored in the checkpoint was chosen on the DEV split, so the
 eval numbers here are an honest estimate. Add --extra-eval own_data/test to also report
@@ -26,7 +26,7 @@ def parse_args():
     ap.add_argument("--data-root")
     ap.add_argument("--eval-dir")
     ap.add_argument("--extra-eval", help="our own webcam data (real/ + spoof/), reported separately")
-    ap.add_argument("--weights", default="weights/liveness_mobilenetv2.pt")
+    ap.add_argument("--weights", default="ml/anti_spoofing/anti_spoofing.pt")
     ap.add_argument("--results", default="results/antispoof")
     ap.add_argument("--threshold", type=float, help="override the threshold saved in the checkpoint")
     ap.add_argument("--batch-size", type=int, default=64)

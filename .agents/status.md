@@ -10,12 +10,31 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
 
+## 2026-11-22: models moved to `ml/`, Features demo page (Đức Mạnh, not committed yet)
+
+- `backend/app/pipeline/{liveness,recognizer,emotion}.py` are gone. Each basic model is now `ml/<feature>/infer.py` plus the weights
+  `ml/<feature>/<feature>.pt` for `face_recognition`, `anti_spoofing` and `emotion`. `backend/app/core/ml_models.py` finds them
+  (`weights_file()`, `load_infer()`); the attendance-camera stages use it. `pipeline/` keeps only Mai Chi's detector, tracker and matcher.
+- `ml/face_recognition/infer.py` is new (written from the notebook export format): `embed()` and `identify()`, threshold from the file
+  (cosine >= 0.5254). `ml/face_recognition/face_recognition.pt` is a copy of `verification_fp32_v1/selected_model.pt`. Checked on real photos.
+- `ml/emotion/infer.py` is new; it expects a ResNet-18 checkpoint in the format described in its docstring. No model exists yet.
+- `ml/anti_spoofing/infer.py` is the old `liveness.py`; it reads `ml/anti_spoofing/anti_spoofing.pt` (the file is in place now, renamed from `liveness_mobilenetv2.pt`; checked on real faces: live, score 0.99, threshold 0.0239; not yet tried on printed photos or phone screens).
+- New page **Features demo** (`/features-demo`, `frontend/src/pages/FeaturesDemo.vue`): tick face recognition / anti-spoofing / emotion,
+  it streams webcam frames to `POST /api/features-demo/infer` (`backend/app/api/features_demo.py`, `services/features_demo.py`), draws the
+  results. Recognition uses the registered students: the Drive enrolment photos (photo folder + student card) that MultiCam also uses, embedded on first use (`GET /api/features-demo/gallery`). Faces are found with OpenCV Haar (demo only); `pillow-heif` is needed for HEIC photos. A feature without weights shows a clear error.
+- The Features demo page has a **Session log** panel (camera on to camera off, always shown). The "Save log (CSV)" box only decides
+  whether that session is written to `logs/features_demo_<start time>.csv` (repo root, git-ignored, one row per face per frame) when the
+  camera turns off (`POST /api/features-demo/log`; also sent with `sendBeacon` if the tab is closed while the camera is on).
+- `requirements.txt` now lists torch, torchvision, numpy, pillow, opencv-python-headless (<5: OpenCV 5 has no CascadeClassifier).
+- `runs/` no longer exists at the repo root; the `runs/**` rules in `.gitignore` are now obsolete. The notebooks still write to `runs/`
+  when re-run (Thuận Minh's), which would recreate it.
+
 ## 2026-11-21: multi-person naming + progress check (Mai Chi, not committed yet)
 
 **New from teammates since 2026-11-18:**
 - Thuận Minh: `ml/face_recognition/01_train_classification.ipynb`, `02_train_triplet.ipynb`,
   `03_evaluate_verification.ipynb`. Selected model: triplet + cosine, threshold ≥ 0.5254, holdout AUC 0.954,
-  TAR 54.1 % at FAR 2.0 %. `backend/app/pipeline/recognizer.py` is still a stub; weights are on his machine.
+  TAR 54.1 % at FAR 2.0 %. Inference code is now `ml/face_recognition/infer.py` and the weights are in `ml/face_recognition/` (see 2026-11-22).
 - Everyone uploaded enrolment photos to their Drive folder (Đức Mạnh 14, Hồng Minh 12 HEIC, Thuận Minh 23,
   Minh Thành 30). Thuận Minh's card is on the Drive as `student_card_image/TMinh.jpg`.
 

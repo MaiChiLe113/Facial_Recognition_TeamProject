@@ -3,7 +3,7 @@
 Example (Kaggle, LCC-FASD attached as a dataset):
 
     python train.py --data-root /kaggle/input/lcc-fasd --epochs 10 \
-        --out weights/liveness_mobilenetv2.pt --results results/antispoof
+        --out ml/anti_spoofing/anti_spoofing.pt --results results/antispoof
 
 Own webcam samples (printed photo / phone replay) can be mixed in:
 
@@ -49,7 +49,7 @@ def parse_args():
     ap.add_argument("--limit", type=int, default=0, help="debug: cap images per split")
     ap.add_argument("--no-pretrained", action="store_true", help="debug only (no ImageNet download)")
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--out", default="weights/liveness_mobilenetv2.pt")
+    ap.add_argument("--out", default="ml/anti_spoofing/anti_spoofing.pt")
     ap.add_argument("--results", default="results/antispoof")
     return ap.parse_args()
 

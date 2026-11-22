@@ -2,7 +2,7 @@
 
 COS30082 Applied Machine Learning team project. Three cameras (corridor, classroom, doorway) track every person with a numeric ID; the doorway **attendance camera** checks liveness, recognises the face and reads emotion, then the ID becomes `ID n · Name` on every camera. Hawkeye logs check-in, entry, exit and total time in class.
 
-> Status: the Home page runs on mock data for the roster and events. The Home and Demo pages play the recorded takes with **real person boxes** (YOLO11n + ByteTrack, precomputed), and people are recognised at check-in on the attendance camera and named on all three cameras (all four people in take 1, three in take 3, Nguyen Hong Minh in takes 4 and 8; all five members have enrolment photos). The live per-frame pipeline is still a set of stubs marked `TODO` with their owners.
+> Status: the Home page runs on mock data for the roster and events. The Home and MultiCam pages play the recorded takes with **real person boxes** (YOLO11n + ByteTrack, precomputed), and people are recognised at check-in on the attendance camera and named on all three cameras (all four people in take 1, three in take 3, Nguyen Hong Minh in takes 4 and 8; all five members have enrolment photos). The live per-frame pipeline is still a set of stubs marked `TODO` with their owners.
 
 ## Repo layout
 
@@ -69,7 +69,7 @@ The recordings live in the team Google Drive folder `AppliedML/video data/` (one
 | Classroom | `cam_2` | `pDHjQPf` | CAM 2 |
 | Doorway | `attendance_cam` | `2SiEwN8` | Attendance camera |
 
-`data/video_config.json` lists all 8 synced takes and which take the Home page plays (`"take"`, currently 3). The Demo page plays any take: pick it in the table and press Play. Files are matched across cameras by take number, not by the timestamp in the filename: the CAM 2 device clock runs about 23.4 s ahead of the others in every take. Use `offset_s` per camera to fine-tune sync.
+`data/video_config.json` lists all 8 synced takes and which take the Home page plays (`"take"`, currently 3). The MultiCam page (route `/demo`) plays any take: pick it in the table and press Play. Files are matched across cameras by take number, not by the timestamp in the filename: the CAM 2 device clock runs about 23.4 s ahead of the others in every take. Use `offset_s` per camera to fine-tune sync.
 
 ## Tracking and naming (Mai Chi)
 
@@ -97,9 +97,9 @@ Takes: the old take 1 was a failed recording and was deleted from the Drive fold
 | --- | --- | --- |
 | Integration, multi-camera tracking, cross-camera matching | Mai Chi | `backend/app/pipeline/{detector,tracker,matcher}.py`, `ml/tracking/` |
 | Web app, database, camera streaming | Đức Mạnh | `frontend/`, `backend/app/main.py`, `backend/app/db/` |
-| Face embedding models (classification + triplet) | Thuận Minh | `ml/face_recognition/`, `backend/app/pipeline/recognizer.py` |
-| Anti-spoofing | Hồng Minh | `ml/anti_spoofing/`, `backend/app/pipeline/liveness.py` |
-| Emotion | Minh Thành | `ml/emotion/`, `backend/app/pipeline/emotion.py` |
+| Face embedding models (classification + triplet) | Thuận Minh | `ml/face_recognition/` (`infer.py` + `face_recognition.pt`) |
+| Anti-spoofing | Hồng Minh | `ml/anti_spoofing/` (`infer.py` + `anti_spoofing.pt`) |
+| Emotion | Minh Thành | `ml/emotion/` (`infer.py` + `emotion.pt`) |
 
 ## Data contract for bounding boxes
 

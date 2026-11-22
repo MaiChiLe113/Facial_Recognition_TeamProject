@@ -33,7 +33,7 @@ const capitalise = (s) => s[0].toUpperCase() + s.slice(1)
     <div class="grid-top">
       <CameraCard v-for="cam in cameras" :key="cam.cam_id" :cam="cam" live
         :highlight="cam.cam_id === 'attendance_cam'">
-        <!-- TODO: live values from liveness.py / recognizer.py / emotion.py (currently mock) -->
+        <!-- TODO: live values from the ml/<feature>/infer.py models (currently mock) -->
         <ul v-if="cam.cam_id === 'attendance_cam'" class="checks">
           <li v-if="st.identity_verified" class="ok">Identity verified · {{ st.name }}</li>
           <li v-else class="bad">Unknown — <RouterLink to="/add">please register</RouterLink></li>

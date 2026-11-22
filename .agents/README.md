@@ -5,6 +5,7 @@ Start here. These files tell an agent (Claude, Copilot, Cursor…) what the proj
 | File | Read it for |
 | --- | --- |
 | `README.md` (this file) | Project in one minute, hard rules, how to run and verify |
+| [`assignment.md`](assignment.md) | The full official assignment brief and marking scheme (source of truth for requirements) |
 | [`status.md`](status.md) | Branches, what is done, what comes next |
 | [`architecture.md`](architecture.md) | How the backend pipeline and the frontend are put together |
 | [`decisions.md`](decisions.md) | Decisions already made and why. Do not reopen them without asking |
@@ -35,10 +36,9 @@ The team design doc is the source of truth for scope and marking. It is a Claude
 
    Never edit:
    - `backend/app/pipeline/{detector,tracker,matcher}.py` (Mai Chi)
-   - `backend/app/pipeline/recognizer.py` (Thuận Minh)
-   - `backend/app/pipeline/liveness.py` (Hồng Minh)
-   - `backend/app/pipeline/emotion.py` (Minh Thành)
-   - anything in `ml/`
+   - `ml/face_recognition/` (Thuận Minh), `ml/anti_spoofing/` (Hồng Minh), `ml/emotion/` (Minh Thành): each holds `infer.py` and the weights `<feature>.pt`; the app finds them through `backend/app/core/ml_models.py`
+   - anything else in `ml/`
+   - never create a `runs/` folder outside `ml/`
 
    Shared files (`README.md`, `requirements.txt`, `data/`) need a reason, and the change must stay minimal.
 2. **API contract.** Never rename or remove fields in an existing API response; only add. The frontend and teammates depend on the shapes. The bounding-box contract is in the root `README.md`.
@@ -75,3 +75,5 @@ Gotchas:
 - **Git Bash mangles arguments.** Arguments that start with `/` get rewritten (for example `/api/x` becomes `C:/Program Files/Git/api/x`). Use full URLs, or do HTTP checks from Python.
 - **Pylance "fastapi could not be resolved"** only means the editor is not using `backend/.venv`.
 - **Demo videos are not in the repo.** They live in the team Google Drive (`AppliedML/video data/`), set through `HAWKEYE_VIDEO_ROOT` in `backend/.env`.
+
+After any code changes, you have to update the .agents/ where needed or be affected by that change(s) to prevent context drift

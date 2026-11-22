@@ -1,8 +1,10 @@
 """The attendance camera: find the face, check liveness, recognise it, read the emotion.
-Adapters only: the models are in app/pipeline/detector.py (Mai Chi), liveness.py (Hồng Minh),
-recognizer.py (Thuận Minh) and emotion.py (Minh Thành)."""
+Adapters only: the face detector is app/pipeline/detector.py (Mai Chi); the three models live in
+ml/anti_spoofing/ (Hồng Minh), ml/face_recognition/ (Thuận Minh) and ml/emotion/ (Minh Thành), each as
+infer.py plus <feature>.pt, found by app/core/ml_models.py."""
 from collections import deque
 
+from ..ml_models import load_infer
 from ..registry import register_stage
 from .base import Stage
 
@@ -30,8 +32,7 @@ class Liveness(Stage):
     buffer for the main (largest) face, which is enough for one person at the door."""
 
     def setup(self):
-        from ...pipeline import liveness
-        self.liveness = liveness
+        self.liveness = load_infer("anti_spoofing")
         self.recent = deque(maxlen=int(self.options.get("frames", 10)))
 
     def process(self, ctx):
@@ -51,8 +52,7 @@ class Recognize(Stage):
     shared["gallery"]; TODO (Đức Mạnh): fill it from the face_embeddings table when the DB is wired."""
 
     def setup(self):
-        from ...pipeline import recognizer
-        self.recognizer = recognizer
+        self.recognizer = load_infer("face_recognition")
         self.threshold = self.options.get("threshold")
 
     def process(self, ctx):
@@ -66,8 +66,7 @@ class Recognize(Stage):
 @register_stage("emotion")
 class Emotion(Stage):
     def setup(self):
-        from ...pipeline import emotion
-        self.emotion = emotion
+        self.emotion = load_infer("emotion")
 
     def process(self, ctx):
         for face in ctx.faces:
