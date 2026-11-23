@@ -10,6 +10,18 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
 
+## 2026-11-23: emotion model trained and wired in (Minh Thành)
+
+- `ml/emotion/emotion_training.ipynb` (run, outputs saved): small CNN, ResNet-18 on FER2013, ResNet-18 on FER2013 + AffectNet
+  (Hugging Face `Mauregato/affectnet_short`, contempt dropped, faces cut with YuNet). Selected: ResNet-18 (ImageNet, conv1 +
+  layer1 frozen) on FER2013 + AffectNet. Test accuracy: FER2013 0.707 (macro-F1 0.698), AffectNet 0.661 (0.632); the
+  FER2013-only model gets 0.460 on AffectNet. Results in `ml/emotion/README.md` (plots in `results/emotion/`, git-ignored).
+- `ml/emotion/infer.py` rewritten inside, same contract (`predict(face_crop, smooth=True)`, `reset()`, `HAWKEYE_EMOTION_WEIGHTS`):
+  crop -> grayscale 48x48 -> 96x96 inside the model, probabilities averaged over the last second (`SMOOTH_SECONDS = 1.0`). Checkpoint keys:
+  `state_dict`, `classes`, `face_size`, `img_size`, `mean`, `std`. `ml/emotion/emotion.pt` (44.8 MB, committed on `main` with `git add -f`) is written by the
+  last notebook cell. Through `load_infer("emotion")`: 0.7055 on the FER2013 test set.
+- Crop: the raw face box (Features demo `MARGIN["emotion"] = 0.0`) scores the same as a square crop with this model (0.633 vs 0.636), so no change needed there.
+
 ## 2026-11-23: innovative feature built: door audit + presence verification (Đức Mạnh, not committed yet)
 
 - Code in `ml/presence_verification/` (see its `README.md`, manual tests in `TEST.md`, plan + deviations in `PLAN.md`):
@@ -33,7 +45,7 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
   (`weights_file()`, `load_infer()`); the attendance-camera stages use it. `pipeline/` keeps only Mai Chi's detector, tracker and matcher.
 - `ml/face_recognition/infer.py` is new (written from the notebook export format): `embed()` and `identify()`, threshold from the file
   (cosine >= 0.5254). `ml/face_recognition/face_recognition.pt` is a copy of `verification_fp32_v1/selected_model.pt`. Checked on real photos.
-- `ml/emotion/infer.py` is new; it expects a ResNet-18 checkpoint in the format described in its docstring. No model exists yet.
+- `ml/emotion/infer.py` is new; it expects a ResNet-18 checkpoint in the format described in its docstring. (Model trained 2026-11-23, see above.)
 - `ml/anti_spoofing/infer.py` is the old `liveness.py`; it reads `ml/anti_spoofing/anti_spoofing.pt` (the file is in place now, renamed from `liveness_mobilenetv2.pt`; checked on real faces: live, score 0.99, threshold 0.0239; not yet tried on printed photos or phone screens).
 - New page **Features demo** (`/features-demo`, `frontend/src/pages/FeaturesDemo.vue`): tick face recognition / anti-spoofing / emotion,
   it streams webcam frames to `POST /api/features-demo/infer` (`backend/app/api/features_demo.py`, `services/features_demo.py`), draws the
