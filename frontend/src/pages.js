@@ -2,12 +2,15 @@
 // from this list, so adding a page = adding one entry here.
 //   component  the page to show. Leave it out to show the Placeholder card (todo + owner).
 //   icon       SVG path for the sidebar. Pages with sidebar: false are reached another way.
+//   bare       full screen, no sidebar (the phone camera page).
 import AddPerson from './pages/AddPerson.vue'
 import AttendCourse from './pages/AttendCourse.vue'
+import Camera from './pages/Camera.vue'
 import Demo from './pages/Demo.vue'
 import FeaturesDemo from './pages/FeaturesDemo.vue'
 import History from './pages/History.vue'
 import Home from './pages/Home.vue'
+import LiveCameras from './pages/LiveCameras.vue'
 
 export const PAGES = [
   { key: 'home', path: '/', label: 'Home', component: Home,
@@ -20,6 +23,10 @@ export const PAGES = [
     icon: 'M4 5h16v14H4zM10 9l5 3-5 3z' },
   { key: 'features-demo', path: '/features-demo', label: 'Features demo', component: FeaturesDemo,
     icon: 'M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z' },
+  { key: 'live', path: '/live', label: 'Live cameras', component: LiveCameras,
+    icon: 'M3 7h12v10H3zM15 10l6-3v10l-6-3' },
+  // Opened on a phone / laptop over Wi-Fi: it only sends its camera to the host (see docs/LAN_DEMO.md).
+  { key: 'camera', path: '/camera', label: 'Camera', sidebar: false, bare: true, component: Camera },
   // Shown as the "+ Add person" button at the bottom of the sidebar, not in the nav list.
   { key: 'add', path: '/add', label: 'Add person', sidebar: false, component: AddPerson },
 ]

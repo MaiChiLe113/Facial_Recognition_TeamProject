@@ -53,3 +53,6 @@ logs/
 
 # Face photos uploaded on the Add person page (personal data)
 data/photos/
+
+# mkcert certificate for the Wi-Fi demo (docs/LAN_DEMO.md); the key is private
+frontend/certs/

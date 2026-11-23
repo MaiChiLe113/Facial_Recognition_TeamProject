@@ -49,7 +49,6 @@ for router in ROUTERS:
     app.include_router(router)
 
 
-# TODO (Đức Mạnh): live mode
-# - WebSocket /ws/camera/{cam_id}: receive frames, call app.state.engine.process_frame(cam_id, image, t)
-# - WebSocket /ws/dashboard: push boxes, events and map positions to the UI (subscribe to the event bus)
-# - POST /api/students: registration from the "+ Add person" page
+# Live mode: WebSocket /ws/camera/{cam_id} (app/api/live.py) runs each phone's frames through engine.process_frame;
+# POST /api/students (app/api/records.py) registers from the "+ Add person" page.
+# TODO (Đức Mạnh): WebSocket /ws/dashboard: push events and map positions to the UI (subscribe to the event bus)
