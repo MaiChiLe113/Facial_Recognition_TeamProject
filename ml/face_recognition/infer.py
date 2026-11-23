@@ -30,7 +30,7 @@ _DEFAULT_WEIGHTS = Path(__file__).resolve().parent / "face_recognition.pt"
 EMBEDDING_DIMENSIONS = 512
 
 _lock = threading.Lock()
-_state: dict = {}   # filled once by _load(): model, device, size, mean, std, threshold
+_state: dict = {}   # model, preprocessing and matching policy, filled once by _load()
 
 
 def _weights_path() -> Path:
@@ -59,6 +59,14 @@ def _load():
         payload = torch.load(path, map_location="cpu", weights_only=True)
         if payload.get("architecture") != "resnet18_embedding" or payload.get("embedding_dimensions") != EMBEDDING_DIMENSIONS:
             raise ValueError(f"{path} is not a resnet18_embedding / {EMBEDDING_DIMENSIONS}-d export")
+        cutoff = float(payload["threshold"])
+        if not -1.0 <= cutoff <= 1.0:
+            raise ValueError("The weights must provide a cosine threshold between -1 and 1")
+        matching = payload.get("matching", {})
+        gallery_strategy = matching.get("gallery_strategy", "best_photo")
+        min_score_gap = float(matching.get("min_score_gap", 0))
+        if gallery_strategy not in ("best_photo", "centroid") or not 0.0 <= min_score_gap <= 2.0:
+            raise ValueError("Invalid matching policy in face recognition weights")
 
         class FaceEmbedding(nn.Module):
             def __init__(self):
@@ -81,7 +89,9 @@ def _load():
             size=tuple(size) if isinstance(size, (list, tuple)) else (int(size), int(size)),
             mean=torch.tensor(payload["normalization"]["mean"], device=device).view(1, 3, 1, 1),
             std=torch.tensor(payload["normalization"]["std"], device=device).view(1, 3, 1, 1),
-            threshold=float(payload["threshold"]),   # accept when cosine similarity >= threshold
+            threshold=cutoff,
+            gallery_strategy=gallery_strategy,
+            min_score_gap=min_score_gap,
         )
     return _state
 
@@ -115,23 +125,34 @@ def _template_matrix(templates, student_id):
     return mat / norms[:, None]
 
 
-def similarity_scores(query, gallery):
-    """Best cosine similarity of `query` (a unit embedding) to each student's templates: {student_id: score}."""
+def similarity_scores(query, gallery, *, gallery_strategy="best_photo"):
+    """Score each identity using its best photo or its unit-normalized mean embedding."""
     if not isinstance(gallery, dict) or any(k is None for k in gallery):
         raise ValueError("gallery must be a {student_id: [embedding, ...]} dict")
+    if gallery_strategy not in ("best_photo", "centroid"):
+        raise ValueError("gallery_strategy must be best_photo or centroid")
+    query = np.asarray(query, dtype=np.float64)
     scores = {}
     for student_id, templates in gallery.items():
         mat = _template_matrix(templates, student_id)
-        if mat is not None:
-            scores[student_id] = float((mat @ np.asarray(query, dtype=np.float64)).max())
+        if mat is None:
+            continue
+        if gallery_strategy == "centroid":
+            centroid = mat.mean(axis=0)
+            length = np.linalg.norm(centroid)
+            if length > 1e-12:
+                scores[student_id] = float(centroid @ query / length)
+        else:
+            scores[student_id] = float((mat @ query).max())
     return scores
 
 
 def identify(face_crop, gallery, threshold):
     """Return (student_id or None, similarity).
 
-    Cosine similarity to every template; the best template of each student counts. The best student
-    wins when its score is >= threshold (None = the threshold calibrated in the weights file).
+    The weights select the gallery strategy and minimum lead over the runner-up. The best student
+    wins when its score is >= threshold (None uses the threshold stored in the weights) and its
+    lead exceeds the configured gap. A one-identity gallery can decide using the threshold alone.
     Unknown = (None, best score). An empty gallery gives (None, 0.0) without loading the model.
     Two different students with the exact same best score are a tie and count as Unknown.
     """
@@ -144,16 +165,16 @@ def identify(face_crop, gallery, threshold):
     if not any(np.size(t) for t in gallery.values()):
         return None, 0.0
     query = embed(face_crop).astype(np.float64)
-    scores = similarity_scores(query, gallery)
+    scores = similarity_scores(query, gallery, gallery_strategy=_state.get("gallery_strategy", "best_photo"))
     if not scores:
         return None, 0.0
     if threshold is None:
         threshold = _load()["threshold"]
-    best = max(scores.values())
-    winners = [sid for sid, s in scores.items() if s == best]
-    if len(winners) != 1 or best < threshold:
+    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    winner, best = ranked[0]
+    if best < threshold or (len(ranked) > 1 and best - ranked[1][1] <= _state.get("min_score_gap", 0)):
         return None, best
-    return winners[0], best
+    return winner, best
 
 
 def threshold():

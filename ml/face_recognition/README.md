@@ -6,14 +6,41 @@
 - [x] `03_evaluate_verification.ipynb` — ROC/AUC on the verification pairs, cosine vs Euclidean, threshold
 - [x] Inference code: `infer.py` (`embed()`, `identify()`), loaded by the backend and the Features demo page. The app reads
       `ml/face_recognition/face_recognition.pt`, a copy of `verification_fp32_v1/selected_model.pt` (git-ignored)
-- [ ] Check the model on our own enrolment photos and attendance-camera faces
+- [x] Replay the model on team enrolment photos and existing attendance-camera faces
+- [ ] Check performance on a new recording with registered and unregistered people
 
 Results (from `03_evaluate_verification.ipynb`, added 2026-11-21): **triplet + cosine** is the selected
 model, threshold cosine ≥ 0.5254 (Euclidean ≤ 0.9743). On 3,314 independent holdout pairs: AUC 0.954,
-true-match acceptance 54.1 %, false-match rate 2.0 %. The weights (`selected_model.pt`, ~45 MB) live on
-`ml/face_recognition/verification_fp32_v1/` (committed). `face_recognition.pt` next to `infer.py` is the copy the app loads; nothing may be written to a repo-root `runs/` folder.
+true-match acceptance 54.1 %, false-match rate 2.0 %. Keep the weights in external storage and copy
+`selected_model.pt` (~45 MB) to `face_recognition.pt` next to `infer.py` for the app to load.
 
 The Features demo page (`backend/app/services/features_demo.py`) also uses the YuNet file below to find faces; without it, it falls back to OpenCV's Haar cascade and loads fewer enrolment photos.
+
+## Optional camera profile
+
+The separately distributed `face_recognition_camera_optimized.pt` contains the camera-fine-tuned
+triplet model and an experimental matching policy. It averages and normalizes each student's
+enrolment embeddings. A match requires a cosine similarity of at least 0.692213 (rounded) and a
+lead of more than 0.025 over the runner-up.
+
+Copy the file next to `infer.py`. From the repository root in PowerShell, set the weights path before
+starting the demo.
+
+```powershell
+$env:HAWKEYE_FACE_RECOGNITION_WEIGHTS = (Resolve-Path 'ml/face_recognition/face_recognition_camera_optimized.pt').Path
+```
+
+Restart the backend and reset the Features page's face threshold slider to use the model default. The
+gallery is recomputed for the new weights. Set `HAWKEYE_DRIVE_ROOT` to the folder containing `AppliedML/`
+if it is outside the configured Drive location. To use the regular model, clear the weights override
+and restart the backend.
+
+[Notebook 03](03_evaluate_verification.ipynb) records calibration on take 1 and comparison on take 3.
+On the same 68 annotated camera crops, the camera profile gave 21 correct, one wrong, and 46 `Unknown`.
+The earlier camera candidate gave 16 correct, one wrong, and 51 `Unknown`. Both accepted 3/68 simulated
+unregistered queries with the true identity removed from the gallery. The regular model gave 34 correct,
+33 wrong, and one `Unknown`. Both clips were previously inspected. A new clip with real unregistered
+people is needed to assess performance for the demo.
 
 ## Baseline in use now: `name_tracks.py`
 
