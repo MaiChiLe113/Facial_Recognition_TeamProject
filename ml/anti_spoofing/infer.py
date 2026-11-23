@@ -1,12 +1,13 @@
-"""Anti-spoofing (liveness).  Owner: Hồng Minh
+"""Anti-spoofing (liveness) inference.  Owner: Hồng Minh
 
-Training code: ml/anti_spoofing/. Must be our own trained / fine-tuned model.
+Training code: this folder (train.py). Must be our own trained / fine-tuned model.
+The backend loads this file through backend/app/core/ml_models.py (feature name "anti_spoofing").
 
 Model: MobileNetV2 (ImageNet backbone, partly fine-tuned) with a 1-logit head,
 trained by ml/anti_spoofing/train.py. sigmoid(logit) = P(live).
 
-Weights file: <repo>/weights/liveness_mobilenetv2.pt (git-ignored; copy it from Drive/Kaggle),
-or set HAWKEYE_LIVENESS_WEIGHTS to another path. The decision threshold is stored inside the
+Weights file: ml/anti_spoofing/anti_spoofing.pt (git-ignored; copy it from Drive/Colab),
+or set HAWKEYE_ANTI_SPOOFING_WEIGHTS to another path. The decision threshold is stored inside the
 checkpoint (chosen on the dev split), so it is not hard-coded here.
 
 This file is self-contained on purpose (it does not import from ml/) so the backend can
@@ -20,9 +21,8 @@ from pathlib import Path
 
 import numpy as np
 
-# backend/app/pipeline/liveness.py -> parents[3] is the repo root
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-_DEFAULT_WEIGHTS = _REPO_ROOT / "weights" / "liveness_mobilenetv2.pt"
+# Convention for every feature: ml/<feature>/<feature>.pt
+_DEFAULT_WEIGHTS = Path(__file__).resolve().parent / "anti_spoofing.pt"
 
 MAX_FRAMES = 10  # average the score over at most the last 10 crops
 
@@ -31,7 +31,7 @@ _state: dict = {}  # filled once by _load(): model, threshold, size, mean, std
 
 
 def _weights_path() -> Path:
-    return Path(os.environ.get("HAWKEYE_LIVENESS_WEIGHTS", _DEFAULT_WEIGHTS))
+    return Path(os.environ.get("HAWKEYE_ANTI_SPOOFING_WEIGHTS", _DEFAULT_WEIGHTS))
 
 
 def _load():
@@ -49,7 +49,7 @@ def _load():
         if not path.is_file():
             raise FileNotFoundError(
                 f"Liveness weights not found at {path}. Train with ml/anti_spoofing/train.py "
-                "and copy the .pt file there, or set HAWKEYE_LIVENESS_WEIGHTS."
+                "and copy the .pt file there, or set HAWKEYE_ANTI_SPOOFING_WEIGHTS."
             )
         ckpt = torch.load(path, map_location="cpu", weights_only=True)
         model = mobilenet_v2(weights=None)

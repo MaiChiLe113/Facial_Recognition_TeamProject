@@ -25,6 +25,11 @@ async def lifespan(app):
     if init_db():
         log.info("Seeded the database from data/mock/")
     app.state.engine, app.state.engine_error = None, None
+    try:   # embed the enrolment photos in the background so the Features demo page opens ready
+        from .services import features_demo
+        features_demo.start_preload()
+    except Exception:  # noqa: BLE001 - never block the API
+        log.exception("Could not start loading the registered faces")
     try:
         engine = Engine.load().start()
         app.state.engine = engine

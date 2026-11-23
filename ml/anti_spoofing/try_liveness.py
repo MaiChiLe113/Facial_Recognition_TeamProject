@@ -1,4 +1,4 @@
-"""Try backend/app/pipeline/liveness.py on photos AND videos, including tilted faces.
+"""Try ml/anti_spoofing/infer.py (the runtime liveness check) on photos AND videos, including tilted faces.
 
 Run from the repo root:
 
@@ -40,7 +40,7 @@ import numpy as np
 from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 IMG_EXT = {".jpg", ".jpeg", ".jfif", ".png", ".bmp", ".webp", ".heic", ".heif"}
 VID_EXT = {".webm", ".mp4", ".mov", ".avi", ".mkv", ".m4v"}
@@ -322,7 +322,7 @@ def main():
     if a.save_crops:
         Path(a.save_crops).mkdir(parents=True, exist_ok=True)
 
-    from app.pipeline.liveness import _weights_path, check
+    from infer import _weights_path, check
 
     finder = None if a.no_crop else FaceFinder()
     print("weights:", _weights_path())

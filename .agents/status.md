@@ -10,12 +10,60 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
 
+## 2026-11-23: emotion model trained and wired in (Minh Thành)
+
+- `ml/emotion/emotion_training.ipynb` (run, outputs saved): small CNN, ResNet-18 on FER2013, ResNet-18 on FER2013 + AffectNet
+  (Hugging Face `Mauregato/affectnet_short`, contempt dropped, faces cut with YuNet). Selected: ResNet-18 (ImageNet, conv1 +
+  layer1 frozen) on FER2013 + AffectNet. Test accuracy: FER2013 0.707 (macro-F1 0.698), AffectNet 0.661 (0.632); the
+  FER2013-only model gets 0.460 on AffectNet. Results in `ml/emotion/README.md` (plots in `results/emotion/`, git-ignored).
+- `ml/emotion/infer.py` rewritten inside, same contract (`predict(face_crop, smooth=True)`, `reset()`, `HAWKEYE_EMOTION_WEIGHTS`):
+  crop -> grayscale 48x48 -> 96x96 inside the model, probabilities averaged over the last second (`SMOOTH_SECONDS = 1.0`). Checkpoint keys:
+  `state_dict`, `classes`, `face_size`, `img_size`, `mean`, `std`. `ml/emotion/emotion.pt` (44.8 MB, committed on `main` with `git add -f`) is written by the
+  last notebook cell. Through `load_infer("emotion")`: 0.7055 on the FER2013 test set.
+- Crop: the raw face box (Features demo `MARGIN["emotion"] = 0.0`) scores the same as a square crop with this model (0.633 vs 0.636), so no change needed there.
+
+## 2026-11-23: innovative feature built: door audit + presence verification (Đức Mạnh, not committed yet)
+
+- Code in `ml/presence_verification/` (see its `README.md`, manual tests in `TEST.md`, plan + deviations in `PLAN.md`):
+  `trajectories.py` (tracks → map, valid area per camera), `door_audit.py` (crossings, Δt model, Hungarian, pair
+  classifier, alerts D1/D2/D3), `presence.py` (features, rules R1–R5, model score), `simulate.py`, `train.py`,
+  `evaluate.py`, `infer.py` (API for the backend), `tests/` (19 unit tests).
+- Model file `presence_verification.joblib` and `outputs/` are git-ignored; rebuild with `train.py` (~2 min CPU).
+- Backend plug-in `backend/app/features/presence_verification/` (switched on in `pipeline.json`): `GET /api/features/presence_verification/take/{take}`,
+  `/model`, `/live`. Without the model file it shows `failed` in `/api/pipeline/status` and mounts no routes.
+- Frontend: `PresencePanel.vue` on the Demo (MultiCam) page, map trails on `RoomMap.vue` (optional `trails` prop; red = alert).
+- `RoomMap.vue` draws the 2D map from the team's FigJam design (board b8wiU877MrltPtUYAI4BiW, section node 19:6), copied into `frontend/src/roomLayout.js` (map pixels, 920 x 520). To change the map: edit it in Figma, then update that file. The Figma door gap is y 0.727 to 0.906; `data/calibration/room204_map.json` (used by the homographies and the presence trails) has it at 0.789 to 0.961, so the drawn door and the trails can differ slightly. The calibration file is Mai Chi's and was not changed. People dots and trails are still fractions of the map (x 920, y 520). The mock `door` / `cameras` fields of `session.json` are not drawn.
+- New deps in `requirements.txt`: `scikit-learn`, `scipy`, `joblib` (installed in the repo-root `.venv`); matplotlib only for figures.
+- Still open: tell Mai Chi (it reads `data/tracks/` and `link_names.py` names, never writes them), team OK for the new
+  deps, record scripted fraud takes (all recorded takes are normal). Known real failure: take 3 gives D3 + D1 because
+  the tracker switches IDs while three people stand in the doorway.
+
+## 2026-11-22: models moved to `ml/`, Features demo page (Đức Mạnh, not committed yet)
+
+- `backend/app/pipeline/{liveness,recognizer,emotion}.py` are gone. Each basic model is now `ml/<feature>/infer.py` plus the weights
+  `ml/<feature>/<feature>.pt` for `face_recognition`, `anti_spoofing` and `emotion`. `backend/app/core/ml_models.py` finds them
+  (`weights_file()`, `load_infer()`); the attendance-camera stages use it. `pipeline/` keeps only Mai Chi's detector, tracker and matcher.
+- `ml/face_recognition/infer.py` is new (written from the notebook export format): `embed()` and `identify()`, threshold from the file
+  (cosine >= 0.5254). `ml/face_recognition/face_recognition.pt` is a copy of `verification_fp32_v1/selected_model.pt`. Checked on real photos.
+- `ml/emotion/infer.py` is new; it expects a ResNet-18 checkpoint in the format described in its docstring. (Model trained 2026-11-23, see above.)
+- `ml/anti_spoofing/infer.py` is the old `liveness.py`; it reads `ml/anti_spoofing/anti_spoofing.pt` (the file is in place now, renamed from `liveness_mobilenetv2.pt`; checked on real faces: live, score 0.99, threshold 0.0239; not yet tried on printed photos or phone screens).
+- New page **Features demo** (`/features-demo`, `frontend/src/pages/FeaturesDemo.vue`): tick face recognition / anti-spoofing / emotion,
+  it streams webcam frames to `POST /api/features-demo/infer` (`backend/app/api/features_demo.py`, `services/features_demo.py`), draws the
+  results. Recognition uses the registered students: the Drive enrolment photos (photo folder + student card) that MultiCam also uses, embedded on first use (`GET /api/features-demo/gallery`). Faces are found with OpenCV Haar (demo only); `pillow-heif` is needed for HEIC photos. A feature without weights shows a clear error.
+- Features demo page has a **Recognition threshold** slider (shown when face recognition is ticked). `POST /api/features-demo/infer` takes an optional `?threshold=` (cosine, -1..1, else 400); left out = the threshold saved in the weights, which `GET /api/features-demo/status` now returns as `threshold` on the face_recognition entry. The choice is kept in the browser (`localStorage`), per viewer, not on the server. The pipeline's `recognize` stage still reads `options.threshold` from `pipeline.json`. The threshold actually used (custom or the weights' own) is logged in a `threshold` column of the session log and the CSV, next to `similarity`, on rows where recognition ran. Anti-spoofing has the same: a **Liveness threshold** slider (0..1), `?liveness_threshold=` on `/infer` (else 400), `threshold` on the anti_spoofing entry of `/status`, and a `liveness_threshold` CSV column. It is applied in `services/features_demo.py` by comparing the returned score (`score > 0 and score >= threshold`), because `ml/anti_spoofing/` is not ours to edit; the default is read through `infer._load()["threshold"]` (private, no public accessor). The `liveness` pipeline stage still has no threshold option. The status line under the camera shows `Live 97%` / `Spoof 88%` = how sure the shown label is (`liveness_confidence` on the face, 0.5 at the threshold up to 1.0; a distance to the decision boundary, not a calibrated probability); the raw P(live) stays in `liveness_score` and in the log.
+- The Features demo page has a **Session log** panel (camera on to camera off, always shown). The "Save log (CSV)" box only decides
+  whether that session is written to `logs/features_demo_<start time>.csv` (repo root, git-ignored, one row per face per frame) when the
+  camera turns off (`POST /api/features-demo/log`; also sent with `sendBeacon` if the tab is closed while the camera is on).
+- `requirements.txt` now lists torch, torchvision, numpy, pillow, opencv-python-headless (<5: OpenCV 5 has no CascadeClassifier).
+- `runs/` no longer exists at the repo root; the `runs/**` rules in `.gitignore` are now obsolete. The notebooks still write to `runs/`
+  when re-run (Thuận Minh's), which would recreate it.
+
 ## 2026-11-21: multi-person naming + progress check (Mai Chi, not committed yet)
 
 **New from teammates since 2026-11-18:**
 - Thuận Minh: `ml/face_recognition/01_train_classification.ipynb`, `02_train_triplet.ipynb`,
   `03_evaluate_verification.ipynb`. Selected model: triplet + cosine, threshold ≥ 0.5254, holdout AUC 0.954,
-  TAR 54.1 % at FAR 2.0 %. `backend/app/pipeline/recognizer.py` is still a stub; weights are on his machine.
+  TAR 54.1 % at FAR 2.0 %. Inference code is now `ml/face_recognition/infer.py` and the weights are in `ml/face_recognition/` (see 2026-11-22).
 - Everyone uploaded enrolment photos to their Drive folder (Đức Mạnh 14, Hồng Minh 12 HEIC, Thuận Minh 23,
   Minh Thành 30). Thuận Minh's card is on the Drive as `student_card_image/TMinh.jpg`.
 
@@ -34,7 +82,8 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
   eye on the Demo page. Take 3 checked (correct; ID 5 = Đức Mạnh after a tracker ID switch from ID 1).
   Take 1 checked (all attendance names and cam_1 / cam_2 handoffs correct; seated people later get new
   unnamed IDs on cam_2). Takes 4 and 8 still to check.
-- Minh Thành is not in `students.csv` (no student ID in the metadata sheet). He is not in any recorded
+- Minh Thành was added to `students.csv` as Do Minh Thanh (105550306 / SWH01234) and removed from the
+  placeholder list in `data/mock/session.json`; `backend/tests/test_db.py` now checks he is on the roster. He is not in any recorded
   take, and he was correctly not named on any track (at most 1 crop per track matched him).
 - Seen, not fixed: the Demo page shows `Infinity:NaN` as the duration for `.webm` videos (frontend, Đức Mạnh).
 

@@ -21,7 +21,7 @@ const items = PAGES.filter((p) => p.sidebar !== false)
       </button>
     </nav>
     <button class="add-person" :class="{ active: route.name === 'add' }" @click="router.push('/add')">
-      <span class="plus">+</span> Add person
+      <span class="plus">+</span> Add Student
     </button>
   </aside>
 </template>

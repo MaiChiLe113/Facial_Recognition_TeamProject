@@ -13,9 +13,7 @@
     { "student_id_vn": "SWH02803", "global_id": 11, "status": "checked_in", "check_in": "08:37", "entry": null,    "exit": null,    "minutes": null },
     { "student_id_vn": "SWH02486", "global_id": null, "status": "not_seen", "check_in": null,    "entry": null,    "exit": null,    "minutes": null }
   ],
-  "placeholder_students": [
-    { "student_name": "Minh Thành", "note": "Not in the metadata sheet yet" }
-  ],
+  "placeholder_students": [],
   "events": [
     { "time": "08:52", "event": "Nguyen Duc Manh left class",     "source": "cam_2" },
     { "time": "08:38", "event": "ID 12 detected (unknown)",        "source": "cam_1" },

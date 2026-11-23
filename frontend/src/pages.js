@@ -5,6 +5,7 @@
 import AddPerson from './pages/AddPerson.vue'
 import AttendCourse from './pages/AttendCourse.vue'
 import Demo from './pages/Demo.vue'
+import FeaturesDemo from './pages/FeaturesDemo.vue'
 import History from './pages/History.vue'
 import Home from './pages/Home.vue'
 
@@ -15,8 +16,10 @@ export const PAGES = [
     icon: 'M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M12 9a2 2 0 1 0 0 .01M9 16c.5-1.5 1.6-2.2 3-2.2s2.5.7 3 2.2' },
   { key: 'history', path: '/history', label: 'History', component: History,
     icon: 'M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 7v5l3 2' },
-  { key: 'demo', path: '/demo', label: 'Demo', component: Demo,
+  { key: 'demo', path: '/demo', label: 'MultiCam', component: Demo,
     icon: 'M4 5h16v14H4zM10 9l5 3-5 3z' },
+  { key: 'features-demo', path: '/features-demo', label: 'Features demo', component: FeaturesDemo,
+    icon: 'M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z' },
   // Shown as the "+ Add person" button at the bottom of the sidebar, not in the nav list.
   { key: 'add', path: '/add', label: 'Add person', sidebar: false, component: AddPerson },
 ]

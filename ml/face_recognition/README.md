@@ -4,18 +4,39 @@
 - [x] `01_train_classification.ipynb` — ResNet-18 → 512-d → softmax, cross-entropy (128×128 input selected, epoch 18)
 - [x] `02_train_triplet.ipynb` — same backbone, triplet loss, semi-hard mining selected (epoch 19 of 20)
 - [x] `03_evaluate_verification.ipynb` — ROC/AUC on the verification pairs, cosine vs Euclidean, threshold
-- [ ] Wire the exported model into `backend/app/pipeline/recognizer.py` (still a stub: `embed()` and
-      `identify()` raise `NotImplementedError`; the notebook says the recognizer is delivered separately)
-- [ ] Check the model on our own enrolment photos and attendance-camera faces
+- [x] Inference code: `infer.py` (`embed()`, `identify()`), loaded by the backend and the Features demo page
+- [x] Demo weights: `face_recognition.pt`, stored in Git alongside `infer.py`
+- [x] Replay the model on team enrolment photos and existing attendance-camera faces
+- [ ] Check performance on a new recording with registered and unregistered people
 
-Results (from `03_evaluate_verification.ipynb`, added 2026-11-21): **triplet + cosine** is the selected
-model, threshold cosine ≥ 0.5254 (Euclidean ≤ 0.9743). On 3,314 independent holdout pairs: AUC 0.954,
-true-match acceptance 54.1 %, false-match rate 2.0 %. The weights (`selected_model.pt`, ~45 MB) live on
-Thuận Minh's machine under `runs/face_recognition/verification_fp32_v1/`, not in git.
+The original Kaggle evaluation in `03_evaluate_verification.ipynb` selected **triplet + cosine** at a
+cosine threshold ≥ 0.5254 (Euclidean ≤ 0.9743). On 3,314 independent holdout pairs, the original
+`selected_model.pt` scored AUC 0.954, with 54.1 % true-match acceptance and a 2.0 % false-match rate.
 
-## Baseline in use now: `name_tracks.py`
+The Features demo page (`backend/app/services/features_demo.py`) also uses the YuNet file below to find faces; without it, it falls back to OpenCV's Haar cascade and loads fewer enrolment photos.
 
-Until the models above are trained, the demo names people with OpenCV's pre-trained **YuNet** (face
+## Demo weights
+
+The checked-in `face_recognition.pt` contains the camera-fine-tuned triplet model. Its matching policy
+averages and normalizes each student's
+enrolment embeddings. A match requires a cosine similarity of at least 0.692213 (rounded) and a
+lead of more than 0.025 over the runner-up.
+
+Pull the repo, restart the backend and reset the Features page's face threshold slider to use the model
+default. The gallery is recomputed for the new weights. Set `HAWKEYE_DRIVE_ROOT` to the folder containing
+`AppliedML/` if it is outside the configured Drive location. `HAWKEYE_FACE_RECOGNITION_WEIGHTS` can point
+to a different checkpoint for comparison.
+
+[Notebook 03](03_evaluate_verification.ipynb) records calibration on take 1 and comparison on take 3.
+On the same 68 annotated camera crops, the camera profile gave 21 correct, one wrong, and 46 `Unknown`.
+The earlier camera candidate gave 16 correct, one wrong, and 51 `Unknown`. Both accepted 3/68 simulated
+unregistered queries with the true identity removed from the gallery. The regular model gave 34 correct,
+33 wrong, and one `Unknown`. Both clips were previously inspected. A new clip with real unregistered
+people is needed to assess performance for the demo.
+
+## Offline track naming: `name_tracks.py`
+
+The offline script names people with OpenCV's pre-trained **YuNet** (face
 detection) + **SFace** (128-d embedding, cosine similarity, threshold 0.363 as recommended by OpenCV).
 Weights go in `ml/face_recognition/models/` (git-ignored), from `github.com/opencv/opencv_zoo`
 (~0.2 MB and ~37 MB):
@@ -40,8 +61,9 @@ The Drive folder is found from `HAWKEYE_VIDEO_ROOT` in `backend/.env` (two level
   `ID n · Mai Chi` after it.
 - **All five members enrolled (2026-11-21, full Drive folders, photos + card):** Mai Chi 16 faces / 16
   files, Đức Mạnh 15/15, Thuận Minh 24/24 (incl. his card `TMinh.jpg`), Hồng Minh 9/12 (no face in 3 HEIC
-  photos), Minh Thành 24/28 (no face in 4 webcam photos). Minh Thành is **not in `students.csv`** (no
-  student ID in the metadata sheet), so he was enrolled from a separate roster file with `--students`.
+  photos), Minh Thành 24/28 (no face in 4 webcam photos). For this run Minh Thành
+  was enrolled from a separate roster file with `--students`; since 2026-11-21 he is in `students.csv`
+  (Do Minh Thanh), so the default run enrols him too.
   He is not in any of the recorded takes, and he was correctly not named on any track (at most 1 face
   crop per track matched him), so his enrolment caused no false names.
 - **Result, takes 1–8 (2026-11-21, run with all five enrolled):**

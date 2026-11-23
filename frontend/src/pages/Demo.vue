@@ -3,9 +3,10 @@
 // The backend streams every take (?take=N) with its precomputed boxes (data/tracks/take<N>/).
 // TODO (Đức Mạnh + Mai Chi): run the take through the live pipeline on the backend.
 import { computed, onMounted, ref } from 'vue'
-import { demoTakes, fetchDashboard, fetchDemoConfig, fetchTracks } from '../api.js'
+import { demoTakes, fetchDashboard, fetchDemoConfig, fetchPresence, fetchTracks } from '../api.js'
 import CameraCard from '../components/CameraCard.vue'
 import EventLog from '../components/EventLog.vue'
+import PresencePanel from '../components/PresencePanel.vue'
 import RoomMap from '../components/RoomMap.vue'
 import { useSyncedPlayback } from '../composables/useSyncedPlayback.js'
 import { clockOf, eventsFromTracks } from '../takeEvents.js'
@@ -18,6 +19,7 @@ const { take: defaultTake, takes } = demoTakes()
 const selected = ref(defaultTake)
 const dash = ref(null)   // event log and map (mock session until the pipeline runs the take)
 const message = ref('')
+const presence = ref(null)   // presence verification + door audit of the take (null while loading)
 
 const cards = {}
 const videoOf = (camId) => cards[camId]?.video
@@ -28,6 +30,8 @@ const { srcs, playing, position, duration, seek, play, togglePause, restart, sto
 function loadTake(n) {
   fetchDemoConfig(n).then((d) => { if (selected.value === n) demo.value = d })
   tracks.value = {}
+  presence.value = null
+  fetchPresence(n).then((p) => { if (selected.value === n) presence.value = p })
   Promise.all(ORDER.map((c) => fetchTracks(c, n))).then((list) => {
     if (selected.value === n) tracks.value = Object.fromEntries(ORDER.map((c, i) => [c, list[i]]))
   })
@@ -72,6 +76,13 @@ const allTakeEvents = computed(() => eventsFromTracks(tracks.value,
 const liveEvents = computed(() => (hasVideo.value ? allTakeEvents.value.filter((e) => e.t <= position.value + 0.05) : [])
   .map((e) => ({ ...e, time: clockOf(e.t) })))
 
+// Map trails from presence verification, drawn up to the playback position while a video plays.
+const trails = computed(() => {
+  const all = presence.value?.trails ?? []
+  if (!hasVideo.value) return all
+  return all.map((tr) => ({ ...tr, points: tr.points.filter((p) => p[0] <= position.value + 0.05) }))
+})
+
 // Playback line: drag to scrub. While dragging, the videos pause and resume on release.
 let wasPlaying = false
 function scrubStart() { wasPlaying = playing.value; if (wasPlaying) togglePause() }
@@ -83,7 +94,7 @@ const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padSt
   <div v-if="!demo" class="loading">Loading demo…</div>
   <div v-else class="page">
     <header class="topbar">
-      <h1>Demo · <span style="color:#dd958f">Take {{ selected }} loaded</span></h1>
+      <h1>MultiCam · <span style="color:#dd958f">Take {{ selected }} loaded</span></h1>
       <div class="topbar-right">
         <div class="demo-controls">
           <!-- One button: loads and plays the take the first time, then pauses / resumes it. -->
@@ -115,9 +126,11 @@ const fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padSt
     <template v-if="dash">
       <div class="grid-bottom">
         <EventLog class="demo-log" :events="liveEvents" :title="`Event log · take ${selected}`" />
-        <RoomMap :map="dash.map" :room="dash.course.room" />
+        <RoomMap :map="dash.map" :room="dash.course.room" :trails="trails" />
       </div>
     </template>
+
+    <PresencePanel :result="presence" :position="position" :live="hasVideo" />
 
     <section class="card roster">
       <header class="card-head">

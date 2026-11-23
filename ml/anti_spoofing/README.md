@@ -11,7 +11,7 @@ MobileNetV2 with ImageNet weights and **partial fine-tuning** (allowed by the br
 | `train.py` | training loop (run on Kaggle/Colab GPU) |
 | `evaluate.py` | final numbers + ROC plot for the report |
 
-Runtime code that uses the trained model: `backend/app/pipeline/liveness.py`.
+Runtime code that uses the trained model: `infer.py` in this folder (loaded by the backend and the Features demo page).
 
 ## Data
 
@@ -38,13 +38,13 @@ training time and at demo time.
 pip install -r requirements.txt
 python train.py --data-root /kaggle/input/lcc-fasd --epochs 10 \
     --extra-train own_data/train --extra-dev own_data/dev \
-    --out weights/liveness_mobilenetv2.pt --results results/antispoof
+    --out ml/anti_spoofing/anti_spoofing.pt --results results/antispoof
 python evaluate.py --data-root /kaggle/input/lcc-fasd --extra-eval own_data/test \
-    --weights weights/liveness_mobilenetv2.pt --results results/antispoof
+    --weights ml/anti_spoofing/anti_spoofing.pt --results results/antispoof
 ```
 
-Copy `weights/liveness_mobilenetv2.pt` into the repo's `weights/` folder (git-ignored), or
-set `HAWKEYE_LIVENESS_WEIGHTS=<path>`. The decision threshold is stored inside the file.
+The app looks for `ml/anti_spoofing/anti_spoofing.pt` (git-ignored; copy it from Drive), or
+set `HAWKEYE_ANTI_SPOOFING_WEIGHTS=<path>`. The decision threshold is stored inside the file.
 
 ## Method (for the report)
 

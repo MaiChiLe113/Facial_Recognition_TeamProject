@@ -4,6 +4,8 @@ Newest first. Add a line when the user decides something; do not reopen a decisi
 
 | Date | Decision | Why |
 | --- | --- | --- |
+| 2026-11-23 | `scikit-learn`, `scipy`, `joblib` added to `requirements.txt` for presence verification; `*.joblib` and `ml/presence_verification/outputs/` git-ignored. Recorded takes are scored as the start of a 90-min class (`sessions.CLASS_S`) | User asked to implement the plan without waiting for review; team still to be told about the new deps |
+| 2026-11-23 | Đức Mạnh's innovative feature = door audit (check-ins vs door crossings) + presence verification, built in `ml/presence_verification/` (plan: its `PLAN.md`); door audit first, presence verification builds on its matches. It reads `data/tracks/` and `link_names.py` output, never writes them | User request (Đức Mạnh); plan awaits review, no code yet |
 | 2026-11-18 | SQLite is the data store (`data/hawkeye.sqlite3`, git-ignored, seeded from `data/mock/`); CSV/JSON in `data/mock/` stay as seed data and the frontend's offline fallback. Attendance-cam status and map positions stay in `session.json` (live state) | User request (Đức Mạnh); lifts the 2026-11-17 hold |
 | 2026-11-17 | Keep CSV (`data/mock/`) as the data store for now; SQLite step 1 on hold | User request (Mai Chi) |
 | 2026-11-17 | Old take 1 deleted (failed recording); takes renumbered 1–8, demo take 4 → 3 | User request (Mai Chi) |
