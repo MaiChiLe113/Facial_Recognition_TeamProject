@@ -50,3 +50,6 @@ AppliedML/
 
 # Features demo CSV logs (root/logs/)
 logs/
+
+# Face photos uploaded on the Add person page (personal data)
+data/photos/

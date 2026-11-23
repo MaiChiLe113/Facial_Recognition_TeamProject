@@ -1,8 +1,7 @@
 // Talks to the FastAPI backend. If the backend is not running, falls back to the
 // same mock files in ../data/mock so the page still renders.
 import sessionMock from '../../data/mock/session.json'
-import studentsCsv from '../../data/mock/students.csv?raw'
-import coursesCsv from '../../data/mock/courses.csv?raw'
+import roster from '../../data/mock/roster.json'
 import videoConfig from '../../data/video_config.json'
 import trackCam1 from '../../data/mock/tracks/cam_1.json'
 import trackCam2 from '../../data/mock/tracks/cam_2.json'
@@ -200,18 +199,13 @@ export function buildRoster(students, session) {
   })
 }
 
-const parseCourseKeys = (value) => (value || '').replace(/[[\]]/g, '').split(',').filter((v) => v.trim()).map(Number)
-
+// Offline fallback = the seed the backend starts from (data/mock/roster.json), same shape as GET /api/students.
 function mockStudents() {
-  return parseCsv(studentsCsv).map((s) => ({
-    student_id_vn: s.student_id_vn, student_id_au: s.student_id_au, name: s.student_name,
-    year: s.year, courses: parseCourseKeys(s.courses), photo_folder: s.photo_folder,
-    photo: s.student_card ? `/photos/${s.student_id_vn}` : null,
-  }))
+  return roster.students.map((s) => ({ ...s, photo: s.student_card ? `/photos/${s.student_id_vn}` : null }))
 }
 
 function mockCourses() {
-  return parseCsv(coursesCsv).map((c) => ({ ...c, key_id: Number(c.key_id) }))
+  return roster.courses
 }
 
 function mockSessions() {
@@ -228,39 +222,27 @@ function mockSessions() {
 }
 
 // ---- offline fallback: same shape as backend/app/db/queries.py ----
-function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/)
-  const header = lines[0].split(',')
-  return lines.slice(1).map((line) => {
-    const cells = line.match(/("[^"]*"|[^,]*)(,|$)/g).map((c) => c.replace(/,$/, '').replace(/^"|"$/g, ''))
-    return Object.fromEntries(header.map((h, i) => [h, cells[i] ?? '']))
-  })
-}
-
 function buildMockDashboard() {
-  const students = parseCsv(studentsCsv)
-  const courses = parseCsv(coursesCsv)
   const s = sessionMock.session
-  const course = courses.find((c) => Number(c.key_id) === s.course_key)
+  const course = roster.courses.find((c) => c.key_id === s.course_key)
   const byId = Object.fromEntries(sessionMock.attendance.map((a) => [a.student_id_vn, a]))
-  const roster = students.map((st) => {
+  const rows = mockStudents().map((st) => {
     const a = byId[st.student_id_vn] ?? {}
-    const enrolled = (st.courses || '').replace(/[[\]]/g, '').split(',').map(Number).includes(s.course_key)
     return {
-      name: st.student_name, student_id: st.student_id_vn, global_id: a.global_id ?? null, enrolled,
+      name: st.name, student_id: st.student_id_vn, global_id: a.global_id ?? null, enrolled: st.courses.includes(s.course_key),
       status: a.status ?? 'not_seen', check_in: a.check_in ?? null, entry: a.entry ?? null,
       exit: a.exit ?? null, minutes: a.minutes ?? null,
-      photo: st.student_card ? `/photos/${st.student_id_vn}` : null,
+      photo: st.photo,
     }
   })
   for (const p of sessionMock.placeholder_students ?? []) {
-    roster.push({ name: p.student_name, student_id: null, global_id: null, enrolled: false, status: 'placeholder', note: p.note })
+    rows.push({ name: p.student_name, student_id: null, global_id: null, enrolled: false, status: 'placeholder', note: p.note })
   }
   return {
     source: 'mock',
     course: { id: course.course_id, name: course.course_name, session_time: course.session_time, room: s.room },
     session: s,
-    roster,
+    roster: rows,
     events: sessionMock.events,
     attendance_cam_status: sessionMock.attendance_cam_status,
     map: sessionMock.map,

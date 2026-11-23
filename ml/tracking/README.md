@@ -199,7 +199,7 @@ exits in take 3):
 
 People (same labels in every take): `P1` red jersey, `P2` grey T-shirt, `P3` navy jersey #27 with
 glasses, `P4` the person with red hair and a grey shirt (seated in take 3, walks in first in take 1).
-`P4` is **Le Mai Chi** (`SWH02378` in `data/mock/students.csv`), matched by eye to the enrolment
+`P4` is **Le Mai Chi** (`SWH02378` in the student roster, `GET /api/students`), matched by eye to the enrolment
 photos in the team Drive folder `AppliedML/Mai Chi/`. P1–P3 have no photos yet, so they stay
 unnamed.
 cam_1 and cam_2 also see people through the glass between the corridor and the room; those
@@ -211,7 +211,7 @@ person,cam_id,appear_s,disappear_s,event,notes
 
 | column | meaning |
 | --- | --- |
-| `person` | a stable label for the real person across all cameras and rows, e.g. `P1`, `P2`, or the student ID from `data/mock/students.csv` if known. Same person = same label on every camera. |
+| `person` | a stable label for the real person across all cameras and rows, e.g. `P1`, `P2`, or the student ID from the roster (`GET /api/students`) if known. Same person = same label on every camera. |
 | `cam_id` | `cam_1`, `cam_2` or `attendance_cam` |
 | `appear_s` | seconds from the start of **that camera's** video when the person first becomes visible (any part of the body) |
 | `disappear_s` | seconds when the person is last visible. For a `check_in`/`enter_class`/`leave_class` row, use the moment of the event for both `appear_s` and `disappear_s` |

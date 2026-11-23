@@ -3,8 +3,9 @@
 Stand-in for the trained face model until train_classification.py / train_triplet.py exist:
 OpenCV's pre-trained YuNet (face detection) + SFace (128-d face embedding, cosine similarity).
 
-1. Enrol: for every student in data/mock/students.csv, embed the faces in their photo folder and on their
-   student card (both paths are relative to the folder that holds AppliedML/, i.e. HAWKEYE_VIDEO_ROOT/../..).
+1. Enrol: for every student in the backend's database (data/hawkeye.sqlite3, read-only), embed the faces in their
+   photo folder and on their student card ("AppliedML/..." paths are relative to the folder that holds AppliedML/,
+   i.e. HAWKEYE_VIDEO_ROOT/../..; "data/photos/..." are photos uploaded on the Add person page).
 2. Match: for every attendance_cam track in data/tracks/take<N>/attendance_cam.json, embed the faces that
    fall inside the track box, compare with every enrolled face, and write the student's name into the
    track's "name" field when enough frames agree, plus "name_from": the time (s) of the MIN_MATCHED_FRAMES-th
@@ -20,9 +21,9 @@ Models (git-ignored, ml/face_recognition/models/), from github.com/opencv/opencv
     face_detection_yunet_2023mar.onnx, face_recognition_sface_2021dec.onnx
 """
 import argparse
-import csv
 import json
 import shutil
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -33,7 +34,7 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "ml" / "tracking"))
 from link_names import link_take  # noqa: E402
-from paths import configured_take, video_config, video_path, video_root  # noqa: E402
+from paths import configured_take, db_path, student_file, video_config, video_path  # noqa: E402
 
 MODELS = Path(__file__).resolve().parent / "models"
 ENROL_CACHE = REPO / "data" / "raw" / "enrol"          # HEIC -> JPEG copies (git-ignored)
@@ -89,20 +90,28 @@ def read_image(path):
     return img
 
 
-STUDENTS_CSV = REPO / "data" / "mock" / "students.csv"
+def roster(db):
+    """The registered students, read-only from the backend's database (the backend owns the roster: it is seeded
+    from data/mock/roster.json and grows through POST /api/students)."""
+    if not Path(db).is_file():
+        sys.exit(f"No database at {db}. Start the backend once (it creates and seeds it), "
+                 "or run: cd backend && python -m app.db.seed")
+    with sqlite3.connect(f"{Path(db).resolve().as_uri()}?mode=ro", uri=True) as con:
+        con.row_factory = sqlite3.Row
+        return [dict(r) for r in con.execute(
+            "SELECT student_id_vn, name AS student_name, photo_folder, student_card FROM students ORDER BY name")]
 
 
-def enrol(model, students_csv=STUDENTS_CSV):
+def enrol(model, db=None):
     """{student_id_vn: {"name", "embeddings": [n, 128], "sources": [...]}} for students with photos."""
-    drive = video_root().parent.parent           # .../My Drive (holds AppliedML/)
     gallery = {}
-    for s in csv.DictReader(Path(students_csv).open(encoding="utf-8")):
+    for s in roster(db or db_path()):
         files = []
-        folder = drive / s["photo_folder"] if s.get("photo_folder") else None
+        folder = student_file(s["photo_folder"]) if s.get("photo_folder") else None
         if folder and folder.is_dir():
             files += sorted(p for p in folder.iterdir() if p.suffix.lower() in IMAGE_EXT)
         if s.get("student_card"):
-            files.append(drive / s["student_card"])
+            files.append(student_file(s["student_card"]))
         embs, used = [], []
         for f in files:
             img = read_image(f) if f.exists() else None
@@ -175,12 +184,13 @@ def name_take(model, gallery, take, every=2):
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--take", default=None, help="take number or 'all' (default: the configured take)")
-    p.add_argument("--students", default=str(STUDENTS_CSV), help="roster CSV (default: data/mock/students.csv)")
+    p.add_argument("--db", default=None, help="backend database to read the students from (default: HAWKEYE_DB, "
+                                              "else data/hawkeye.sqlite3)")
     a = p.parse_args()
     takes = ([t["take"] for t in video_config()["takes"]] if a.take == "all"
              else [configured_take() if a.take is None else int(a.take)])
     model = FaceModel()
-    gallery = enrol(model, a.students)
+    gallery = enrol(model, a.db)
     for t in takes:
         for s in name_take(model, gallery, t):
             print(f"take {s['take']} attendance_cam track {s['track']}: {s['face_crops']} face crops, "

@@ -38,6 +38,7 @@ _lock = threading.Lock()
 _people_model = None
 _face_model = None
 _face_lock = threading.Lock()   # YuNet keeps its input size as state: one call at a time
+_face_state = {}                # the size / threshold last set on YuNet (setting them redoes its anchors)
 
 
 def _path(env, default):
@@ -108,9 +109,14 @@ def detect_faces(frame, conf=FACE_CONF, min_size=MIN_FACE_PX):
     height, width = frame.shape[:2]
     scale = min(1.0, FACE_MAX_SIDE / max(height, width))
     small = frame if scale == 1.0 else cv2.resize(frame, (round(width * scale), round(height * scale)))
+    size = (small.shape[1], small.shape[0])
     with _face_lock:
-        model.setScoreThreshold(conf)
-        model.setInputSize((small.shape[1], small.shape[0]))
+        if _face_state.get("size") != size:
+            model.setInputSize(size)
+            _face_state["size"] = size
+        if _face_state.get("conf") != conf:
+            model.setScoreThreshold(conf)
+            _face_state["conf"] = conf
         _, found = model.detect(small)
     faces = []
     for row in ([] if found is None else found):

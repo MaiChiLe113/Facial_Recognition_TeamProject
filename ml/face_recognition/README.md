@@ -50,11 +50,12 @@ ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all
 
 The Drive folder is found from `HAWKEYE_VIDEO_ROOT` in `backend/.env` (two levels up from `video data/`).
 
-- **Enrolment:** every student in `data/mock/students.csv` with photos: the files in `photo_folder` and the
-  `student_card` image (paths relative to the Drive folder that holds `AppliedML/`; HEIC is converted
+- **Enrolment:** every student in the backend's database (`data/hawkeye.sqlite3`, read-only; start the backend once to
+  create it) with photos: the files in `photo_folder` and the `student_card` image (`AppliedML/...` paths are relative to
+  the Drive folder that holds `AppliedML/`, `data/photos/...` are Add person uploads; HEIC is converted
   into `data/raw/enrol/` with macOS `sips`, or with `pillow-heif` on Windows/Linux:
   `pip install pillow pillow-heif`). A photo with no face found is retried at 960, 640, 480 and 320 px:
-  YuNet misses faces that fill a phone close-up. `--students <csv>` enrols from another roster file.
+  YuNet misses faces that fill a phone close-up. `--db <file>` reads another database.
 - **Matching:** each face crop votes only for the student it matches best (with several students
   enrolled, one crop used to count for everyone above the threshold). Each `attendance_cam` track is named
   when at least 3 face crops inside its box match one student. `name_from` = time of the 3rd match, so the UI shows `ID n · Unknown` until check-in and
@@ -62,8 +63,7 @@ The Drive folder is found from `HAWKEYE_VIDEO_ROOT` in `backend/.env` (two level
 - **All five members enrolled (2026-11-21, full Drive folders, photos + card):** Mai Chi 16 faces / 16
   files, Đức Mạnh 15/15, Thuận Minh 24/24 (incl. his card `TMinh.jpg`), Hồng Minh 9/12 (no face in 3 HEIC
   photos), Minh Thành 24/28 (no face in 4 webcam photos). For this run Minh Thành
-  was enrolled from a separate roster file with `--students`; since 2026-11-21 he is in `students.csv`
-  (Do Minh Thanh), so the default run enrols him too.
+  was enrolled from a separate roster file; he is now in the database (Do Minh Thanh), so the default run enrols him too.
   He is not in any of the recorded takes, and he was correctly not named on any track (at most 1 face
   crop per track matched him), so his enrolment caused no false names.
 - **Result, takes 1–8 (2026-11-21, run with all five enrolled):**

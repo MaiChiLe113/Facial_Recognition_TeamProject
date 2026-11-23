@@ -1,4 +1,5 @@
 fastapi>=0.115
+python-multipart>=0.0.9       # file uploads (POST /api/students)
 uvicorn[standard]>=0.30
 python-dotenv>=1.0
 sqlalchemy>=2.0
@@ -8,7 +9,7 @@ torchvision>=0.17
 numpy>=1.26
 pillow>=10.0
 pillow-heif>=0.16
-opencv-python-headless>=4.9,<5
+opencv-python>=4.9,<5     # one OpenCV package only: ultralytics needs this one; <5 because OpenCV 5 has no CascadeClassifier
 # Presence verification + door audit (ml/presence_verification/)
 scikit-learn>=1.4
 scipy>=1.11

@@ -1,0 +1,77 @@
+{
+  "_note": "Seed for a new database (backend/app/db/seed.py). The database is the roster from then on: register students on the Add person page (POST /api/students), not here. Re-seed: python -m app.db.seed --reset",
+  "courses": [
+    {
+      "key_id": 1,
+      "course_id": "COS30082",
+      "course_name": "Applied Machine Learning",
+      "session_time": "Wednesday 8-12AM",
+      "room": "204"
+    },
+    {
+      "key_id": 2,
+      "course_id": "COS40007",
+      "course_name": "AI Engineering",
+      "session_time": "Wednesday 1-5PM",
+      "room": "204"
+    }
+  ],
+  "students": [
+    {
+      "student_id_vn": "SWH02378",
+      "student_id_au": "105555880",
+      "name": "Le Mai Chi",
+      "year": "K6",
+      "courses": [
+        1,
+        2
+      ],
+      "photo_folder": "AppliedML/Mai Chi",
+      "student_card": "AppliedML/student_card_image/chi.jpeg"
+    },
+    {
+      "student_id_vn": "SWH02701",
+      "student_id_au": "105547489",
+      "name": "Nguyen Duc Manh",
+      "year": "K6",
+      "courses": [
+        1
+      ],
+      "photo_folder": "AppliedML/Đức Mạnh",
+      "student_card": "AppliedML/student_card_image/manh.png"
+    },
+    {
+      "student_id_vn": "SWH02803",
+      "student_id_au": "105555547",
+      "name": "Do Trinh Thuan Minh",
+      "year": "K6",
+      "courses": [
+        1
+      ],
+      "photo_folder": "AppliedML/Thuận Minh",
+      "student_card": "AppliedML/student_card_image/TMinh.jpg"
+    },
+    {
+      "student_id_vn": "SWH02486",
+      "student_id_au": "105554913",
+      "name": "Nguyen Hong Minh",
+      "year": "K6",
+      "courses": [
+        1
+      ],
+      "photo_folder": "AppliedML/Hồng Minh",
+      "student_card": null
+    },
+    {
+      "student_id_vn": "SWH01234",
+      "student_id_au": "105550306",
+      "name": "Do Minh Thanh",
+      "year": "K6",
+      "courses": [
+        1
+      ],
+      "photo_folder": "AppliedML/Minh Thành",
+      "student_card": null
+    }
+  ]
+}
