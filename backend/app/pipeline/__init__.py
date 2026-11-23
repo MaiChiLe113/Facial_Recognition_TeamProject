@@ -1,4 +1,5 @@
-"""Per-frame pipeline modules that are not models. Each module is a stub with its owner and a TODO.
+"""Per-frame pipeline modules that are not models. detector.py is implemented; tracker.py, matcher.py and
+attendance.py are still stubs with their owner and a TODO.
 
 The three basic models (anti_spoofing, face_recognition, emotion) live in the repo's ml/ folder as
 ml/<feature>/infer.py + ml/<feature>/<feature>.pt; see app/core/ml_models.py.

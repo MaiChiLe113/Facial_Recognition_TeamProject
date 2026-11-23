@@ -2,7 +2,7 @@
 
 COS30082 Applied Machine Learning team project. Three cameras (corridor, classroom, doorway) track every person with a numeric ID; the doorway **attendance camera** checks liveness, recognises the face and reads emotion, then the ID becomes `ID n · Name` on every camera. Hawkeye logs check-in, entry, exit and total time in class.
 
-> Status: the Home page runs on mock data for the roster and events. The Home and MultiCam pages play the recorded takes with **real person boxes** (YOLO11n + ByteTrack, precomputed), and people are recognised at check-in on the attendance camera and named on all three cameras (all four people in take 1, three in take 3, Nguyen Hong Minh in takes 4 and 8; all five members have enrolment photos). The live per-frame pipeline is still a set of stubs marked `TODO` with their owners.
+> Status: the Home page runs on mock data for the roster and events. The Home and MultiCam pages play the recorded takes with **real person boxes** (YOLO11n + ByteTrack, precomputed), and people are recognised at check-in on the attendance camera and named on all three cameras (all four people in take 1, three in take 3, Nguyen Hong Minh in takes 4 and 8; all five members have enrolment photos). In the live per-frame pipeline the attendance camera runs end to end (face detection, liveness, recognition, emotion) and CAM1 / CAM2 detect people; the live tracker, cross-camera matcher and attendance rules are still stubs marked `TODO` with their owners.
 
 ## Repo layout
 
@@ -11,7 +11,7 @@ backend/            FastAPI server (API + video streaming)
   app/main.py       builds the app; routes live in app/api/ (one file per area)
   app/core/         plug-in pipeline: stage registry, event bus, runner (configured by backend/pipeline.json)
   app/features/     one folder per innovation feature; see app/features/README.md
-  app/pipeline/     one stub per model / step (detector, tracker, liveness, recognizer, emotion, matcher, attendance)
+  app/pipeline/     non-model steps: detector (done), tracker, matcher, attendance (stubs); the models are in ml/<feature>/
   app/db/schema.sql SQLite tables (not wired yet)
 frontend/           Vue 3 + Vite web app (Home page built, other pages placeholders)
   src/pages.js      page registry: add one entry to get a route + sidebar item

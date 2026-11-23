@@ -10,6 +10,20 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
 
+## 2026-11-23: live detector (Mai Chi, branch `tracking/live-detector`)
+
+- `backend/app/pipeline/detector.py` implemented: `detect_people()` = YOLO11n (class 0, conf 0.4, same as the precomputed
+  tracks; `ml/tracking/yolo11n.pt`, downloaded by Ultralytics if missing), `detect_faces()` = OpenCV YuNet (score 0.8,
+  faces < 20 px dropped, largest first; `ml/face_recognition/models/face_detection_yunet_2023mar.onnx`, now committed with
+  `git add -f`, 230 KB). Boxes `(x, y, w, h, score)` in pixels, clipped to the frame; models load once, on first use.
+  Overrides: `HAWKEYE_PERSON_DETECTOR`, `HAWKEYE_FACE_DETECTOR`.
+- Unblocks the attendance-camera pipeline: on take 1 frames, `detect_faces -> liveness -> recognize -> emotion` all report
+  `ready` (17 / 57 / 7 / 6 ms per frame on Mai Chi's Mac). Hồng Minh's PR #6 asked for this.
+- Seen while testing (Thuận Minh's area, not changed): with a 2-person test gallery, a person not in the gallery scored
+  cosine 0.68 while an enrolled person scored 0.57 on doorway frames; check the recognizer on our camera faces.
+- `backend/tests/test_detector.py`: 7 tests on the committed calibration frames (skip without OpenCV / Ultralytics).
+- `requirements.txt`: `ultralytics>=8.3` added. Still stubs: `tracker.py`, `matcher.py`, `attendance.py`.
+
 ## 2026-11-23: emotion model trained and wired in (Minh Thành)
 
 - `ml/emotion/emotion_training.ipynb` (run, outputs saved): small CNN, ResNet-18 on FER2013, ResNet-18 on FER2013 + AffectNet
