@@ -8,10 +8,11 @@ backend/.env
 node_modules/
 frontend/dist/
 
-# Data and models (only the face-recognition exports below are allowed in Git)
+# Data and models. The face recognition demo uses one versioned export.
 *.webm
 *.mp4
 *.pt
+!/ml/face_recognition/face_recognition.pt
 *.pth
 *.onnx
 data/videos/
@@ -28,16 +29,7 @@ runs/**
 *.joblib
 ml/presence_verification/outputs/
 
-# Keep caches, logs and training/recovery checkpoints ignored; allow final face exports.
-!runs/face_recognition/
-!runs/face_recognition/classification_optimization_v1/
-!runs/face_recognition/classification_optimization_v1/resnet18_128/
-!runs/face_recognition/triplet_optimization_v1/
-!runs/face_recognition/triplet_optimization_v1/semi_hard/
-!runs/face_recognition/verification_fp32_v1/
-!runs/face_recognition/classification_optimization_v1/resnet18_128/inference.pt
-!runs/face_recognition/triplet_optimization_v1/semi_hard/inference.pt
-!runs/face_recognition/verification_fp32_v1/selected_model.pt
+# Notebook caches and training/recovery checkpoints
 .ipynb_checkpoints/
 *.ckpt
 *.safetensors

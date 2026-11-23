@@ -4,9 +4,8 @@ Training and evaluation: the notebooks in this folder (triplet loss + cosine sim
 The backend and the Features demo page load this file through backend/app/core/ml_models.py
 (feature name "face_recognition").
 
-Weights file: ml/face_recognition/face_recognition.pt (git-ignored). It is the calibrated export
-`selected_model.pt` from 03_evaluate_verification.ipynb: a ResNet-18 that returns 512-d unit
-embeddings, with the input size, normalisation and the cosine threshold stored inside it.
+Weights file: ml/face_recognition/face_recognition.pt. The camera-calibrated ResNet-18 returns
+512-d unit embeddings. The export stores input size, normalisation, and the cosine matching policy.
 Set HAWKEYE_FACE_RECOGNITION_WEIGHTS to use another file, and HAWKEYE_FACE_DEVICE to "cpu" / "cuda"
 (default "auto").
 
@@ -52,9 +51,8 @@ def _load():
         path = _weights_path()
         if not path.is_file():
             raise FileNotFoundError(
-                f"Face recognition weights not found at {path}. Copy the export "
-                "(selected_model.pt from 03_evaluate_verification.ipynb) there as face_recognition.pt, "
-                "or set HAWKEYE_FACE_RECOGNITION_WEIGHTS."
+                f"Face recognition weights not found at {path}. Restore face_recognition.pt from Git "
+                "or set HAWKEYE_FACE_RECOGNITION_WEIGHTS to an available export."
             )
         payload = torch.load(path, map_location="cpu", weights_only=True)
         if payload.get("architecture") != "resnet18_embedding" or payload.get("embedding_dimensions") != EMBEDDING_DIMENSIONS:
