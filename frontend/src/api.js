@@ -136,6 +136,23 @@ export async function createStudent(form) {
   return { ok: false, message: body?.detail ? String(body.detail) : `The backend answered ${res.status}.` }
 }
 
+// ---- Live cameras over Wi-Fi (backend/app/api/live.py) -------------------------------------------
+//   GET /api/live -> { cameras: [{ cam_id, label, place, role, connected, senders, fps, people, faces, frame_ms }],
+//                      host_urls: ['https://<host IP>:5173/camera'] }
+//   GET /api/live/{cam_id}/stream   MJPEG of the annotated frames (use as <img src>)
+//   WS  /ws/camera/{cam_id}         the Camera page sends JPEG frames; each answer = that frame's summary
+export async function fetchLive() {
+  try {
+    return { ...(await getJson('/api/live')), offline: false }
+  } catch {
+    return { cameras: [], host_urls: [], offline: true }
+  }
+}
+
+export const liveStreamUrl = (camId) => `/api/live/${camId}/stream`
+export const cameraSocketUrl = (camId) =>
+  `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/camera/${encodeURIComponent(camId)}`
+
 // ---- Features demo page (backend/app/api/features_demo.py) ----------------------------------------
 // The three basic models run on the backend; there is no offline fallback, so these report offline: true.
 export async function fetchFeatureStatus() {

@@ -5,6 +5,7 @@ import Placeholder from './pages/Placeholder.vue'
 const routes = PAGES.map((p) => ({
   path: p.path,
   name: p.key,
+  meta: { bare: !!p.bare },
   component: p.component ?? Placeholder,
   props: p.component ? false : { label: p.label, todo: p.todo, owner: p.owner },
 }))

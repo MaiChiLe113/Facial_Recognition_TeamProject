@@ -2,7 +2,7 @@
 
 COS30082 Applied Machine Learning team project. Three cameras (corridor, classroom, doorway) track every person with a numeric ID; the doorway **attendance camera** checks liveness, recognises the face and reads emotion, then the ID becomes `ID n · Name` on every camera. Hawkeye logs check-in, entry, exit and total time in class.
 
-> Status: the Home page runs on mock data for the roster and events. The Home and MultiCam pages play the recorded takes with **real person boxes** (YOLO11n + ByteTrack, precomputed), and people are recognised at check-in on the attendance camera and named on all three cameras (all four people in take 1, three in take 3, Nguyen Hong Minh in takes 4 and 8; all five members have enrolment photos). In the live per-frame pipeline the attendance camera runs end to end (face detection, liveness, recognition, emotion) and CAM1 / CAM2 detect people; the live tracker, cross-camera matcher and attendance rules are still stubs marked `TODO` with their owners.
+> Status: the Home page runs on mock data for the roster and events. The Home and MultiCam pages play the recorded takes with **real person boxes** (YOLO11n + ByteTrack, precomputed), and people are recognised at check-in on the attendance camera and named on all three cameras (all four people in take 1, three in take 3, Nguyen Hong Minh in takes 4 and 8; all five members have enrolment photos). Live mode: phones on the same Wi-Fi act as the three cameras (`/camera`) and the host's **Live cameras** page shows each stream with person tracking (corridor, classroom) or face, liveness, recognition and emotion (doorway). The cross-camera matcher and the attendance rules are still stubs marked `TODO` with their owners.
 
 ## Repo layout
 
@@ -11,7 +11,7 @@ backend/            FastAPI server (API + video streaming)
   app/main.py       builds the app; routes live in app/api/ (one file per area)
   app/core/         plug-in pipeline: stage registry, event bus, runner (configured by backend/pipeline.json)
   app/features/     one folder per innovation feature; see app/features/README.md
-  app/pipeline/     non-model steps: detector (done), tracker, matcher, attendance (stubs); the models are in ml/<feature>/
+  app/pipeline/     non-model steps: detector, tracker (done), matcher, attendance (stubs); the models are in ml/<feature>/
   app/db/schema.sql SQLite tables (not wired yet)
 frontend/           Vue 3 + Vite web app (Home page built, other pages placeholders)
   src/pages.js      page registry: add one entry to get a route + sidebar item
@@ -48,7 +48,7 @@ npm run dev                   # http://localhost:5173
 
 Press **Run demo videos** on the Home page. The three videos stream from the backend and play in sync.
 
-**Demo with other devices' cameras (same Wi-Fi):** run `npm run dev:lan` instead and open the printed `https://<host IP>:5173` address on each device. Full steps: [`docs/LAN_DEMO.md`](docs/LAN_DEMO.md).
+**Demo with other devices' cameras (same Wi-Fi):** run `npm run dev:lan` instead and open the printed `https://<host IP>:5173` address on each device. Full steps: [`docs/LAN_DEMO.md`](docs/LAN_DEMO.md). To use phones as the three cameras: open `/camera` on each phone and **Live cameras** on the host, which shows every stream with detection, tracking and recognition.
 
 ## Adding to the pipeline
 

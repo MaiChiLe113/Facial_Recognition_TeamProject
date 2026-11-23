@@ -80,6 +80,7 @@ allow Node.js on **Private networks** when Windows Defender Firewall asks.
 
 | Page | Path | Uses the device's camera for |
 | --- | --- | --- |
+| Camera | `/camera` | Sending its video to the host's **Live cameras** page (see below) |
 | Features demo | `/features-demo` | Face recognition, liveness and emotion on every frame |
 | Home | `/` | Live camera tile |
 | Add person | `/add` | Taking registration photos |
@@ -88,6 +89,31 @@ allow Node.js on **Private networks** when Windows Defender Firewall asks.
 Several devices can use the Features demo at once: each browser tab has its own ID, so liveness keeps a separate
 frame buffer per device. All the computing happens on the host (about 75–90 ms per frame on Mai Chi's Mac, measured
 2026-11-23), so with many devices at once each one gets fewer results per second.
+
+## Phones as cameras, everything shown on the host
+
+For the three-camera demo (corridor, classroom, doorway), the other devices are only cameras and the host shows all
+of them, with detection, tracking and recognition drawn on the video.
+
+1. **Each phone / laptop:** open `https://<host IP>:5173/camera` and tap where it stands: **CAM 1 Corridor**,
+   **CAM 2 Classroom** or **Attendance camera Doorway** (or open `/camera?cam=cam_1` to skip the choice).
+   It shows its own preview and "sending to the host · n fps". **Switch camera** picks the front or back camera;
+   the screen is kept on while it sends.
+2. **The host:** open **Live cameras** in the sidebar (`/live`). Each camera tile shows the device's video with:
+   - corridor / classroom: a box per person with its track ID (YOLO11n + ByteTrack, the same settings as the
+     recorded takes; a person hidden for up to 3 s keeps the ID);
+   - doorway: a box per face with the name, liveness (**Spoof** in red) and emotion; the list under the tile repeats it.
+
+How it works: the device sends a JPEG frame (640 px wide, at most 10 a second) over the WebSocket
+`/ws/camera/<cam_id>` and waits for the host's answer before sending the next, so a busy host lowers the frame rate
+instead of falling behind. The host runs the camera's pipeline from `backend/pipeline.json` and serves the drawn frames
+as an MJPEG stream (`/api/live/<cam_id>/stream`). Measured on Mai Chi's Mac with recorded frames sent as a phone would:
+corridor ~12 fps (about 15–25 ms of work a frame), doorway ~4–6 fps (about 170 ms: face, liveness, recognition,
+emotion).
+
+Recognition runs on each frame, so a face's name is the most frequent answer since that face appeared (faces are
+linked across frames by box overlap, with gaps up to 1.5 s); a spoof never gets a name. The cross-camera matcher
+(one shared ID per person across cameras) is not built yet, so each camera numbers its own people.
 
 ## No "Not secure" warning (optional, recommended for the video)
 
@@ -143,7 +169,9 @@ Reopen the browser and load the Network address: no warning, padlock shown.
 
 | Problem | Cause | Fix |
 | --- | --- | --- |
-| Page does not load on the other device | Not on the same network, client isolation, or firewall | Same Wi-Fi as the host; try a phone hotspot; allow `node` in the host's firewall |
+| `ERR_ADDRESS_UNREACHABLE` on the other device | Its browser may not reach the local network (macOS 15+, iOS 14+ ask per app) | **Mac:** System Settings → Privacy & Security → **Local Network** → turn on Chrome (or the browser used), restart it. **iPhone/iPad:** Settings → Chrome → **Local Network** on |
+| `ERR_ADDRESS_UNREACHABLE`, permission already on | The device is not on the host's network: mobile data, a guest Wi-Fi, another network name, a VPN, or iCloud Private Relay | Same Wi-Fi name as the host; turn off VPN / Private Relay; check the device's IP starts like the host's (e.g. `192.168.68.`) |
+| Page does not load on the other device (timeout) | Client isolation on campus/guest Wi-Fi, or the host's firewall | Try a phone hotspot; allow `node` in the host's firewall |
 | Camera blocked or no camera prompt | Opened `http://`, or permission denied earlier | Use the `https://` Network address; reset the camera permission in the browser's site settings |
 | "Not secure" in the address bar | Self-signed certificate (expected) | Harmless; to remove it, set up the trusted certificate (section above) |
 | "backend offline" on the page | Backend not running on the host, or it crashed | Restart step 3 and read its terminal |

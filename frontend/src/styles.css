@@ -26,6 +26,7 @@ h2 { font-size: 20px; }
 /* ---------- layout ---------- */
 .app { display: flex; min-height: 100vh; }
 .main { flex: 1; padding: 24px 28px; min-width: 0; }
+.main.bare { padding: 0; }
 
 .sidebar {
   width: 220px; background: var(--sidebar); color: #f2f2f2;

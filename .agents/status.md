@@ -10,6 +10,24 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
 
+## 2026-11-23: phones as live cameras, live tracker (Mai Chi, branch `tracking/live-detector`)
+
+- `backend/app/pipeline/tracker.py` implemented: Ultralytics BYTETracker fed with `detect_people` boxes, settings from
+  `ml/tracking/configs/bytetrack_long.yaml`; the 3 s lost-track buffer is converted to frames from the measured live fps.
+  Take 1 corridor at 10 fps: P4 3.4–7.3 s, P1 17.2–22.3 s (ground truth 3.5–7.0, 17–22.5). `lap` added to requirements.
+- Live mode (`app/api/live.py`, `app/services/live.py`): `WS /ws/camera/{cam_id}` receives JPEG frames from the new
+  **Camera** page (`/camera`, full screen, for phones), runs `engine.process_frame`, draws boxes and labels, and
+  `GET /api/live/{cam_id}/stream` serves MJPEG to the new **Live cameras** page (`/live`); `GET /api/live` = status.
+  The doorway pipeline uses the Features demo's registered faces (`features_demo.registered_faces()`). Vite proxies
+  `/ws` (and `HAWKEYE_BACKEND` overrides the backend address). Tested through `wss://<host IP>` with recorded frames.
+- Doorway names: per-frame recognition flickers, so names are a majority vote over a face linked across frames.
+- **For Thuận Minh:** on take 1 doorway frames the trained model (camera profile threshold 0.69) named Thuận Minh as
+  Hồng Minh on most frames (raw: Hồng Minh 4, Thuận Minh 1), and Hồng Minh as Thuận Minh on 7 of 19; Đức Mạnh was
+  recognised on 2 of 41 frames. The OpenCV baseline (`name_tracks.py`) named all four correctly on takes 1 and 3.
+- `main.py` TODO list updated (camera WebSocket and `POST /api/students` done; `/ws/dashboard` still open).
+- Tests: `backend/tests/test_live.py` (name vote, live tracker); 50 of 51 backend tests pass (the failing one only
+  objects to a local `runs/` folder).
+
 ## 2026-11-23: roster in the database, registration API, Wi-Fi demo (Mai Chi, branch `tracking/live-detector`)
 
 - **`data/mock/students.csv` and `courses.csv` are deleted.** The database is the roster: a new database is seeded

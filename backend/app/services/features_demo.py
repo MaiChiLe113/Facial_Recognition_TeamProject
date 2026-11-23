@@ -372,6 +372,13 @@ def load_registered(force=False):
         _load_lock.release()
 
 
+def registered_faces():
+    """A copy of the loaded registered faces for other users (the live cameras):
+    ({student_id: [embedding, ...]}, {student_id: name}). Empty until the first load has finished."""
+    with _lock:
+        return {sid: list(v) for sid, v in _gallery.items()}, {sid: p["name"] for sid, p in _people.items()}
+
+
 _reload_wanted = threading.Event()
 
 
