@@ -28,7 +28,7 @@ class FrameContext:
     people: list = field(default_factory=list)
     # track: [{"local_id", "box"}]; after match: [{"global_id", "box", "map_xy"}]
     tracks: list = field(default_factory=list)
-    # detect_faces: [{"box", "score", "crop"}]; later stages add "live", "liveness_score",
+    # detect_faces: [{"box", "score", "crops" (per model, see attendance_cam.py)}]; later stages add "live", "liveness_score",
     # "student_id", "similarity", "emotion", "emotion_score"
     faces: list = field(default_factory=list)
     # events to publish once every stage has run

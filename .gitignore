@@ -8,11 +8,9 @@ backend/.env
 node_modules/
 frontend/dist/
 
-# Data and models. The face recognition demo uses one versioned export.
+# Data and models (.pt weights are committed)
 *.webm
 *.mp4
-*.pt
-!/ml/face_recognition/face_recognition.pt
 *.pth
 *.onnx
 data/videos/

@@ -68,8 +68,8 @@ def create_student(name: str = Form(...), student_id_vn: str = Form(...), studen
             raise HTTPException(422, str(e)) from e
         raise
 
-    from ..services import features_demo
-    features_demo.roster_changed()                 # the new student is recognised once the photos are embedded
+    from ..services import gallery
+    gallery.roster_changed()                       # the new student is recognised once the photos are embedded
     return saved
 
 

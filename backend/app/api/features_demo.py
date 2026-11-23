@@ -10,7 +10,7 @@
     POST   /api/features-demo/log                    body = {started, rows}: save a finished camera session to
                                                      logs/features_demo_<start>.csv (repo root)
     GET    /api/features-demo/gallery[?reload=true]  the registered students: the enrolment photos on the
-                                                     shared Drive (same as MultiCam), embedded on first use
+                                                     shared Drive (same as the recorded takes on Home), embedded on first use
 
 The body is the raw image (Content-Type image/jpeg), so no multipart library is needed.
 """
@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from ..core.ml_models import FEATURES
 from ..services import features_demo as demo
+from ..services import gallery as registered_gallery
 
 router = APIRouter(prefix="/api/features-demo", tags=["features-demo"])
 
@@ -77,4 +78,4 @@ async def save_log(request: Request):
 @router.get("/gallery")
 def gallery(reload: bool = False):
     """The registered students (their photos on the shared Drive, embedded on first use)."""
-    return demo.registered(force=reload)
+    return registered_gallery.registered(force=reload)

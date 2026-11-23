@@ -33,6 +33,8 @@ async def lifespan(app):
     try:
         engine = Engine.load().start()
         app.state.engine = engine
+        from .services import gallery
+        gallery.attach(engine)              # the recognize stage reads the registered faces from shared["gallery"]
         for name, feature in engine.features.items():
             if getattr(feature, "router", None) is not None and feature.status == "ready":
                 app.include_router(feature.router, prefix=f"/api/features/{name}", tags=[f"feature: {name}"])

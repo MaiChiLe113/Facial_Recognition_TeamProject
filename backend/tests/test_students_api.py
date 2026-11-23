@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 import app.db
 from app.api import records
 from app.db import init_db, queries
-from app.services import features_demo
+from app.services import gallery
 
 JPEG = b"\xff\xd8\xff\xe0fake-jpeg"
 
@@ -34,7 +34,7 @@ class RegisterStudent(unittest.TestCase):
         self.db, self.photos_dir = tmp / "test.sqlite3", tmp / "photos"
         init_db(self.db)
         for p in (patch.object(app.db, "DB_PATH", self.db), patch.object(records, "PHOTOS_DIR", self.photos_dir),
-                  patch.object(features_demo, "roster_changed")):
+                  patch.object(gallery, "roster_changed")):
             self.reload = p.start()
             self.addCleanup(p.stop)
         api = FastAPI()

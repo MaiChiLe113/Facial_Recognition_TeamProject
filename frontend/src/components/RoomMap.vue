@@ -26,8 +26,8 @@ const trailPaths = computed(() => props.trails
 
 <template>
   <section class="card room-map">
-    <h2>Room {{ room }} map</h2>
-    <svg :viewBox="`0 0 ${W} ${H}`" role="img" :aria-label="`Room ${room} map`">
+    <h2>Room {{ props.room }} map</h2>
+    <svg :viewBox="`0 0 ${W} ${H}`" role="img" :aria-label="`Room ${props.room} map`">
       <rect :x="corridor.x" :y="corridor.y" :width="corridor.w" :height="corridor.h" class="rm-area rm-corridor" />
       <rect :x="room.x" :y="room.y" :width="room.w" :height="room.h" class="rm-area rm-room" />
       <text :x="corridorLabel.x" :y="corridorLabel.y" class="rm-title">Corridor</text>

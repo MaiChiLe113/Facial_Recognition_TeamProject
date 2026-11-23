@@ -1,17 +1,19 @@
 """The attendance camera: find the face, check liveness, recognise it, read the emotion.
 Adapters only: the face detector is app/pipeline/detector.py (Mai Chi); the three models live in
 ml/anti_spoofing/ (Hồng Minh), ml/face_recognition/ (Thuận Minh) and ml/emotion/ (Minh Thành), each as
-infer.py plus <feature>.pt, found by app/core/ml_models.py."""
+infer.py plus <feature>.pt, found by app/core/ml_models.py.
+
+Each face is cut out once per model with that model's margin (ml_models.MARGIN, the same crops as the Features demo):
+face["crops"] = {"face_recognition": ..., "anti_spoofing": ..., "emotion": ...} (None when empty)."""
 from collections import deque
 
-from ..ml_models import load_infer
+from ..ml_models import FEATURES, crop_face, load_infer
 from ..registry import register_stage
 from .base import Stage
 
 
-def _crop(image, box):
-    x, y, w, h = (int(v) for v in box[:4])
-    return image[max(y, 0):y + h, max(x, 0):x + w] if hasattr(image, "shape") else None
+def _crops(image, box):
+    return {feature: crop_face(image, box, feature) for feature in FEATURES}
 
 
 @register_stage("detect_faces")
@@ -21,7 +23,7 @@ class DetectFaces(Stage):
         self.detector = detector
 
     def process(self, ctx):
-        ctx.faces = [{"box": tuple(d[:4]), "score": d[4] if len(d) > 4 else None, "crop": _crop(ctx.image, d)}
+        ctx.faces = [{"box": tuple(d[:4]), "score": d[4] if len(d) > 4 else None, "crops": _crops(ctx.image, d)}
                      for d in self.detector.detect_faces(ctx.image)]
 
 
@@ -36,12 +38,12 @@ class Liveness(Stage):
         self.recent = deque(maxlen=int(self.options.get("frames", 10)))
 
     def process(self, ctx):
-        faces = [f for f in ctx.faces if f["crop"] is not None]
+        faces = [f for f in ctx.faces if f["crops"]["anti_spoofing"] is not None]
         if not faces:
             self.recent.clear()
             return
         main = max(faces, key=lambda f: f["box"][2] * f["box"][3])
-        self.recent.append(main["crop"])
+        self.recent.append(main["crops"]["anti_spoofing"])
         result = self.liveness.check(list(self.recent))
         main["live"], main["liveness_score"] = bool(result["live"]), result.get("score")
 
@@ -49,7 +51,7 @@ class Liveness(Stage):
 @register_stage("recognize")
 class Recognize(Stage):
     """Options: {"threshold": <from the ROC>}. The gallery {student_id: [embeddings]} is read from
-    shared["gallery"]; TODO (Đức Mạnh): fill it from the face_embeddings table when the DB is wired."""
+    shared["gallery"], which app/services/gallery.py keeps up to date (gallery.attach(engine) in main.py)."""
 
     def setup(self):
         self.recognizer = load_infer("face_recognition")
@@ -58,9 +60,10 @@ class Recognize(Stage):
     def process(self, ctx):
         gallery = self.shared.get("gallery", {})
         for face in ctx.faces:
-            if face.get("live") is False or face["crop"] is None:
+            crop = face["crops"]["face_recognition"]
+            if face.get("live") is False or crop is None:
                 continue                       # never identify a spoof
-            face["student_id"], face["similarity"] = self.recognizer.identify(face["crop"], gallery, self.threshold)
+            face["student_id"], face["similarity"] = self.recognizer.identify(crop, gallery, self.threshold)
 
 
 @register_stage("emotion")
@@ -70,7 +73,8 @@ class Emotion(Stage):
 
     def process(self, ctx):
         for face in ctx.faces:
-            if face["crop"] is None:
+            crop = face["crops"]["emotion"]
+            if crop is None:
                 continue
-            result = self.emotion.predict(face["crop"])
+            result = self.emotion.predict(crop)
             face["emotion"], face["emotion_score"] = result["label"], result.get("score")

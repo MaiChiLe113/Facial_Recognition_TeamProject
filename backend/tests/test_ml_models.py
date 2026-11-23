@@ -81,7 +81,7 @@ class EnrolmentRoot(unittest.TestCase):
     def test_prefers_the_configured_root_then_falls_back_to_the_repo_folder(self):
         import tempfile
         from pathlib import Path
-        from app.services import features_demo as fd
+        from app.services import gallery as fd
 
         with tempfile.TemporaryDirectory() as drive, tempfile.TemporaryDirectory() as repo:
             (Path(repo) / "AppliedML").mkdir()

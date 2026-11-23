@@ -1,7 +1,7 @@
 <script setup>
 // Opened on a phone or laptop over Wi-Fi (https://<host IP>:5173/camera). The device is only a camera: it sends its
 // frames to the host (WebSocket /ws/camera/<cam_id>), which runs detection, tracking and recognition and shows the
-// result on its Live cameras page. ?cam=<cam_id> picks the camera straight away.
+// result on its Home page (Live source). ?cam=<cam_id> picks the camera straight away.
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { cameraSocketUrl, fetchLive } from '../api.js'

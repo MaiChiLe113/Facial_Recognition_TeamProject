@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-21. Update this file at the end of every step.
+Last updated: 2026-11-24. Update this file at the end of every step.
 
 ## Branch
 
@@ -9,6 +9,43 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not create other branches.
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
+
+## 2026-11-24: one live view, one model path, one gallery (Đức Mạnh, not committed yet)
+
+**Backend**
+- `core/ml_models.py`: new `MARGIN` (face_recognition 0.1, anti_spoofing 0.25, emotion 0.0) and `crop_face(image, box, feature)`.
+  Used by the Features demo, the enrolment gallery and the attendance-camera stages.
+- `core/stages/attendance_cam.py`: `detect_faces` now stores `face["crops"]` (one crop per model with its margin) instead of
+  one raw `face["crop"]`. **Behaviour change:** liveness now gets the 25 % margin it was trained with (before: no margin),
+  recognition 10 %. Checked on an enrolment photo: pipeline and Features demo give the same box, name (sim. 0.79), live 0.9999, neutral.
+- `services/features_demo.py` finds faces with `pipeline/detector.detect_faces` (min 36 px, as before 60 × 0.6).
+  **Removed:** its own YuNet code and the Haar-cascade fallback (`_find_faces` internals, `_crop`, `MARGIN`, `YUNET_FILE`).
+  Without the YuNet file the demo now reports an error instead of falling back to Haar.
+- New `services/gallery.py` owns the registered faces: `load_registered`, `registered_faces`, `registered`, `roster_changed`,
+  the `data/raw/face_embeddings.npz` cache (same file and keys, the existing cache stays valid) and `attach(engine)`, which keeps
+  `engine.shared["gallery"]` current after every load (called in `main.py`). Users: Features demo, `services/live.py`
+  (now only reads names), `api/records.py` (`roster_changed`), `/api/features-demo/gallery`. Enrolment photos are also
+  searched with `detect_faces` (min 24 px). Embeddings are **not** moved into the `face_embeddings` table: that table has
+  no file key (path, size, date), which the cache needs to skip unchanged photos; it would need a schema change.
+
+**Frontend (Đức Mạnh's Home page, every behaviour that moved)**
+- Home has a source switch **Live / Recorded** (+ take menu), kept in the URL (`/?source=recorded&take=N`).
+- Live: each tile shows `/api/live/<cam_id>/stream`; doorway tile lines are the real faces from `GET /api/live` (identity /
+  "please register", liveness, emotion), corridor / classroom tiles show people tracked + fps; top bar shows "n of 3 cameras
+  sending" or Backend offline; the sender URL notice from Live cameras is on Home. The mock `attendance_cam_status` lines are gone.
+  "+" on an idle tile opens `/camera?cam=<cam_id>` in a new tab (**removed:** the local-only `getUserMedia` preview and device
+  picker in `CameraCard.vue`). Boxes stay server-drawn in Live mode (a 1 s poll would lag the 10 fps stream); Recorded draws
+  them client-side from the tracks, as before.
+- Recorded (moved from MultiCam): Play / Pause / Restart, the synced playback line with scrubbing, the take's event log
+  following the video, presence verification panel, map trails up to the playback position, the Recorded takes table, and the
+  "no video / backend offline" messages. Roster and map are shown in both modes.
+- **Removed pages:** `pages/Demo.vue` (MultiCam) and `pages/LiveCameras.vue`, and their `pages.js` entries. `/demo` redirects to
+  `/?source=recorded` (keeps `?take=`), `/live` to `/`.
+- `useSyncedPlayback.js`: .webm files with no duration in the header (Infinity) are made to report their real length
+  before playing; times show `–:––` while unknown (was `Infinity:NaN`).
+- `RoomMap.vue`: the title showed the room *shape object* instead of the number (the imported `room` shadowed the prop); fixed.
+- Tests: 51 run, 50 pass; the failing one (`test_every_camera_processes_a_frame`) only fails because `ultralytics` is not
+  installed in this `.venv` (failed the same way before the change). Frontend builds; Home checked in Chrome in both modes.
 
 ## 2026-11-23: phones as live cameras, live tracker (Mai Chi, branch `tracking/live-detector`)
 

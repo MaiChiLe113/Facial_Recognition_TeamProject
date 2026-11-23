@@ -80,11 +80,11 @@ allow Node.js on **Private networks** when Windows Defender Firewall asks.
 
 | Page | Path | Uses the device's camera for |
 | --- | --- | --- |
-| Camera | `/camera` | Sending its video to the host's **Live cameras** page (see below) |
+| Camera | `/camera` | Sending its video to the host's **Home** page, Live source (see below) |
 | Features demo | `/features-demo` | Face recognition, liveness and emotion on every frame |
-| Home | `/` | Live camera tile |
+| Home | `/` | Nothing itself: **+** on an idle tile opens `/camera?cam=<cam_id>` on this device |
 | Add person | `/add` | Taking registration photos |
-| MultiCam | `/demo` | Recorded takes only (no camera) |
+| Home, Recorded source | `/?source=recorded&take=N` (old `/demo` redirects here) | Recorded takes only (no camera) |
 
 Several devices can use the Features demo at once: each browser tab has its own ID, so liveness keeps a separate
 frame buffer per device. All the computing happens on the host (about 75–90 ms per frame on Mai Chi's Mac, measured
@@ -99,15 +99,20 @@ of them, with detection, tracking and recognition drawn on the video.
    **CAM 2 Classroom** or **Attendance camera Doorway** (or open `/camera?cam=cam_1` to skip the choice).
    It shows its own preview and "sending to the host · n fps". **Switch camera** picks the front or back camera;
    the screen is kept on while it sends.
-2. **The host:** open **Live cameras** in the sidebar (`/live`). Each camera tile shows the device's video with:
+2. **The host:** open **Home** with the source switch on **Live** (the default; old `/live` links redirect here).
+   Each camera tile shows the device's video with:
    - corridor / classroom: a box per person with its track ID (YOLO11n + ByteTrack, the same settings as the
      recorded takes; a person hidden for up to 3 s keeps the ID);
-   - doorway: a box per face with the name, liveness (**Spoof** in red) and emotion; the list under the tile repeats it.
+   - doorway: a box per face with the name, liveness (**Spoof** in red) and emotion; the lines under the tile list each face's identity, liveness and emotion from `GET /api/live`.
+   An idle tile shows **+**, which opens `/camera?cam=<cam_id>` in a new tab so this device becomes that camera.
 
 How it works: the device sends a JPEG frame (640 px wide, at most 10 a second) over the WebSocket
 `/ws/camera/<cam_id>` and waits for the host's answer before sending the next, so a busy host lowers the frame rate
 instead of falling behind. The host runs the camera's pipeline from `backend/pipeline.json` and serves the drawn frames
-as an MJPEG stream (`/api/live/<cam_id>/stream`). Measured on Mai Chi's Mac with recorded frames sent as a phone would:
+as an MJPEG stream (`/api/live/<cam_id>/stream`). The boxes are drawn on the frame by the host, not by the
+browser: `GET /api/live` is polled once a second, so boxes drawn from it would trail a 10 fps picture by up to a
+second. The doorway models run exactly as on the Features demo page: the same face detector (`detect_faces`), the same
+crops (`ml_models.crop_face`, margins 0.1 / 0.25 / 0.0) and the same registered faces (`services/gallery.py`). Measured on Mai Chi's Mac with recorded frames sent as a phone would:
 corridor ~12 fps (about 15–25 ms of work a frame), doorway ~4–6 fps (about 170 ms: face, liveness, recognition,
 emotion).
 

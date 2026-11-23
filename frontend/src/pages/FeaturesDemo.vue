@@ -3,7 +3,7 @@
 // Tick the features to use; every ~0.4 s a frame goes to POST /api/features-demo/infer and the result is drawn
 // over the video. The models are the ones in ml/<feature>/ (weights <feature>.pt), run by the backend.
 // Recognition compares against the registered students: their enrolment photos on the shared Drive, the same
-// ones MultiCam names people from (loaded by the backend on first use).
+// ones the recorded takes on Home are named from (loaded by the backend on first use).
 // Session log: from camera on to camera off, every result is listed in the Session log panel. The
 // "Save log" box only decides whether that session is written to logs/*.csv when the camera turns off.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -357,7 +357,7 @@ function lines(f) {
               </li>
               <li v-if="!registered.people.length" class="empty">No registered face could be loaded.</li>
             </ul>
-            <p class="muted small">Photos counted in each member's folder on the Drive; the same ones MultiCam names people from (plus the student card).
+            <p class="muted small">Photos counted in each member's folder on the Drive; the same ones the recorded takes on Home are named from (plus the student card).
               <span v-if="registered.skipped.length">{{ registered.skipped.length }} photo(s) had no detectable face and are not used for matching.</span></p>
           </template>
         </section>

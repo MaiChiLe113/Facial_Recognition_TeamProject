@@ -1,4 +1,4 @@
-// Plays several <video> elements together and keeps them in step (same logic as the Home page).
+// Plays several <video> elements together and keeps them in step (Home, Recorded mode).
 //   cameras: ref of camera objects ({ cam_id, offset_s })
 //   videoOf: cam_id -> <video> element
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
@@ -10,6 +10,9 @@ export function useSyncedPlayback(cameras, videoOf) {
   const duration = ref(0)       // longest take time over the loaded videos
   let timer, posTimer
 
+  // A .webm written by MediaRecorder has no duration in its header: the browser reports Infinity until it has read
+  // to the end. lengthOf() treats that as unknown (0), and play() makes the browser find the real length first.
+  const lengthOf = (v) => (Number.isFinite(v?.duration) ? v.duration : 0)
   const loaded = () => cameras.value.filter((c) => srcs.value[c.cam_id] && videoOf(c.cam_id))
 
   // Playback line: read the lead video's time ~10x a second.
@@ -18,7 +21,7 @@ export function useSyncedPlayback(cameras, videoOf) {
     if (!cams.length) { position.value = 0; duration.value = 0; return }
     const lv = videoOf(cams[0].cam_id)
     position.value = Math.max(0, lv.currentTime - (cams[0].offset_s || 0))
-    duration.value = Math.max(0, ...cams.map((c) => (videoOf(c.cam_id).duration || 0) - (c.offset_s || 0)))
+    duration.value = Math.max(0, ...cams.map((c) => lengthOf(videoOf(c.cam_id)) - (c.offset_s || 0)))
   }
   watch(srcs, (s) => {
     clearInterval(posTimer)
@@ -30,7 +33,7 @@ export function useSyncedPlayback(cameras, videoOf) {
   function seek(t) {
     for (const c of loaded()) {
       const v = videoOf(c.cam_id)
-      v.currentTime = Math.min(t + (c.offset_s || 0), v.duration || Infinity)
+      v.currentTime = Math.min(t + (c.offset_s || 0), lengthOf(v) || Infinity)
     }
     position.value = t
   }
@@ -44,7 +47,7 @@ export function useSyncedPlayback(cameras, videoOf) {
     for (const c of cams.slice(1)) {
       const v = videoOf(c.cam_id)
       const want = base + (c.offset_s || 0)
-      if (Math.abs(v.currentTime - want) > 0.3 && want < (v.duration || Infinity)) v.currentTime = want
+      if (Math.abs(v.currentTime - want) > 0.3 && want < (lengthOf(v) || Infinity)) v.currentTime = want
     }
     if (cams.every((c) => videoOf(c.cam_id).ended)) playing.value = false
   }
@@ -65,12 +68,25 @@ export function useSyncedPlayback(cameras, videoOf) {
       v.addEventListener('loadedmetadata', resolve, { once: true })
       v.addEventListener('error', resolve, { once: true })
     })))
+    await Promise.all(cams.map((c) => findLength(videoOf(c.cam_id))))
     for (const c of cams) {
       const v = videoOf(c.cam_id)
       v.currentTime = c.offset_s || 0
       v.play().catch(() => {})
     }
     playing.value = cams.length > 0
+  }
+
+  // Seeking far past the end makes the browser read the whole file and fire durationchange with the real length.
+  function findLength(v) {
+    if (!v || Number.isFinite(v.duration) || v.error) return Promise.resolve()
+    return new Promise((resolve) => {
+      const done = () => { clearTimeout(guard); v.removeEventListener('durationchange', check); resolve() }
+      const check = () => { if (Number.isFinite(v.duration)) done() }
+      const guard = setTimeout(done, 5000)     // never block Play on a file that will not tell
+      v.addEventListener('durationchange', check)
+      v.currentTime = 1e101
+    })
   }
 
   function togglePause() {

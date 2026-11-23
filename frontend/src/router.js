@@ -10,6 +10,9 @@ const routes = PAGES.map((p) => ({
   props: p.component ? false : { label: p.label, todo: p.todo, owner: p.owner },
 }))
 routes.push({ path: '/class', redirect: '/history' })   // Class was merged into History
+// MultiCam (/demo) and Live cameras (/live) were merged into Home; old links still work.
+routes.push({ path: '/demo', redirect: (to) => ({ path: '/', query: { source: 'recorded', ...(to.query.take ? { take: to.query.take } : {}) } }) })
+routes.push({ path: '/live', redirect: '/' })
 routes.push({ path: '/:pathMatch(.*)*', redirect: '/' })
 
 export default createRouter({ history: createWebHistory(), routes })

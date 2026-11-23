@@ -1,57 +1,34 @@
 <script setup>
-// One camera panel: the <video>, a canvas overlay with the track boxes, and a slot
-// below for extra content (the attendance cam's liveness / identity / emotion lines).
+// One camera tile on Home, in either source mode:
+//   Recorded  a <video> of the take plus a canvas overlay with its precomputed track boxes (tracks, showBoxes).
+//   Live      the camera's MJPEG stream from the backend (stream = /api/live/<cam_id>/stream). Its boxes and labels are
+//             drawn on the frame by the backend (app/services/live.py), in the same frame they were found in; boxes
+//             from the 1 s GET /api/live poll would trail a 10 fps picture by up to a second. With no device sending,
+//             the "+" opens the Camera page (/camera?cam=<cam_id>) on this device, which sends its camera to the host.
+// The slot below holds extra lines (the doorway camera's identity / liveness / emotion).
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = defineProps({
   cam: { type: Object, required: true },
-  src: String,
-  tracks: Object,
+  src: String,           // recorded: video URL
+  tracks: Object,        // recorded: data/tracks/take<N>/<cam>.json
   showBoxes: Boolean,
   highlight: Boolean,
-  live: Boolean,       // Home: empty frame shows a "+" box that asks for this device's camera
+  live: Boolean,         // live mode
+  stream: String,        // live: MJPEG URL, set while a device is sending
 })
 
 const video = ref(null)
-// Green dot = picture is moving: a live camera, or a video that is playing (grey when paused / ended).
+// Green dot = picture is moving: a live camera that is sending, or a video that is playing (grey when paused / ended).
 const videoPlaying = ref(false)
 const canvas = ref(null)
-// The frame takes the video's own shape (no black bars); 16:9 until a video has loaded (all recordings are 1280x720).
+// The frame takes the picture's own shape (no black bars); 16:9 until a video or stream has loaded.
 const ratio = ref('16 / 9')
 const onMeta = () => { frameT = null; const v = video.value; if (v?.videoWidth) ratio.value = `${v.videoWidth} / ${v.videoHeight}` }
-defineExpose({ video })   // the Demo page plays, pauses and syncs the videos
+const onStreamLoad = (e) => { const i = e.target; if (i.naturalWidth) ratio.value = `${i.naturalWidth} / ${i.naturalHeight}` }
+defineExpose({ video })   // Home plays, pauses and syncs the videos in Recorded mode
 
-// ---- live device camera (Home) ----
-// TODO (Đức Mạnh, task 5): send frames to /ws/camera/{cam_id} for the pipeline.
-const stream = ref(null)
-const devices = ref([])          // video inputs, known once permission is given
-const deviceId = ref('')
-const camError = ref('')
-
-async function startCamera(id) {
-  camError.value = ''
-  if (!navigator.mediaDevices?.getUserMedia) {
-    camError.value = 'This browser cannot open a camera here (needs https or localhost).'
-    return
-  }
-  try {
-    const s = await navigator.mediaDevices.getUserMedia({ video: id ? { deviceId: { exact: id } } : true, audio: false })
-    stopCamera()
-    stream.value = s
-    video.value.srcObject = s
-    video.value.play().catch(() => {})
-    deviceId.value = s.getVideoTracks()[0]?.getSettings().deviceId ?? ''
-    devices.value = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput')
-  } catch (e) {
-    camError.value = e.name === 'NotAllowedError' ? 'Camera permission was denied.' : `Camera error: ${e.message}`
-  }
-}
-function stopCamera() {
-  stream.value?.getTracks().forEach((t) => t.stop())
-  stream.value = null
-  if (video.value) video.value.srcObject = null
-  ratio.value = '16 / 9'   // khung trở về kích thước cũ khi tắt camera
-}
+const openCamera = () => window.open(`/camera?cam=${encodeURIComponent(props.cam.cam_id)}`, '_blank')
 
 // Box for one track at time t: linear interpolation between keyframes,
 // hidden outside the first..last keyframe range.
@@ -99,7 +76,7 @@ function draw() {
   watchFrames(v)
   const ctx = c.getContext('2d')
   ctx.clearRect(0, 0, W, H)
-  if (!props.showBoxes || !props.tracks || !v.videoWidth) return
+  if (props.live || !props.showBoxes || !props.tracks || !v.videoWidth) return
   const s = Math.min(W / v.videoWidth, H / v.videoHeight)
   const pw = v.videoWidth * s, ph = v.videoHeight * s
   const ox = (W - pw) / 2, oy = (H - ph) / 2
@@ -125,36 +102,36 @@ function draw() {
 }
 
 onMounted(draw)
-onBeforeUnmount(() => { cancelAnimationFrame(raf); stopCamera() })
+onBeforeUnmount(() => cancelAnimationFrame(raf))
 </script>
 
 <template>
   <section class="card cam-card" :class="{ 'cam-highlight': highlight }">
     <header class="cam-head">
-      <span class="dot" :class="{ on: stream || videoPlaying }" />
+      <span class="dot" :class="{ on: live ? !!stream : videoPlaying }" />
       <div>
         <div class="cam-title">{{ cam.label }}</div>
         <div class="cam-place">{{ cam.place }}</div>
       </div>
-      <select v-if="stream && devices.length > 1" v-model="deviceId" class="input compact" aria-label="Camera device"
-        @change="startCamera(deviceId)">
-        <option v-for="(d, i) in devices" :key="d.deviceId" :value="d.deviceId">{{ d.label || `Camera ${i + 1}` }}</option>
-      </select>
     </header>
     <div class="cam-view" :style="{ aspectRatio: ratio }">
-      <video ref="video" :src="src || undefined" muted playsinline preload="auto" @loadedmetadata="onMeta"
-        @playing="videoPlaying = true" @pause="videoPlaying = false" @ended="videoPlaying = false" @emptied="videoPlaying = false" />
-      <canvas ref="canvas" class="cam-overlay" />
-      <button v-if="stream" class="btn cam-stop" @click="stopCamera">Stop</button>
-      <button v-else-if="live" class="cam-add" :aria-label="`Turn on a camera for ${cam.label}`" @click="startCamera()">
-        <span class="plus">+</span>
-        <span>Add camera</span>
-        <span v-if="camError" class="muted">{{ camError }}</span>
-      </button>
-      <div v-else-if="!src" class="cam-empty">
-        <div>No video loaded</div>
-        <div class="muted">{{ cam.folder }}/ · stream {{ cam.stream_id }}</div>
-      </div>
+      <template v-if="live">
+        <img v-if="stream" class="cam-stream" :src="stream" :alt="`${cam.label} live`" @load="onStreamLoad" />
+        <button v-else class="cam-add" :aria-label="`Use this device as ${cam.label}`" @click="openCamera">
+          <span class="plus">+</span>
+          <span>Add camera</span>
+          <span class="muted">Opens /camera?cam={{ cam.cam_id }} on this device</span>
+        </button>
+      </template>
+      <template v-else>
+        <video ref="video" :src="src || undefined" muted playsinline preload="auto" @loadedmetadata="onMeta"
+          @playing="videoPlaying = true" @pause="videoPlaying = false" @ended="videoPlaying = false" @emptied="videoPlaying = false" />
+        <canvas ref="canvas" class="cam-overlay" />
+        <div v-if="!src" class="cam-empty">
+          <div>No video loaded</div>
+          <div class="muted">{{ cam.folder }}/ · stream {{ cam.stream_id }}</div>
+        </div>
+      </template>
     </div>
     <slot />
   </section>

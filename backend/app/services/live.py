@@ -3,7 +3,7 @@
 A phone or laptop opens the Camera page (/camera) and sends JPEG frames over the WebSocket /ws/camera/{cam_id}.
 Each frame runs that camera's pipeline from backend/pipeline.json (corridor / classroom: detect people -> track;
 doorway: detect faces -> liveness -> recognise -> emotion). The frame is drawn with the results and kept, and the
-host's Live page shows every camera as an MJPEG stream (GET /api/live/{cam_id}/stream).
+host's Home page (Live source) shows every camera as an MJPEG stream (GET /api/live/{cam_id}/stream).
 
 One frame per camera is processed at a time: the sender waits for the answer before sending the next frame, so a
 slow host lowers the frame rate instead of building a queue.
@@ -56,15 +56,15 @@ def cameras():
         return list(_cams.values())
 
 
-def _faces_for(engine, role):
-    """Point the doorway pipeline at the registered faces (the same gallery the Features demo uses)."""
+def _names_for(role):
+    """Names of the registered students for the doorway camera. The recognize stage reads the faces themselves from
+    engine.shared["gallery"], which app/services/gallery.py keeps current (gallery.attach in main.py)."""
     if role != "attendance":
         return {}
-    from . import features_demo
-    gallery, names = features_demo.registered_faces()
-    if not gallery:
-        threading.Thread(target=features_demo.load_registered, daemon=True).start()   # returns at once if loading
-    engine.shared["gallery"] = gallery
+    from . import gallery
+    faces, names = gallery.registered_faces()
+    if not faces:
+        threading.Thread(target=gallery.load_registered, daemon=True).start()   # returns at once if loading
     return names
 
 
@@ -144,7 +144,7 @@ def process(engine, cam_id, data):
     cam = camera(cam_id)
     pipeline = engine.pipelines[cam_id]
     with cam.lock:
-        names = _faces_for(engine, pipeline.role)
+        names = _names_for(pipeline.role)
         now = time.time()
         started = time.perf_counter()
         ctx = engine.process_frame(cam_id, img, now)

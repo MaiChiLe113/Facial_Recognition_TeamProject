@@ -2,7 +2,7 @@
 
 COS30082 Applied Machine Learning team project. Three cameras (corridor, classroom, doorway) track every person with a numeric ID; the doorway **attendance camera** checks liveness, recognises the face and reads emotion, then the ID becomes `ID n · Name` on every camera. Hawkeye logs check-in, entry, exit and total time in class.
 
-> Status: the Home page runs on mock data for the roster and events. The Home and MultiCam pages play the recorded takes with **real person boxes** (YOLO11n + ByteTrack, precomputed), and people are recognised at check-in on the attendance camera and named on all three cameras (all four people in take 1, three in take 3, Nguyen Hong Minh in takes 4 and 8; all five members have enrolment photos). Live mode: phones on the same Wi-Fi act as the three cameras (`/camera`) and the host's **Live cameras** page shows each stream with person tracking (corridor, classroom) or face, liveness, recognition and emotion (doorway). The cross-camera matcher and the attendance rules are still stubs marked `TODO` with their owners.
+> Status: the Home page runs on mock data for the roster and events. The Home page (source switch **Recorded**) plays the recorded takes with **real person boxes** (YOLO11n + ByteTrack, precomputed), and people are recognised at check-in on the attendance camera and named on all three cameras (all four people in take 1, three in take 3, Nguyen Hong Minh in takes 4 and 8; all five members have enrolment photos). Live mode: phones on the same Wi-Fi act as the three cameras (`/camera`) and the host's **Home** page (source switch **Live**, the default) shows each stream with person tracking (corridor, classroom) or face, liveness, recognition and emotion (doorway). The cross-camera matcher and the attendance rules are still stubs marked `TODO` with their owners.
 
 ## Repo layout
 
@@ -48,7 +48,7 @@ npm run dev                   # http://localhost:5173
 
 Press **Run demo videos** on the Home page. The three videos stream from the backend and play in sync.
 
-**Demo with other devices' cameras (same Wi-Fi):** run `npm run dev:lan` instead and open the printed `https://<host IP>:5173` address on each device. Full steps: [`docs/LAN_DEMO.md`](docs/LAN_DEMO.md). To use phones as the three cameras: open `/camera` on each phone and **Live cameras** on the host, which shows every stream with detection, tracking and recognition.
+**Demo with other devices' cameras (same Wi-Fi):** run `npm run dev:lan` instead and open the printed `https://<host IP>:5173` address on each device. Full steps: [`docs/LAN_DEMO.md`](docs/LAN_DEMO.md). To use phones as the three cameras: open `/camera` on each phone and **Home** (Live) on the host, which shows every stream with detection, tracking and recognition.
 
 ## Adding to the pipeline
 
@@ -72,7 +72,7 @@ The recordings live in the team Google Drive folder `AppliedML/video data/` (one
 | Classroom | `cam_2` | `pDHjQPf` | CAM 2 |
 | Doorway | `attendance_cam` | `2SiEwN8` | Attendance camera |
 
-`data/video_config.json` lists all 8 synced takes and which take the Home page plays (`"take"`, currently 3). The MultiCam page (route `/demo`) plays any take: pick it in the table and press Play. Files are matched across cameras by take number, not by the timestamp in the filename: the CAM 2 device clock runs about 23.4 s ahead of the others in every take. Use `offset_s` per camera to fine-tune sync.
+`data/video_config.json` lists all 8 synced takes and which take the Home page plays (`"take"`, currently 3). Home in Recorded mode (`/?source=recorded&take=N`; the old `/demo` route redirects there) plays any take: pick it in the take menu or the table and press Play. Files are matched across cameras by take number, not by the timestamp in the filename: the CAM 2 device clock runs about 23.4 s ahead of the others in every take. Use `offset_s` per camera to fine-tune sync.
 
 ## Tracking and naming (Mai Chi)
 

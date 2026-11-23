@@ -72,6 +72,9 @@ h2 { font-size: 20px; }
 .cam-view { position: relative; aspect-ratio: 4 / 3; background: #1d1d1d; margin: 0 6px 6px; border-radius: 6px; overflow: hidden; }
 .cam-view video, .cam-overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
 .cam-view video { object-fit: contain; }
+.cam-view .cam-stream { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.source-switch { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.source-switch .btn.active { border-color: var(--green); color: var(--green); }
 .cam-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: #ddd; gap: 4px; font-size: 14px; }
 .cam-empty .muted { color: #999; font-size: 12px; }
 .checks { list-style: none; margin: 4px 0 12px; padding: 0 18px; display: grid; gap: 6px; font-size: 15px; }
