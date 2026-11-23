@@ -13,7 +13,8 @@ and `/photos` to it.
 
 **Why https:** browsers only allow the camera on `https://` pages or on `localhost`. On `http://192.168.x.x:5173` the
 camera is blocked on every device except the host. `npm run dev:lan` therefore serves https with a self-signed
-certificate; each device accepts a warning once (step 5).
+certificate; each device accepts a warning once (step 5), and browsers label the page "Not secure". To remove the
+warning, see "No 'Not secure' warning" below.
 
 ## 1. Host setup (once)
 
@@ -88,6 +89,48 @@ Several devices can use the Features demo at once: each browser tab has its own 
 frame buffer per device. All the computing happens on the host (about 75–90 ms per frame on Mai Chi's Mac, measured
 2026-11-23), so with many devices at once each one gets fewer results per second.
 
+## No "Not secure" warning (optional, recommended for the video)
+
+With the default setup the address bar says **Not secure**: the certificate was made by the host for itself, so no
+device trusts it. The connection is still encrypted and the camera works; only the label and the warning page remain.
+To remove them, make a certificate with [mkcert](https://github.com/FiloSottile/mkcert) and trust its authority once
+on every device. `npm run dev:lan` uses it automatically when `frontend/certs/lan.pem` and `lan-key.pem` exist
+(git-ignored).
+
+**On the host (once):**
+
+```bash
+brew install mkcert                     # Windows: choco install mkcert   (or: scoop install mkcert)
+mkcert -install                         # trusts mkcert's authority on this computer; asks for your password
+```
+
+Then, from `frontend/`, with the host's current IP from step 4:
+
+```bash
+mkdir -p certs
+mkcert -cert-file certs/lan.pem -key-file certs/lan-key.pem 192.168.68.118 localhost 127.0.0.1
+```
+
+Restart `npm run dev:lan`. The host's own browser now shows no warning.
+
+**On every other device (once):** `mkcert -CAROOT` prints a folder. Send only **`rootCA.pem`** from it to the device
+(AirDrop, email, USB). **Never share `rootCA-key.pem`**: anyone who has it can make certificates your devices trust.
+
+| Device | Trust `rootCA.pem` |
+| --- | --- |
+| iPhone / iPad | Open the file → Settings → **Profile Downloaded** → Install. Then Settings → General → About → **Certificate Trust Settings** → turn on full trust for it |
+| Android | Rename it `rootCA.crt` → Settings → Security → Encryption & credentials → **Install a certificate** → CA certificate (Chrome uses it) |
+| Mac | Double-click it → Keychain Access, **System** keychain → open the certificate → Trust → **Always Trust** |
+| Windows | Rename it `rootCA.crt` → double-click → Install Certificate → Local Machine → **Trusted Root Certification Authorities** |
+| Firefox (any OS) | Firefox keeps its own list: Settings → Privacy & Security → Certificates → View Certificates → Authorities → **Import** |
+
+Reopen the browser and load the Network address: no warning, padlock shown.
+
+- **If the host's IP changes:** run the `mkcert -cert-file ...` line again with the new IP. The devices keep trusting
+  the authority, so nothing to redo there.
+- **After the project:** run `mkcert -uninstall` on the host, delete `frontend/certs/`, and remove the certificate or
+  profile from each device.
+
 ## 6. Check before recording
 
 - [ ] Host: backend terminal shows no errors; `https://localhost:5173/features-demo` works on the host itself
@@ -102,6 +145,7 @@ frame buffer per device. All the computing happens on the host (about 75–90 ms
 | --- | --- | --- |
 | Page does not load on the other device | Not on the same network, client isolation, or firewall | Same Wi-Fi as the host; try a phone hotspot; allow `node` in the host's firewall |
 | Camera blocked or no camera prompt | Opened `http://`, or permission denied earlier | Use the `https://` Network address; reset the camera permission in the browser's site settings |
+| "Not secure" in the address bar | Self-signed certificate (expected) | Harmless; to remove it, set up the trusted certificate (section above) |
 | "backend offline" on the page | Backend not running on the host, or it crashed | Restart step 3 and read its terminal |
 | A model shows "weights not found" | Weight file missing on the host | See the table in step 1; `anti_spoofing.pt` comes with PR #6 |
 | Everyone is "Unknown" | No registered faces loaded | Drive photo folders not available offline, or the Drive path in `backend/.env` is wrong |
