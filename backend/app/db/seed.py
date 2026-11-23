@@ -3,26 +3,16 @@
     python -m app.db.seed            # seed only if the database is empty
     python -m app.db.seed --reset    # empty every table and seed again (works while the backend runs)
 
-Sources: students.csv (+ enrollments from its "courses" column, e.g. "[1,2]"), courses.csv,
-session.json (today's session), past_sessions.json (earlier sessions), data/video_config.json (cameras).
+Sources: roster.json (courses, and students with their course keys), session.json (today's session),
+past_sessions.json (earlier sessions), data/video_config.json (cameras). After the first start the database is the
+roster: new students come from the Add person page (POST /api/students).
 """
 import argparse
-import csv
 import json
 
 from sqlalchemy import text
 
 from ..config import DB_PATH, MOCK_DIR, VIDEO_CONFIG
-
-
-def _read_csv(name):
-    with open(MOCK_DIR / name, newline="", encoding="utf-8") as f:
-        return list(csv.DictReader(f))
-
-
-def parse_course_keys(value):
-    value = (value or "").strip().strip("[]")
-    return [int(v) for v in value.split(",") if v.strip()]
 
 
 def event_type(message):
@@ -56,7 +46,7 @@ def _add_session(conn, s, students):
              "status": a.get("status", "not_seen")})
     for e in s.get("events", []):
         # Mock events from session.json carry no student ID: match the student's name in the text.
-        st = e.get("student_id") or next((x["student_id_vn"] for x in students if x["student_name"] in e["event"]), None)
+        st = e.get("student_id") or next((x["student_id_vn"] for x in students if x["name"] in e["event"]), None)
         conn.execute(text(
             "INSERT INTO events (session_id, at, cam_id, student_id_vn, type, message) VALUES (:sid, :at, :cam, :st, :t, :msg)"),
             {"sid": sid, "at": _at(s["date"], e["time"]), "cam": e["source"], "st": st,
@@ -66,23 +56,18 @@ def _add_session(conn, s, students):
 
 def seed_all(path=None):
     from . import connect
-    students = _read_csv("students.csv")
+    from .queries import insert_student
+    roster = json.loads((MOCK_DIR / "roster.json").read_text(encoding="utf-8"))
+    students = roster["students"]
     session = json.loads((MOCK_DIR / "session.json").read_text(encoding="utf-8"))
     past = json.loads((MOCK_DIR / "past_sessions.json").read_text(encoding="utf-8"))["sessions"]
     cfg = json.loads(VIDEO_CONFIG.read_text(encoding="utf-8"))
 
     with connect(path) as conn:
-        for c in _read_csv("courses.csv"):
-            conn.execute(text("INSERT INTO courses VALUES (:key_id, :course_id, :course_name, :session_time, :room)"),
-                         {**c, "key_id": int(c["key_id"])})
+        for c in roster["courses"]:
+            conn.execute(text("INSERT INTO courses VALUES (:key_id, :course_id, :course_name, :session_time, :room)"), c)
         for s in students:
-            conn.execute(text(
-                "INSERT INTO students (student_id_vn, student_id_au, name, year, photo_folder, student_card)"
-                " VALUES (:vn, :au, :name, :year, :folder, :card)"),
-                {"vn": s["student_id_vn"], "au": s["student_id_au"] or None, "name": s["student_name"],
-                 "year": s["year"] or None, "folder": s["photo_folder"] or None, "card": s.get("student_card") or None})
-            for k in parse_course_keys(s["courses"]):
-                conn.execute(text("INSERT INTO enrollments VALUES (:st, :k)"), {"st": s["student_id_vn"], "k": k})
+            insert_student(conn, s)
         for p in session.get("placeholder_students", []):
             conn.execute(text("INSERT INTO placeholder_students (name, note) VALUES (:n, :note)"),
                          {"n": p["student_name"], "note": p.get("note")})

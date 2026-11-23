@@ -5,7 +5,7 @@ from pathlib import Path
 
 from app.db import connect, init_db
 from app.db import queries
-from app.db.seed import parse_course_keys, reset
+from app.db.seed import reset
 
 
 class DbTest(unittest.TestCase):
@@ -22,8 +22,7 @@ class DbTest(unittest.TestCase):
     def test_second_init_does_not_seed_again(self):
         self.assertFalse(init_db(self.db))
 
-    def test_course_column_becomes_enrollments(self):
-        self.assertEqual(parse_course_keys("[1,2]"), [1, 2])
+    def test_roster_courses_become_enrollments(self):
         chi = next(s for s in queries.list_students(self.db) if s["student_id_vn"] == "SWH02378")
         self.assertEqual(chi["courses"], [1, 2])
         self.assertEqual(chi["photo"], "/photos/SWH02378")

@@ -4,7 +4,7 @@ import json
 
 from sqlalchemy import text
 
-from ..config import MOCK_DIR
+from ..config import MOCK_DIR, is_upload
 from . import connect
 
 STATUSES = {"in_class", "left", "checked_in", "not_seen"}
@@ -14,24 +14,60 @@ def _hhmm(at):
     return at[11:16] if at else None
 
 
-def _photo(student_id, card):
-    return f"/photos/{student_id}" if card else None
+def _photo(student_id, card, folder):
+    """The student's picture: the card, or the first uploaded photo (Drive folders may hold HEIC, so not those)."""
+    return f"/photos/{student_id}" if card or is_upload(folder) else None
 
 
-def list_students(path=None):
+def list_students(path=None, student_id=None):
+    """Every student, or only student_id's row (an empty list if unknown)."""
+    where, args = (" WHERE student_id_vn = :s", {"s": student_id}) if student_id else ("", {})
     with connect(path) as conn:
-        rows = conn.execute(text("SELECT * FROM students ORDER BY name")).mappings().all()
-        enr = conn.execute(text("SELECT student_id_vn, course_key FROM enrollments ORDER BY course_key")).all()
+        rows = conn.execute(text(f"SELECT * FROM students{where} ORDER BY name"), args).mappings().all()
+        enr = conn.execute(text(f"SELECT student_id_vn, course_key FROM enrollments{where} ORDER BY course_key"),
+                           args).all()
     courses = {}
     for st, k in enr:
         courses.setdefault(st, []).append(k)
     return [{"student_id_vn": r["student_id_vn"], "student_id_au": r["student_id_au"], "name": r["name"],
              "year": r["year"], "courses": courses.get(r["student_id_vn"], []), "photo_folder": r["photo_folder"],
-             "student_card": r["student_card"], "photo": _photo(r["student_id_vn"], r["student_card"])} for r in rows]
+             "student_card": r["student_card"],
+             "photo": _photo(r["student_id_vn"], r["student_card"], r["photo_folder"])} for r in rows]
 
 
 def get_student(student_id, path=None):
-    return next((s for s in list_students(path) if s["student_id_vn"] == student_id), None)
+    return next(iter(list_students(path, student_id)), None)
+
+
+class AlreadyExists(Exception):
+    pass
+
+
+def create_student(student, path=None):
+    """student: {student_id_vn, name, student_id_au, year, courses: [course_key], photo_folder, student_card}.
+    Raises AlreadyExists for a taken student_id_vn, ValueError for an unknown course. Returns the saved student."""
+    sid = student["student_id_vn"]
+    with connect(path) as conn:
+        if conn.execute(text("SELECT 1 FROM students WHERE student_id_vn = :s"), {"s": sid}).first():
+            raise AlreadyExists(f"{sid} is already registered")
+        known = {k for (k,) in conn.execute(text("SELECT key_id FROM courses"))}
+        unknown = sorted(set(student.get("courses", [])) - known)
+        if unknown:
+            raise ValueError(f"unknown course key(s): {unknown}")
+        insert_student(conn, student)
+    return get_student(sid, path)
+
+
+def insert_student(conn, student):
+    """One students row plus its enrollments (used by create_student and by the seed)."""
+    conn.execute(text(
+        "INSERT INTO students (student_id_vn, student_id_au, name, year, photo_folder, student_card)"
+        " VALUES (:vn, :au, :name, :year, :folder, :card)"),
+        {"vn": student["student_id_vn"], "au": student.get("student_id_au") or None, "name": student["name"],
+         "year": student.get("year") or None, "folder": student.get("photo_folder") or None,
+         "card": student.get("student_card") or None})
+    for k in sorted(set(student.get("courses", []))):
+        conn.execute(text("INSERT INTO enrollments VALUES (:st, :k)"), {"st": student["student_id_vn"], "k": k})
 
 
 def list_courses(path=None):

@@ -1,7 +1,9 @@
-"""Resolve demo video paths for the tracking scripts.  Owner: Mai Chi
+"""Resolve demo video, Drive and database paths for the ML scripts.  Owner: Mai Chi
 
-Same rules as backend/app/services/videos.py:
+Same rules as the backend (backend/app/config.py, services/videos.py), without importing it:
     HAWKEYE_VIDEO_ROOT (from backend/.env) / cameras[].folder / takes[].files[cam_id]
+    HAWKEYE_DRIVE_ROOT (else two levels above HAWKEYE_VIDEO_ROOT) holds AppliedML/
+    HAWKEYE_DB (else data/hawkeye.sqlite3) is the backend's database, which holds the student roster
 
 Usage:
     from paths import video_path
@@ -22,10 +24,31 @@ ENV_FILE = REPO / "backend" / ".env"
 VIDEO_CONFIG = REPO / "data" / "video_config.json"
 
 
+def _setting(name):
+    """A HAWKEYE_* setting: the process environment wins over backend/.env."""
+    return os.getenv(name) or dotenv_values(ENV_FILE).get(name)
+
+
 def video_root():
-    """HAWKEYE_VIDEO_ROOT from backend/.env (the process environment wins), else data/videos/."""
-    root = os.getenv("HAWKEYE_VIDEO_ROOT") or dotenv_values(ENV_FILE).get("HAWKEYE_VIDEO_ROOT")
-    return Path(root or (REPO / "data" / "videos")).expanduser()
+    """HAWKEYE_VIDEO_ROOT, else data/videos/."""
+    return Path(_setting("HAWKEYE_VIDEO_ROOT") or (REPO / "data" / "videos")).expanduser()
+
+
+def drive_root():
+    """The folder that holds AppliedML/: HAWKEYE_DRIVE_ROOT, else two levels above HAWKEYE_VIDEO_ROOT."""
+    root = _setting("HAWKEYE_DRIVE_ROOT")
+    return Path(root).expanduser() if root else video_root().parent.parent
+
+
+def db_path():
+    """The backend's SQLite database: HAWKEYE_DB, else data/hawkeye.sqlite3."""
+    return Path(_setting("HAWKEYE_DB") or (REPO / "data" / "hawkeye.sqlite3")).expanduser()
+
+
+def student_file(rel):
+    """A student's photo_folder / student_card path, as backend config.student_file: "data/..." is an Add person
+    upload inside the repo, anything else ("AppliedML/...") is on the Drive."""
+    return REPO / rel if Path(rel).parts[:1] == ("data",) else drive_root() / rel
 
 
 def video_config():

@@ -26,7 +26,7 @@ from datetime import datetime
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
-from ..config import DATA_DIR, DRIVE_ROOT, REPO_DIR
+from ..config import DATA_DIR, DRIVE_ROOT, IMAGE_EXT, REPO_DIR, student_file
 from ..core.ml_models import FEATURES, ML_DIR, load_infer, weights_status
 from ..db.queries import list_students
 
@@ -35,7 +35,6 @@ MARGIN = {"face_recognition": 0.1, "anti_spoofing": 0.25, "emotion": 0.0}
 LIVENESS_FRAMES = 10
 
 _lock = threading.Lock()
-IMAGE_EXT = {".jpg", ".jpeg", ".png", ".heic", ".webp"}
 MAX_SIDE = 1600      # phone photos are shrunk before the face search
 SEARCH_SIDES = (1600, 960, 640, 480)   # a face that fills a close-up is found at a smaller size
 
@@ -234,7 +233,7 @@ def _read_photo(path):
     import numpy as np
     from PIL import Image, ImageOps
 
-    if path.suffix.lower() == ".heic":
+    if path.suffix.lower() in (".heic", ".heif"):
         from pillow_heif import register_heif_opener   # pip install pillow-heif
         register_heif_opener()
     rgb = ImageOps.exif_transpose(Image.open(path)).convert("RGB")
@@ -308,11 +307,11 @@ def load_registered(force=False):
 
         plan = []                    # (student, folder_photos, [files])
         for st in students:
-            folder = root / st["photo_folder"] if st["photo_folder"] else None
+            folder = student_file(st["photo_folder"], root) if st["photo_folder"] else None
             files = sorted(p for p in folder.iterdir() if p.suffix.lower() in IMAGE_EXT) if folder and folder.is_dir() else []
             folder_photos = len(files)
             if st["student_card"]:
-                files.append(root / st["student_card"])
+                files.append(student_file(st["student_card"], root))
             plan.append((st, folder_photos, [f for f in files if f.name.lower() != "desktop.ini"]))
 
         cache = _read_cache()
@@ -371,6 +370,25 @@ def load_registered(force=False):
     finally:
         _loading = False
         _load_lock.release()
+
+
+_reload_wanted = threading.Event()
+
+
+def roster_changed():
+    """Call after the student roster changes (POST /api/students): reloads the registered faces in the background,
+    straight away or as soon as a load that is already running ends, so the change is never skipped."""
+    _reload_wanted.set()
+    threading.Thread(target=_reload_when_free, daemon=True, name="features-demo-roster").start()
+
+
+def _reload_when_free():
+    while _reload_wanted.is_set():
+        with _load_lock:             # wait for a running load to finish
+            pass
+        if _reload_wanted.is_set():
+            _reload_wanted.clear()
+            load_registered(force=True)
 
 
 def _warm_up():

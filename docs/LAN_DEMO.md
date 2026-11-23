@@ -1,0 +1,111 @@
+# Demo over Wi-Fi: one backend, every device's camera
+
+One laptop (the **host**) runs the backend and the frontend. Every other laptop or phone on the **same Wi-Fi** opens
+the host's address in a browser and uses **its own camera**. Frames go to the host, which runs face recognition,
+liveness and emotion and sends the result back. Nothing is installed on the other devices.
+
+```
+phone / laptop (browser + its camera)  --https-->  host :5173 (Vite)  --proxy-->  host :8000 (FastAPI + models)
+```
+
+Only port 5173 has to be reachable. The backend stays on the host (`localhost:8000`); Vite forwards `/api`, `/videos`
+and `/photos` to it.
+
+**Why https:** browsers only allow the camera on `https://` pages or on `localhost`. On `http://192.168.x.x:5173` the
+camera is blocked on every device except the host. `npm run dev:lan` therefore serves https with a self-signed
+certificate; each device accepts a warning once (step 5).
+
+## 1. Host setup (once)
+
+Do the normal setup from the root [README](../README.md) ("Run it"), then check:
+
+| Check | How |
+| --- | --- |
+| Backend packages, including torch, OpenCV < 5 and ultralytics | `backend/.venv/bin/pip install -r requirements.txt` (Windows: `backend\.venv\Scripts\pip ...`) |
+| Frontend packages | `cd frontend && npm install` (adds `@vitejs/plugin-basic-ssl`) |
+| Model weights | `ml/face_recognition/face_recognition.pt`, `ml/anti_spoofing/anti_spoofing.pt`, `ml/emotion/emotion.pt`. `GET /api/features-demo/status` shows `"found": true` for each |
+| Registered students | `HAWKEYE_DRIVE_ROOT` / `HAWKEYE_VIDEO_ROOT` in `backend/.env` point at the synced Drive, and the photo folders are **available offline**. The Features demo page lists the registered people |
+| Laptop power | Plugged in, sleep off for the demo |
+
+## 2. Put every device on the same network
+
+- All devices join the **same Wi-Fi**.
+- Campus or guest Wi-Fi often blocks devices from reaching each other ("client isolation"). If step 6 cannot load,
+  use a **phone hotspot** instead and connect the host and the other devices to it.
+
+## 3. Start the backend on the host
+
+```bash
+cd backend
+.venv/bin/uvicorn app.main:app --port 8000
+```
+
+Windows: `.venv\Scripts\uvicorn app.main:app --port 8000`. Leave this terminal open.
+
+## 4. Start the frontend in Wi-Fi mode on the host
+
+```bash
+cd frontend
+npm run dev:lan
+```
+
+Vite prints two addresses:
+
+```
+➜  Local:   https://localhost:5173/
+➜  Network: https://192.168.68.118:5173/
+```
+
+The **Network** line is the address for the other devices. If it is missing, find the host's IP with
+`ipconfig getifaddr en0` (macOS) or `ipconfig` → "IPv4 Address" (Windows).
+
+**Firewall:** the first time, macOS asks whether `node` may accept incoming connections → **Allow**. On Windows,
+allow Node.js on **Private networks** when Windows Defender Firewall asks.
+
+`npm run dev` (without `:lan`) still works as before: http, this machine only.
+
+## 5. Open it on another device
+
+1. Open the Network address with the page path, e.g. `https://192.168.68.118:5173/features-demo`.
+2. Accept the certificate warning once (the certificate is self-signed, made by the host):
+
+   | Browser | Steps |
+   | --- | --- |
+   | Chrome / Edge | **Advanced** → **Proceed to 192.168.x.x (unsafe)** |
+   | Safari (macOS, iPhone) | **Show Details** → **visit this website** → confirm |
+   | Firefox | **Advanced…** → **Accept the Risk and Continue** |
+
+3. Allow the camera when the browser asks.
+
+| Page | Path | Uses the device's camera for |
+| --- | --- | --- |
+| Features demo | `/features-demo` | Face recognition, liveness and emotion on every frame |
+| Home | `/` | Live camera tile |
+| Add person | `/add` | Taking registration photos |
+| MultiCam | `/demo` | Recorded takes only (no camera) |
+
+Several devices can use the Features demo at once: each browser tab has its own ID, so liveness keeps a separate
+frame buffer per device. All the computing happens on the host (about 75–90 ms per frame on Mai Chi's Mac, measured
+2026-11-23), so with many devices at once each one gets fewer results per second.
+
+## 6. Check before recording
+
+- [ ] Host: backend terminal shows no errors; `https://localhost:5173/features-demo` works on the host itself
+- [ ] Each device opens the Network address and shows its camera
+- [ ] A registered member is named, liveness says **Live**, an emotion icon and label show
+- [ ] A printed photo or a phone screen held to the camera shows **Spoof**
+- [ ] Host IP has not changed since the devices opened it (it can change after reconnecting to Wi-Fi)
+
+## Troubleshooting
+
+| Problem | Cause | Fix |
+| --- | --- | --- |
+| Page does not load on the other device | Not on the same network, client isolation, or firewall | Same Wi-Fi as the host; try a phone hotspot; allow `node` in the host's firewall |
+| Camera blocked or no camera prompt | Opened `http://`, or permission denied earlier | Use the `https://` Network address; reset the camera permission in the browser's site settings |
+| "backend offline" on the page | Backend not running on the host, or it crashed | Restart step 3 and read its terminal |
+| A model shows "weights not found" | Weight file missing on the host | See the table in step 1; `anti_spoofing.pt` comes with PR #6 |
+| Everyone is "Unknown" | No registered faces loaded | Drive photo folders not available offline, or the Drive path in `backend/.env` is wrong |
+| Results lag | One host computes for every device | Fewer devices at once; close other heavy apps on the host |
+| Address stopped working | Host's IP changed | Read the new Network line from `npm run dev:lan` |
+| Backend error mentioning `cv2` or `CascadeClassifier` | Two OpenCV packages, or OpenCV 5, in the backend venv | `pip uninstall opencv-python-headless`, then `pip install --force-reinstall --no-deps "opencv-python<5"` |
+| A newly registered person is not recognised | Their photos are still being embedded | Wait a few seconds after Add person; the Features demo page lists them with their photo count when ready |

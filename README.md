@@ -16,7 +16,8 @@ backend/            FastAPI server (API + video streaming)
 frontend/           Vue 3 + Vite web app (Home page built, other pages placeholders)
   src/pages.js      page registry: add one entry to get a route + sidebar item
 data/
-  mock/             mock data: students.csv + courses.csv (from the team metadata sheet), session.json, tracks/
+  mock/             seed + mock data: roster.json (courses + students, seeds a new database), session.json, tracks/
+  photos/           face photos from the Add person page (git-ignored)
   video_config.json which recording each camera plays in the demo
   tracks/take<N>/   real boxes per take and camera (made by ml/tracking, served by /api/tracks)
   ground_truth/     who appears when, per take (take1.csv, take3.csv), for evaluation
@@ -46,6 +47,8 @@ npm run dev                   # http://localhost:5173
 ```
 
 Press **Run demo videos** on the Home page. The three videos stream from the backend and play in sync.
+
+**Demo with other devices' cameras (same Wi-Fi):** run `npm run dev:lan` instead and open the printed `https://<host IP>:5173` address on each device. Full steps: [`docs/LAN_DEMO.md`](docs/LAN_DEMO.md).
 
 ## Adding to the pipeline
 
@@ -86,7 +89,7 @@ ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all     # always a
 `name_tracks.py` needs two small OpenCV face models in `ml/face_recognition/models/` (download commands in [`ml/face_recognition/README.md`](ml/face_recognition/README.md)).
 
 1. **Tracking** (`precompute_tracks.py`): YOLO11n (pre-trained) + ByteTrack with a 3 s buffer, people only, every 3rd frame kept, short tracks and objects that never move (a poster on the classroom wall) dropped. Output: `data/tracks/take<N>/<cam_id>.json`.
-2. **Naming at check-in** (`ml/face_recognition/name_tracks.py`): a baseline until Thuận Minh's model is trained. OpenCV YuNet + SFace compare faces on the attendance camera with each student's enrolment photos (`photo_folder`) and student card (`student_card`) from `data/mock/students.csv`. All five members have photos in their Drive folders (`AppliedML/<your name>/`); Minh Thành (Do Minh Thanh) was added to `students.csv` on 2026-11-21. Rerun after adding photos.
+2. **Naming at check-in** (`ml/face_recognition/name_tracks.py`): a baseline until Thuận Minh's model is trained. OpenCV YuNet + SFace compare faces on the attendance camera with each student's enrolment photos (`photo_folder`) and student card (`student_card`) of every student in the backend's database. All five members have photos in their Drive folders (`AppliedML/<your name>/`). New students are registered on the **Add person** page (`POST /api/students`, photos saved to `data/photos/`); rerun after registering someone.
 3. **Name on every camera** (`ml/tracking/link_names.py`, run by step 2): the cam_1 / cam_2 track standing at the classroom door while that person checks in gets the same name, from the check-in time on.
 
 Takes: the old take 1 was a failed recording and was deleted from the Drive folder on 2026-11-17; the other takes were renumbered (old 2–9 → 1–8, the old demo take 4 is now **take 3**). `data/video_config.json` already uses the new numbers.

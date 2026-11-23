@@ -10,6 +10,31 @@ All work happens on **one branch: `feature/backend-structure`**. It holds the Vu
 - Do not merge into `main` or push unless the user asks.
 - `main` stays as the original template (React frontend, single `main.py`).
 
+## 2026-11-23: roster in the database, registration API, Wi-Fi demo (Mai Chi, branch `tracking/live-detector`)
+
+- **`data/mock/students.csv` and `courses.csv` are deleted.** The database is the roster: a new database is seeded
+  from `data/mock/roster.json` (courses + students with their course keys), and new students come from the Add person
+  page. Existing databases keep their rows; one made before 2026-11-21 lacks Minh Thành:
+  `cd backend && python -m app.db.seed --reset` (mock data only).
+- **`POST /api/students`** (`backend/app/api/records.py`, Đức Mạnh's area, contract as in `frontend/src/api.js`):
+  checks name / `SWH\d{5}` / 9-digit AU ID / course keys / 1–20 photos, saves the photos to
+  `data/photos/<student_id_vn>/` (git-ignored), inserts the student (`queries.create_student`, shared
+  `insert_student` with the seed), rolls the photos back on any failure, then `features_demo.roster_changed()` reloads
+  the registered faces (straight away, or right after a load already running). Tested end to end on a scratch
+  database: 10/10 photos embedded, `/photos/<id>` serves the first photo, a second registration with the same ID → 409.
+- `config.py`: `PHOTOS_DIR`, `IMAGE_EXT` / `BROWSER_IMAGE_EXT` (one list for uploads, enrolment and the gallery; HEIF
+  now embedded too), `is_upload()` and `student_file()` ("data/..." = repo upload, else the Drive).
+  `ml/tracking/paths.py` has the same `student_file()`, `drive_root()` (honours `HAWKEYE_DRIVE_ROOT`) and `db_path()`
+  for the ML scripts; `name_tracks.py` reads the students from the database (read-only `sqlite3`; `--db` replaces
+  `--students`).
+- `requirements.txt`: one OpenCV package, `opencv-python>=4.9,<5` (ultralytics needs it; two packages overwrite each
+  other's `cv2`), and `python-multipart` (uploads). In a venv that has both: `pip uninstall opencv-python-headless`,
+  then `pip install --force-reinstall --no-deps "opencv-python<5"`.
+- **Wi-Fi demo:** `npm run dev:lan` serves https on the host's IP (`@vitejs/plugin-basic-ssl`) so other devices can use
+  their camera; guide in `docs/LAN_DEMO.md`. Tested: a frame sent through `https://<host IP>:5173` was named, live, neutral.
+- Tests: `backend/tests/test_students_api.py` (4) added; 43 of 44 backend tests pass (the failing one only objects to a
+  local `runs/` folder at the repo root).
+
 ## 2026-11-23: live detector (Mai Chi, branch `tracking/live-detector`)
 
 - `backend/app/pipeline/detector.py` implemented: `detect_people()` = YOLO11n (class 0, conf 0.4, same as the precomputed
