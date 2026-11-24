@@ -4,7 +4,7 @@
 // x 0 left -> 1 right, y 0 top -> 1 bottom, as the homographies produce them.
 import { computed } from 'vue'
 import {
-  CAMERA, MAP_H, MAP_W, cameras, corridor, corridorLabel, desks, doorLabels, doorLeaves, room, roomLabel, walls,
+  CAMERA, MAP_H, MAP_W, cameras, corridor, corridorLabel, desks, doorLabels, doorLeaves, glassWindow, room, roomLabel, walls,
 } from '../roomLayout.js'
 
 // map: dashboard map (only its layout is used; live mode draws no people yet); trails (optional): [{ track_id, name, flagged, points: [[t, x, y], ...] }]
@@ -82,6 +82,7 @@ const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t
       <rect v-for="([x, y, w, h], i) in desks" :key="i" :x="x" :y="y" :width="w" :height="h" rx="4" class="rm-desk" />
 
       <rect v-for="(w, i) in walls" :key="`wall${i}`" :x="w.x" :y="w.y" :width="w.w" :height="w.h" class="rm-wall" />
+      <rect :x="glassWindow.x" :y="glassWindow.y" :width="glassWindow.w" :height="glassWindow.h" class="rm-glass" />
       <rect v-for="(d, i) in doorLeaves" :key="`leaf${i}`" :x="d.x" :y="d.y" :width="d.w" :height="d.h" rx="3"
         :transform="`matrix(${d.matrix.join(' ')})`" class="rm-leaf" />
       <text v-for="(l, i) in doorLabels" :key="`dl${i}`" :x="l.x" :y="l.y" class="rm-small">{{ l.text }}</text>
@@ -130,6 +131,7 @@ const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t
 .map-trail circle { fill: var(--c); stroke: #fff; stroke-width: 3; }
 /* Alert: the person keeps their colour, a dashed red halo marks the alert. */
 .map-trail.gone path { opacity: 0.3; }
+.rm-glass { fill: #7cc4fa; }
 .rm-legend li.gone { opacity: 0.5; }
 .map-trail.flagged path { stroke-width: 5; opacity: 1; }
 .map-trail.flagged circle { stroke: var(--danger); stroke-width: 4; animation: map-blink 1s ease-in-out infinite; }

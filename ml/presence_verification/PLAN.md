@@ -41,7 +41,7 @@ Câu trả lời khi phỏng vấn: *"Anti-spoofing kiểm tra khuôn mặt có 
 | Tên trên track | Có ở take 1, 3, 4, 8 (attendance_cam, một phần cam_1/cam_2). Take 2, 5, 6, 7 không có tên | Chỉ 4 take dùng được làm "buổi bình thường có danh tính" |
 | Ground truth | `data/ground_truth/take1.csv`, `take3.csv`: `check_in`, `enter_class`, `seen` theo người | Đủ để **ước lượng phân phối Δt** và đo false alarm. Take 1: Δt (check_in → enter_class) = 3,0–4,5 s |
 | Homography | cam_1, cam_2 → bản đồ, **ước lượng** (`ground_model.py`, không có mốc đo trên sàn) | Ngưỡng vị trí cần biên an toàn. Báo cáo phải có phân tích độ nhạy với nhiễu tọa độ |
-| Bản đồ | `room204_map.json`: hành lang x 0–0,3, phòng x 0,3–1, cửa x = 0,3, y 0,789–0,961 | Định nghĩa vùng: hành lang / cửa / phòng |
+| Bản đồ | `room204_map.json`: hành lang x 0–0,3, phòng x 0,3–1, cửa x = 0,3, y 0,727–0,906 | Định nghĩa vùng: hành lang / cửa / phòng |
 | attendance_cam | Thấy mặt, không thấy chân, nên **không chiếu được lên bản đồ** | Check-in là một sự kiện tại vị trí cửa cố định, không phải một quỹ đạo |
 | Đồng hồ camera | Đồng hồ CAM 2 lệch khoảng 23,4 s, đã chỉnh bằng `offset_s` trong `video_config.json` | Sai lệch đồng bộ còn sót lại làm Δt bị lệch, nên mô hình Δt phải chịu được độ lệch vài giây |
 | Dữ liệu gian lận | **Chưa có** | Cần quay take có kịch bản (bước 7) và mô phỏng (bước 3) |

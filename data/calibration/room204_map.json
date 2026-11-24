@@ -54,12 +54,69 @@
   },
   "attendance_cam": {
    "x": 0.41,
-   "y": 0.698,
-   "_note": "position from the FigJam map (node 19:119, ATT), on the front-left desk row near the door"
+   "y": 0.6026,
+   "_note": "on the front-left desk row near the door (moved with the desks by -0.0954 on 2026-11-24)"
   }
  },
  "scale_per_m": {
   "x": 0.0875,
   "y": 0.143
- }
+ },
+ "desks": [
+  [
+   0.3707,
+   0.1296,
+   0.2152,
+   0.0692
+  ],
+  [
+   0.7022,
+   0.1296,
+   0.2152,
+   0.0692
+  ],
+  [
+   0.3707,
+   0.2796,
+   0.2152,
+   0.0692
+  ],
+  [
+   0.7022,
+   0.2796,
+   0.2152,
+   0.0692
+  ],
+  [
+   0.3707,
+   0.4219,
+   0.2152,
+   0.0692
+  ],
+  [
+   0.7022,
+   0.4219,
+   0.2152,
+   0.0692
+  ],
+  [
+   0.3707,
+   0.565,
+   0.2152,
+   0.0692
+  ],
+  [
+   0.7022,
+   0.5623,
+   0.2152,
+   0.0692
+  ],
+  [
+   0.8413,
+   0.8365,
+   0.1,
+   0.0692
+  ]
+ ],
+ "_desks_note": "[x, y, w, h] fractions, top-left corner. Last one is the small desk by CAM 2. The 8 long desks were moved by -0.0954 in y on 2026-11-24 so the ATT desk (row 4 col 1, index 6) covers y 0.565-0.635, where cam_2 (homography v3, confirmed by GeoCalib) sees people seated at it in several takes (x 0.53-0.55, y 0.58-0.63). Still not measured."
 }
