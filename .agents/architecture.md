@@ -77,6 +77,26 @@ What a person or agent must do:
 5. **Update the numbers written in `.agents/status.md`** (selected model, threshold, AUC) so the next agent does not read stale values, and do not commit the `.pt`.
 6. The `recognize` stage option `threshold` in `backend/pipeline.json` is `null` (use the model's own). If someone set a number there for the old model, change it back or re-tune it.
 
+## Model versions (System log page)
+
+The user controls which version of each model the app runs. `ml/model_versions.json` (committed) holds a hand-set
+label per model: `{"<key>": {"version": "v2", "note": "what changed"}}`, keys `face_recognition`, `anti_spoofing`,
+`emotion`, `presence_verification`, `face_detector`, `person_detector`. The System log page (`/system`, gear icon,
+`GET /api/system/models`, `services/model_log.py`) shows, per model, the file the app actually loads (same paths and
+`HAWKEYE_*` overrides as the loaders), its version label, last modified time, size and SHA-256 fingerprint. Every change
+it detects (new fingerprint or new label) is appended to `logs/model_changes.jsonl` (git-ignored, per machine), checked
+at backend startup and on each page load.
+
+Rules for agents:
+1. **Never replace, retrain into, rename or delete a model file the app loads unless the user asks for it.**
+2. When the user does replace one, bump its `version` in `ml/model_versions.json` and say what changed in `note`, in the same step. Use the label the user gives; otherwise the next `vN`.
+3. Keep old versions only if the user asks, as `ml/<feature>/<feature>_<version>.pt` (not loaded by the app; weights are not committed unless they already are).
+4. To roll back: put the old file back at the loaded path (or point `HAWKEYE_<FEATURE>_WEIGHTS` at it) and set the label back. The log records it as "file replaced".
+5. After a change, open `/system` and check that the fingerprint and label moved, then follow "When someone replaces a model's `.pt` file" above.
+6. Adding a model the app infers with: add it to `models()` in `services/model_log.py` and to `ml/model_versions.json`.
+
+"Last modified" is the file date on that machine (a clone or copy resets it); the fingerprint is the reliable identity.
+
 ## Presence verification + door audit (`ml/presence_verification/`)
 
 Đức Mạnh's innovative feature. Reads `data/tracks/`, `data/calibration/`, `data/ground_truth/` (never writes them).

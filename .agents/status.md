@@ -18,6 +18,7 @@ All work goes on **`feature/backend-structure`**. Don't create other branches, m
 - **Features demo** (`/features-demo`): webcam → face recognition / anti-spoofing / emotion, threshold sliders (per browser, `localStorage`), session log optionally saved to `logs/features_demo_<time>.csv`.
 - **Add person** (`/add`): form + 1–20 photos → `POST /api/students`.
 - **Camera** (`/camera`, full screen, phones): sends JPEG frames over `WS /ws/camera/{cam_id}`.
+- **System log** (`/system`, gear icon under Features demo): each inference model's version label (`ml/model_versions.json`), last modified time, size, SHA-256, and the change history in `logs/model_changes.jsonl`.
 - **Wi-Fi demo guide** (`/guide/lan`): renders `docs/LAN_DEMO.md` with `marked` (`?raw` import, hot-reloads in dev).
 - Sidebar is icon-only (72 px; labels as tooltips / aria-labels), so the cameras get more width.
 - Styles: one type scale (22/17/15/14/13/12), spacing tokens `--space-1..5`, every colour a `:root` token.

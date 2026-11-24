@@ -25,6 +25,12 @@ async def lifespan(app):
     if init_db():
         log.info("Seeded the database from data/mock/")
     app.state.engine, app.state.engine_error = None, None
+    try:   # log any model file that changed since the last run (System log page); hashing runs off the event loop
+        import threading
+        from .services import model_log
+        threading.Thread(target=model_log.check, daemon=True).start()
+    except Exception:  # noqa: BLE001 - never block the API
+        log.exception("Could not check the model files")
     try:   # embed the enrolment photos in the background so the Features demo page opens ready
         from .services import features_demo
         features_demo.start_preload()

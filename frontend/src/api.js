@@ -270,3 +270,13 @@ function buildMockDashboard() {
     map: sessionMock.map,
   }
 }
+
+// ---- System log page (backend/app/api/system.py, services/model_log.py) ----
+// { models: [{key, label, file, found, version, note, modified, size, sha256}], history: [...newest first] }
+export async function fetchSystemModels() {
+  try {
+    return { ...(await getJson('/api/system/models')), offline: false }
+  } catch {
+    return { models: [], history: [], offline: true }
+  }
+}

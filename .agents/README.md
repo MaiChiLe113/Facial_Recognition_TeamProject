@@ -39,7 +39,8 @@ The team design doc is the source of truth for scope and marking. It is a Claude
 4. **Never commit** videos, model weights, `.env` or `*.sqlite3` (already in `.gitignore`).
 5. **Small steps.** After each step: run it, show the user what changed, and wait for their OK before the next one. Make one git commit per step with a clear message.
 6. **Commit messages carry no AI attribution.** No `Co-Authored-By: Claude…` lines, no "Generated with" footers.
-7. **Code style.** Code comments and docs are in English (the team's choice). Stage and feature code must import heavy libraries (torch, cv2) inside `setup()`.
+7. **Model versions are the user's call.** Don't swap a model file the app loads unless asked; when asked, bump `ml/model_versions.json` in the same step (see `architecture.md`, "Model versions").
+8. **Code style.** Code comments and docs are in English (the team's choice). Stage and feature code must import heavy libraries (torch, cv2) inside `setup()`.
 
 ## Run and verify
 
