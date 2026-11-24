@@ -154,11 +154,11 @@ const label = (id) => cameras.value.find((c) => c.cam_id === id)
 .cam-choice span { font-size: 14px; color: #aaa; }
 .cam-bar { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: #1b1b1b; display: flex; flex-direction: column; gap: 8px; }
 .cam-status { display: flex; align-items: center; gap: 10px; font-size: 15px; }
-.cam-msg { font-size: 13px; color: #f2b233; }
+.cam-msg { font-size: 13px; color: var(--amber); }
 .cam-actions { display: flex; gap: 10px; }
 .cam-actions .btn { flex: 1; background: #2a2a2a; color: #f2f2f2; border-color: #444; padding: 12px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: #777; flex: none; }
-.dot.sending { background: #34c759; }
-.dot.starting, .dot.reconnecting { background: #f2b233; }
-.dot.error { background: #ff3b30; }
+.dot.sending { background: var(--green); }
+.dot.starting, .dot.reconnecting { background: var(--amber); }
+.dot.error { background: var(--danger); }
 </style>

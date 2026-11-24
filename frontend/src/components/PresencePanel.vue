@@ -71,19 +71,19 @@ const matchOf = (sid) => props.result?.matches?.find((m) => m.student_id === sid
 </template>
 
 <style scoped>
-.pv { padding: 16px; }
-.pv-sub { font-size: 14px; margin: 12px 0 6px; }
+.pv { padding: var(--space-4); }
+.pv-sub { font-size: 15px; margin: var(--space-4) 0 var(--space-2); }
 .pv-alerts { list-style: none; margin: 0; padding: 0; }
 .pv-alerts li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .pv-alerts li.pending { opacity: 0.45; }
-.pv-alerts li.ok { color: #3f7d2f; }
+.pv-alerts li.ok { color: var(--green); }
 .pv-alerts .grow { flex: 1; }
-.pv-code { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: 4px; color: #fff; background: #b3392e; }
-.pv-code.D3 { background: #b36b00; }
+.pv-code { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: 4px; color: #fff; background: var(--danger); }
+.pv-code.D3 { background: var(--warning-text); }
 .pv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .pv-table th { text-align: left; color: var(--muted); font-weight: 500; }
-.pv-table th, .pv-table td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.pv-table th, .pv-table td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 .pv-table tr.flagged td:first-child { font-weight: 600; }
-.pv-status { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: #e3f2dd; color: #3f7d2f; }
-.pv-status.bad { background: #fbe3e0; color: #8a2b22; }
+.pv-status { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green); }
+.pv-status.bad { background: var(--danger-soft); color: var(--danger); }
 </style>

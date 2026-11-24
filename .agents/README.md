@@ -22,26 +22,18 @@ Hawkeye is a COS30082 (Applied Machine Learning) team project: a multi-camera cl
 The stack runs locally:
 - Backend: FastAPI (Python 3.10+) in `backend/`.
 - Frontend: Vue 3 + Vite (npm) in `frontend/`.
-- Database: SQLite planned (`backend/app/db/schema.sql`), on hold; data lives in CSV under `data/mock/` for now.
+- Database: SQLite (`data/hawkeye.sqlite3`, git-ignored), seeded from `data/mock/`.
 
 The team design doc is the source of truth for scope and marking. It is a Claude Docs document named "Project Plan" (tabs: Project Brief, Tasks and Codebase, Meeting Notes, Chi document). Ask the user for the link if you need it.
 
 ## Hard rules
 
-1. **Ownership.** Only edit files the current user owns. The user is Đức Mạnh, who owns:
-   - `frontend/`
-   - `backend/app/main.py`, `backend/app/api/`, `backend/app/services/`, `backend/app/core/`
-   - `backend/app/db/`
-   - `backend/app/pipeline/attendance.py` (shared with Mai Chi)
-   - `ml/presence_verification/` (Đức Mạnh's individual innovative feature: presence verification + door audit) and `backend/app/features/presence_verification/`
+1. **Who built what (for context only; anyone may edit any file).**
+   - Đức Mạnh: `frontend/`, `backend/app/main.py`, `backend/app/api/`, `backend/app/services/`, `backend/app/core/`, `backend/app/db/`, `backend/app/pipeline/attendance.py` (with Mai Chi), `ml/presence_verification/` and `backend/app/features/presence_verification/`
+   - Mai Chi: `backend/app/pipeline/{detector,tracker,matcher}.py`
+   - Thuận Minh `ml/face_recognition/`, Hồng Minh `ml/anti_spoofing/`, Minh Thành `ml/emotion/`: each holds `infer.py` and the weights `<feature>.pt`; the app finds them through `backend/app/core/ml_models.py`
 
-   Never edit:
-   - `backend/app/pipeline/{detector,tracker,matcher}.py` (Mai Chi)
-   - `ml/face_recognition/` (Thuận Minh), `ml/anti_spoofing/` (Hồng Minh), `ml/emotion/` (Minh Thành): each holds `infer.py` and the weights `<feature>.pt`; the app finds them through `backend/app/core/ml_models.py`
-   - anything else in `ml/` (other than `ml/presence_verification/`)
-   - never create a `runs/` folder outside `ml/`
-
-   Shared files (`README.md`, `requirements.txt`, `data/`) need a reason, and the change must stay minimal.
+   Never create a `runs/` folder outside `ml/`.
 2. **API contract.** Never rename or remove fields in an existing API response; only add. The frontend and teammates depend on the shapes. The bounding-box contract is in the root `README.md`.
 3. **Offline fallback.** `frontend/src/api.js` must keep working with the backend down: it builds the same shapes from `data/mock/`.
 4. **Never commit** videos, model weights, `.env` or `*.sqlite3` (already in `.gitignore`).

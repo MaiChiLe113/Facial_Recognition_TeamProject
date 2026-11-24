@@ -18,22 +18,7 @@ export const minutes = (m) => (m != null ? `${m} min` : '—')
 // unless it was changed by hand on the History page (row.attended true/false).
 export const attended = (row) => (row.attended != null ? row.attended : Boolean(row.check_in && row.entry))
 
-export function todayIso() {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 export function formatDate(iso) {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-}
-
-// "Wednesday 8-12AM" -> { start: "08:00", end: "12:00" };  "Wednesday 1-5PM" -> { start: "13:00", end: "17:00" }
-export function parseSessionTime(text) {
-  const m = /(\d{1,2})\s*-\s*(\d{1,2})\s*(AM|PM)/i.exec(text || '')
-  if (!m) return { start: '', end: '' }
-  const pm = m[3].toUpperCase() === 'PM'
-  const to24 = (h) => (pm && h < 12 ? h + 12 : h)
-  const fmt = (h) => `${String(h).padStart(2, '0')}:00`
-  return { start: fmt(to24(Number(m[1]))), end: fmt(to24(Number(m[2]))) }
 }

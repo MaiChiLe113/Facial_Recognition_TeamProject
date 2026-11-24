@@ -13,6 +13,7 @@ import { demoTakes, fetchDashboard, fetchDemoConfig, fetchLive, fetchPresence, f
 import CameraCard from '../components/CameraCard.vue'
 import ClassRoster from '../components/ClassRoster.vue'
 import EventLog from '../components/EventLog.vue'
+import QrButton from '../components/QrButton.vue'
 import PresencePanel from '../components/PresencePanel.vue'
 import RoomMap from '../components/RoomMap.vue'
 import { useSyncedPlayback } from '../composables/useSyncedPlayback.js'
@@ -126,9 +127,10 @@ const takeEvents = computed(() => (hasVideo.value ? allTakeEvents.value.filter((
 
 // Map trails from presence verification, drawn up to the playback position while a video plays.
 const trails = computed(() => {
-  if (!recorded.value) return undefined
+  if (!recorded.value) return null
   const all = presence.value?.trails ?? []
-  if (!hasVideo.value) return all
+  // Nothing is drawn until the take plays; Restart and a new take start from an empty map (position 0).
+  if (!hasVideo.value) return all.map((tr) => ({ ...tr, points: [] }))
   return all.map((tr) => ({ ...tr, points: tr.points.filter((p) => p[0] <= position.value + 0.05) }))
 })
 
@@ -159,8 +161,9 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
   <div v-else class="home">
     <header class="topbar">
       <h1>{{ dash.course.id }} · Room {{ dash.course.room }}
-        <span v-if="recorded" style="color:#dd958f"> · Take {{ selected }}</span></h1>
+        <span v-if="recorded" class="accent"> · Take {{ selected }}</span></h1>
       <div class="topbar-right">
+        <QrButton :url="live?.host_urls?.[0]" />
         <div class="source-switch" role="group" aria-label="Camera source">
           <button class="btn" :class="{ active: !recorded }" :aria-pressed="!recorded" @click="setSource('live')">Live</button>
           <button class="btn" :class="{ active: recorded }" :aria-pressed="recorded" @click="setSource('recorded')">Recorded</button>
@@ -186,7 +189,8 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
     <div v-if="recorded && message" class="notice"><span>{{ message }}</span></div>
     <div v-if="!recorded" class="notice">
       <span>On a phone or laptop on the same Wi-Fi, open <strong>{{ senderUrl }}</strong> and pick a camera, or press
-        <strong>+</strong> on a tile to use this device. First time on a device: see <code>docs/LAN_DEMO.md</code>.</span>
+        <strong>+</strong> on a tile to use this device. Or press <strong>QR</strong> and scan it. First time on a device: see the
+        <RouterLink to="/guide/lan">Wi-Fi demo guide</RouterLink>.</span>
     </div>
 
     <div class="grid-top">
@@ -212,7 +216,8 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
         </template>
       </CameraCard>
       <EventLog v-if="recorded" class="demo-log" :events="takeEvents" :title="`Event log · take ${selected}`" />
-      <EventLog v-else :events="dash.events" />
+      <!-- Live: no live event feed yet, so the log starts blank (dash.events is mock data). -->
+      <EventLog v-else :events="[]" />
     </div>
 
     <!-- Recorded: always shown (disabled before Play) so choosing a take does not change the page height. -->

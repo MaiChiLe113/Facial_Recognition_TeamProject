@@ -4,8 +4,8 @@
 
 ```
 main.py            builds the app, includes routers, starts the Engine in the lifespan
-api/               one router per area: system, dashboard, demo, pipeline, photos, records (ROUTERS in __init__.py)
-services/          plain functions the routes call (videos.py; dashboard builder moves here with the DB)
+api/               one router per area: system, dashboard, demo, pipeline, photos, records, live, features_demo (ROUTERS in __init__.py)
+services/          plain functions the routes call (videos, live, gallery, features_demo)
 db/__init__.py     SQLite via SQLAlchemy Core: connect(), init_db() (tables from schema.sql; seeds a new DB)
 db/schema.sql      SQLite tables
 db/seed.py         fills the DB from data/mock/ (python -m app.db.seed [--reset])
@@ -24,7 +24,7 @@ core/              plug-in pipeline
     attendance_cam.py  detect_faces, liveness, recognize, emotion
     emit.py            emit_events: frame results -> seen / check_in / spoof events
 features/          one folder per innovation feature; event_counter/ is the template; README.md is the guide
-pipeline/          teammates' model stubs (do not edit, see .agents/README.md)
+pipeline/          detector, tracker (implemented), matcher (stub), attendance
 ```
 
 `backend/pipeline.json` decides:
@@ -53,7 +53,7 @@ If the engine cannot start at all, `app.state.engine` is `None`. The dashboard, 
 2. `emit_events` turns the results into events.
 3. The bus delivers the events to subscribers: the attendance rules and the enabled features.
 
-Nothing calls `process_frame` yet. The camera WebSocket (step 5) or a demo runner will.
+Live mode calls `process_frame` for every frame a phone sends over `/ws/camera/{cam_id}`.
 
 ### Adding things
 
@@ -67,10 +67,10 @@ Applies to `ml/face_recognition/face_recognition.pt`, `ml/anti_spoofing/anti_spo
 
 What the app does by itself:
 - **Threshold:** face recognition and anti-spoofing keep their decision threshold *inside* the `.pt` (chosen on validation data: ROC / EER). Nothing in the app hard-codes it. The Features demo page shows it as "Model default" (from `GET /api/features-demo/status`, field `threshold`) and logs the value actually used in the CSV (`threshold`, `liveness_threshold`).
-- **Face gallery cache:** `data/raw/face_embeddings.npz` is rebuilt automatically when the face recognition `.pt` changes (the cache key is the file size + modified time, see `_signature()` in `services/features_demo.py`). The first request afterwards re-embeds every enrolment photo, so expect a delay once.
+- **Face gallery cache:** `data/raw/face_embeddings.npz` is rebuilt automatically when the face recognition `.pt` changes (the cache key is the file size + modified time, see `services/gallery.py`). The first request afterwards re-embeds every enrolment photo, so expect a delay once.
 
 What a person or agent must do:
-1. **Keep the contract of `infer.py`.** The app calls `face_recognition.infer.identify()` / `threshold()`, `anti_spoofing.infer.check()` (and reads `infer._load()["threshold"]`, because it has no public accessor), `emotion.infer.predict()` / `reset()`. If the new model needs a different input size, normalisation or crop margin, change it inside `infer.py` or the checkpoint, and tell the owner of `backend/app/services/features_demo.py` if the face-crop margin (`MARGIN`) must change.
+1. **Keep the contract of `infer.py`.** The app calls `face_recognition.infer.identify()` / `threshold()`, `anti_spoofing.infer.check()` (and reads `infer._load()["threshold"]`, because it has no public accessor), `emotion.infer.predict()` / `reset()`. If the new model needs a different input size, normalisation or crop margin, change it inside `infer.py` or the checkpoint, and update `MARGIN` in `backend/app/core/ml_models.py` if it must change.
 2. **Store the threshold in the checkpoint** (`payload["threshold"]` for recognition, `ckpt["threshold"]` for anti-spoofing). Choose it on the DEV/validation split, never on the evaluation split. A checkpoint without it breaks loading.
 3. **Tell users to press Reset on the threshold sliders.** A custom threshold is stored in each browser (`localStorage` keys `hawkeye.faceThreshold`, `hawkeye.livenessThreshold`) and survives a model change, but it was tuned for the *old* model. A custom value that suited the old model can be wrong for the new one.
 4. **Check on the Features demo page** (`/features-demo`): the feature shows no "weights missing" tag, "Model default" is the number you expect, and a known student is named while a stranger shows "Unknown". For anti-spoofing, also try a printed photo and a phone screen, not only a real face.
@@ -90,17 +90,17 @@ If `data/tracks/` or the homographies change, retrain and re-run `evaluate.py`: 
 ## Frontend (`frontend/src/`)
 
 ```
-main.js            createApp(App).use(router)
-pages.js           page registry: key, path, label, icon, component (no component -> Placeholder card)
-router.js          Vue Router 4 routes built from pages.js (unknown paths redirect to /)
-App.vue            sidebar + <RouterView>
+pages.js           page registry (router + sidebar built from it): Home, History, Features demo, Camera, Add person, Wi-Fi guide
+router.js          routes from pages.js + redirects (/class, /demo, /live, unknown -> /)
 api.js             fetch helpers with offline fallback to data/mock (keep it working)
-pages/             Home.vue (built), Placeholder.vue
-components/        Sidebar, CameraCard (video + canvas box overlay; exposes `video`), EventLog, ClassRoster, RoomMap
-styles.css         all styles (plain CSS, no UI library)
+pages/             Home, History, FeaturesDemo, AddPerson, Camera, LanGuide, Placeholder
+components/        Sidebar, CameraCard, EventLog, ClassRoster, RoomMap, PresencePanel, QrButton
+composables/       useSyncedPlayback (Recorded mode: play/seek the three videos together)
+roomLayout.js      2D map drawing (from FigJam); takeEvents.js, format.js helpers
+styles.css         all global styles; tokens on :root (colours, --space-1..5); no UI library
 ```
 
-To add a page, add one entry in `pages.js`. The Vite dev server proxies `/api` and `/videos` to `:8000`. The step 5 WebSocket will also need a proxy entry for `/ws` with `ws: true`.
+To add a page, add one entry in `pages.js`. Vite proxies `/api`, `/videos`, `/photos` and `/ws` to the backend (`HAWKEYE_BACKEND`, default `:8000`).
 
 ## Data contracts
 
