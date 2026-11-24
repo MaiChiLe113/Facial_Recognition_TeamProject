@@ -3,6 +3,7 @@
     WS   /ws/camera/{cam_id}        a phone / laptop sends JPEG frames (binary); each answer is the frame's summary
     GET  /api/live                  every camera from backend/pipeline.json: connected, fps, people, faces, host_urls
     GET  /api/live/{cam_id}/stream  MJPEG of the camera's annotated frames (for an <img>)
+    POST /api/live/{cam_id}/remove  host removes the camera: its senders are closed (code 4001) and it shows idle
 """
 import socket
 
@@ -55,6 +56,17 @@ def live_stream(cam_id: str, request: Request):
                              headers={"Cache-Control": "no-store"})
 
 
+@router.post("/api/live/{cam_id}/remove")
+def live_remove(cam_id: str, request: Request):
+    if cam_id not in _engine(request.app).pipelines:
+        raise HTTPException(404, f"Unknown camera '{cam_id}'")
+    live.camera(cam_id).remove()
+    return {"cam_id": cam_id, "removed": True}
+
+
+REMOVED = 4001      # close code: the host removed this camera (the Camera page stops instead of reconnecting)
+
+
 @router.websocket("/ws/camera/{cam_id}")
 async def camera_socket(ws: WebSocket, cam_id: str):
     engine = getattr(ws.app.state, "engine", None)
@@ -64,10 +76,16 @@ async def camera_socket(ws: WebSocket, cam_id: str):
     await ws.accept()
     cam = live.camera(cam_id)
     cam.senders += 1
+    joined = cam.removed
     try:
-        while True:
+        while cam.removed == joined:
             frame = await ws.receive_bytes()
-            await ws.send_json(await run_in_threadpool(live.process, engine, cam_id, frame))
+            summary = await run_in_threadpool(live.process, engine, cam_id, frame)
+            if cam.removed != joined:
+                break
+            await ws.send_json(summary)
+        cam.clear()                         # a frame in flight when Remove was pressed must not light it up again
+        await ws.close(code=REMOVED, reason="Removed by the host")
     except WebSocketDisconnect:
         pass
     finally:

@@ -196,11 +196,15 @@ function tone(f) {
   if (f.live === true) return 'good'
   return 'plain'
 }
-// Name tag on the box: the recognised name, or "Unknown" when recognition ran and found nobody.
+// Tag on the box: the recognised name ("Unknown" when recognition ran and found nobody) and the emotion,
+// e.g. "Manh · 😀 happy". Only emotion ticked: the emotion alone.
 function nameTag(f) {
-  if (f.loading) return { text: 'Loading…', cls: 'wait' }
-  if (!('similarity' in f)) return null            // face recognition is not selected
-  return f.name ? { text: f.name, cls: 'known' } : { text: 'Unknown', cls: 'unknown' }
+  const emo = f.emotion ? `${ICONS[f.emotion] ?? ''} ${f.emotion}`.trim() : ''
+  let tag = null
+  if (f.loading) tag = { text: 'Loading…', cls: 'wait' }
+  else if ('similarity' in f) tag = f.name ? { text: f.name, cls: 'known' } : { text: 'Unknown', cls: 'unknown' }
+  if (!emo) return tag
+  return tag ? { ...tag, text: `${tag.text} · ${emo}` } : { text: emo, cls: 'wait' }
 }
 // ---- session log ----
 const LOG_SHOWN = 100

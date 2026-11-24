@@ -9,7 +9,7 @@
 // Class roster and room map are shown in both modes.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { demoTakes, fetchDashboard, fetchDemoConfig, fetchLive, fetchPresence, fetchTracks, liveStreamUrl } from '../api.js'
+import { demoTakes, fetchDashboard, fetchDemoConfig, fetchLive, fetchPresence, fetchTracks, liveStreamUrl, removeLiveCamera } from '../api.js'
 import CameraCard from '../components/CameraCard.vue'
 import ClassRoster from '../components/ClassRoster.vue'
 import EventLog from '../components/EventLog.vue'
@@ -18,6 +18,7 @@ import PresencePanel from '../components/PresencePanel.vue'
 import RoomMap from '../components/RoomMap.vue'
 import { useSyncedPlayback } from '../composables/useSyncedPlayback.js'
 import { clockOf, eventsFromTracks } from '../takeEvents.js'
+import { liveRoster, recordedRoster, updateLive } from '../rosterStatus.js'
 
 const ORDER = ['cam_1', 'cam_2', 'attendance_cam']
 const POLL_MS = 1000
@@ -57,13 +58,20 @@ async function poll() {
   if (wasOffline && !r.offline) epoch.value = Date.now()
   wasOffline = r.offline
   live.value = r
+  updateLive(r)
   timer = setTimeout(poll, POLL_MS)
 }
 const liveOf = (camId) => live.value?.cameras.find((c) => c.cam_id === camId) ?? null
+// Remove a live camera (also while its device is still sending), then refresh at once so the tile goes idle.
+async function removeCam(camId) {
+  try { await removeLiveCamera(camId) } catch (e) { console.warn(e) }
+  await poll()
+}
 const streamOf = (camId) => (liveOf(camId)?.connected ? `${liveStreamUrl(camId)}?e=${epoch.value}` : undefined)
 const senderUrl = computed(() => live.value?.host_urls?.[0] ?? 'https://<this computer\'s IP>:5173/camera')
 const connected = computed(() => live.value?.cameras.filter((c) => c.connected).length ?? 0)
-const doorFaces = computed(() => liveOf('attendance_cam')?.faces ?? [])
+// Every camera runs face recognition, liveness and emotion (always on); only the doorway checks people in.
+const facesOf = (camId) => liveOf(camId)?.faces ?? []
 const peopleOf = (camId) => liveOf(camId)?.people ?? []
 
 // ---------------- recorded (was MultiCam) ----------------
@@ -115,7 +123,8 @@ function playTake() {
     return
   }
   const ready = cameras.value.filter((c) => c.available)
-  message.value = ready.length < cameras.value.length ? `Only ${ready.length} of ${cameras.value.length} videos found.` : `Playing take ${selected.value}.`
+  // No box while things work; only a warning when some videos are missing.
+  message.value = ready.length < cameras.value.length ? `Only ${ready.length} of ${cameras.value.length} videos found.` : ''
   play(Object.fromEntries(ready.map((c) => [c.cam_id, c.url])))
 }
 
@@ -124,6 +133,13 @@ const allTakeEvents = computed(() => eventsFromTracks(tracks.value,
   Object.fromEntries(cameras.value.map((c) => [c.cam_id, c.offset_s || 0]))))
 const takeEvents = computed(() => (hasVideo.value ? allTakeEvents.value.filter((e) => e.t <= position.value + 0.05) : [])
   .map((e) => ({ ...e, time: clockOf(e.t) })))
+
+// Roster status from the cameras, for the demo only (kept in the page, never saved to the database).
+const roster = computed(() => {
+  if (!recorded.value) { void live.value; return liveRoster(dash.value.roster) }   // re-evaluated on every poll
+  return recordedRoster(dash.value.roster, tracks.value,
+    Object.fromEntries(cameras.value.map((c) => [c.cam_id, c.offset_s || 0])), position.value, hasVideo.value)
+})
 
 // Map trails from presence verification, drawn up to the playback position while a video plays.
 const trails = computed(() => {
@@ -188,7 +204,7 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 
     <div v-if="recorded && message" class="notice"><span>{{ message }}</span></div>
     <div v-if="!recorded" class="notice">
-      <span>On a phone or laptop on the same Wi-Fi, open <strong>{{ senderUrl }}</strong> and pick a camera, or press
+      <span>On a phone or laptop on the <b>same Wi-Fi</b>, open <strong>{{ senderUrl }}</strong> and pick a camera, or press
         <strong>+</strong> on a tile to use this device. Or press <strong>QR</strong> and scan it. First time on a device: see the
         <RouterLink to="/guide/lan">Wi-Fi demo guide</RouterLink>.</span>
     </div>
@@ -197,11 +213,13 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
       <CameraCard v-for="cam in cameras" :key="cam.cam_id" :ref="(el) => { cards[cam.cam_id] = el }" :cam="cam"
         :live="!recorded" :stream="recorded ? undefined : streamOf(cam.cam_id)"
         :src="recorded ? srcs[cam.cam_id] : undefined" :tracks="recorded ? takeTracks(cam.cam_id) : null" :show-boxes="recorded"
-        :highlight="cam.cam_id === 'attendance_cam'">
+        :highlight="cam.cam_id === 'attendance_cam'" @remove="removeCam">
         <template v-if="!recorded && liveOf(cam.cam_id)?.connected">
-          <ul v-if="cam.cam_id === 'attendance_cam'" class="checks">
-            <li v-if="!doorFaces.length" class="bad">No face in view</li>
-            <template v-for="(f, i) in doorFaces" :key="i">
+          <ul class="checks">
+            <li v-if="cam.cam_id !== 'attendance_cam'" class="ok">{{ peopleOf(cam.cam_id).length === 1 ? '1 person' : `${peopleOf(cam.cam_id).length} people` }} tracked
+              <span class="muted">· {{ liveOf(cam.cam_id).fps }} fps</span></li>
+            <li v-if="!facesOf(cam.cam_id).length" class="bad">No face in view</li>
+            <template v-for="(f, i) in facesOf(cam.cam_id)" :key="i">
               <li :class="f.live !== false && f.name ? 'ok' : 'bad'">
                 {{ faceText(f) }}<template v-if="f.live !== false && !f.name"> — <RouterLink to="/add">please register</RouterLink></template>
               </li>
@@ -209,15 +227,8 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
               <li v-if="f.emotion" class="ok">Emotion: {{ capitalise(f.emotion) }}</li>
             </template>
           </ul>
-          <ul v-else class="checks">
-            <li class="ok">{{ peopleOf(cam.cam_id).length === 1 ? '1 person' : `${peopleOf(cam.cam_id).length} people` }} tracked
-              <span class="muted">· {{ liveOf(cam.cam_id).fps }} fps</span></li>
-          </ul>
         </template>
       </CameraCard>
-      <EventLog v-if="recorded" class="demo-log" :events="takeEvents" :title="`Event log · take ${selected}`" />
-      <!-- Live: no live event feed yet, so the log starts blank (dash.events is mock data). -->
-      <EventLog v-else :events="[]" />
     </div>
 
     <!-- Recorded: always shown (disabled before Play) so choosing a take does not change the page height. -->
@@ -229,9 +240,14 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
       <span class="mono muted">{{ fmtTime(duration) }}</span>
     </div>
 
+    <!-- Event log under the playback line (full width). -->
+    <EventLog v-if="recorded" class="demo-log" :events="takeEvents" :title="`Event log · take ${selected}`" />
+    <!-- Live: no live event feed yet, so the log starts blank (dash.events is mock data). -->
+    <EventLog v-else :events="[]" />
+
     <div class="grid-bottom">
-      <ClassRoster :roster="dash.roster" />
-      <RoomMap :map="dash.map" :room="dash.course.room" :trails="trails" />
+      <ClassRoster :roster="roster" />
+      <RoomMap :map="dash.map" :room="dash.course.room" :trails="trails" :time="hasVideo ? position : undefined" />
     </div>
 
     <template v-if="recorded">

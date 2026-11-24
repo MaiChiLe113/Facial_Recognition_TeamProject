@@ -74,6 +74,11 @@ function connect() {
   }
   socket.onclose = (e) => {
     if (stopped) return
+    if (e.code === 4001) {                 // the host pressed Remove on this camera: stop, do not reconnect
+      stop()
+      message.value = 'The host removed this camera. Pick a camera to send again.'
+      return
+    }
     state.value = 'reconnecting'
     message.value = e.code === 4404 ? `The host has no camera "${camId.value}".` : 'Lost the host. Reconnecting…'
     retry = setTimeout(connect, RETRY_MS)

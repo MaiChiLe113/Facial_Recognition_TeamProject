@@ -1,8 +1,8 @@
 """Live cameras over Wi-Fi.  Owner: Mai Chi
 
 A phone or laptop opens the Camera page (/camera) and sends JPEG frames over the WebSocket /ws/camera/{cam_id}.
-Each frame runs that camera's pipeline from backend/pipeline.json (corridor / classroom: detect people -> track;
-doorway: detect faces -> liveness -> recognise -> emotion). The frame is drawn with the results and kept, and the
+Each frame runs that camera's pipeline from backend/pipeline.json: every camera detects faces -> liveness ->
+recognise -> emotion (always on); corridor / classroom also detect and track people. Only the doorway checks in. The frame is drawn with the results and kept, and the
 host's Home page (Live source) shows every camera as an MJPEG stream (GET /api/live/{cam_id}/stream).
 
 One frame per camera is processed at a time: the sender waits for the answer before sending the next frame, so a
@@ -34,6 +34,16 @@ class LiveCamera:
         self.fps = 0.0
         self.senders = 0
         self.face_tracks = []               # [{box, t, votes}] faces linked across frames (name vote)
+        self.removed = 0                    # bumps when the host removes the camera; open senders are closed
+
+    def remove(self):
+        """Host pressed "Remove": drop the picture and status; camera_socket closes every sender (code 4001)."""
+        with self.lock:
+            self.removed += 1
+            self.clear()
+
+    def clear(self):
+        self.jpeg, self.summary, self.last_seen, self.fps, self.face_tracks = None, {}, 0.0, 0.0, []
 
     def describe(self):
         age = time.time() - self.last_seen if self.last_seen else None
@@ -57,10 +67,8 @@ def cameras():
 
 
 def _names_for(role):
-    """Names of the registered students for the doorway camera. The recognize stage reads the faces themselves from
+    """Names of the registered students (every camera recognises faces). The recognize stage reads the faces themselves from
     engine.shared["gallery"], which app/services/gallery.py keeps current (gallery.attach in main.py)."""
-    if role != "attendance":
-        return {}
     from . import gallery
     faces, names = gallery.registered_faces()
     if not faces:

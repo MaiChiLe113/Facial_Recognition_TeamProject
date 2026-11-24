@@ -6,8 +6,8 @@
     "attendance_cam": "attendance"
   },
   "roles": {
-    "outside":    ["detect_people", "track", "match", "emit_events"],
-    "inside":     ["detect_people", "track", "match", "emit_events"],
+    "outside":    ["detect_people", "track", "match", "detect_faces", "liveness", "recognize", "emotion", "emit_events"],
+    "inside":     ["detect_people", "track", "match", "detect_faces", "liveness", "recognize", "emotion", "emit_events"],
     "attendance": ["detect_faces", "liveness", "recognize", "emotion", "emit_events"]
   },
   "options": {

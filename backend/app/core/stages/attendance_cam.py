@@ -1,4 +1,5 @@
-"""The attendance camera: find the face, check liveness, recognise it, read the emotion.
+"""Face stages: find the face, check liveness, recognise it, read the emotion. They run on every camera
+(pipeline.json), but only the attendance camera's results become check-ins (see emit.py).
 Adapters only: the face detector is app/pipeline/detector.py (Mai Chi); the three models live in
 ml/anti_spoofing/ (Hồng Minh), ml/face_recognition/ (Thuận Minh) and ml/emotion/ (Minh Thành), each as
 infer.py plus <feature>.pt, found by app/core/ml_models.py.
@@ -68,13 +69,26 @@ class Recognize(Stage):
 
 @register_stage("emotion")
 class Emotion(Stage):
+    """The emotion infer.py smooths over one module-wide buffer, which would mix the cameras' faces. This stage is
+    one instance per camera, so it asks for the raw probabilities and averages the last SMOOTH_S seconds itself."""
+    SMOOTH_S = 1.0
+
     def setup(self):
         self.emotion = load_infer("emotion")
+        self.recent = deque()           # (t, {label: prob}) of this camera's main face
 
     def process(self, ctx):
-        for face in ctx.faces:
-            crop = face["crops"]["emotion"]
-            if crop is None:
-                continue
-            result = self.emotion.predict(crop)
-            face["emotion"], face["emotion_score"] = result["label"], result.get("score")
+        faces = [f for f in ctx.faces if f["crops"]["emotion"] is not None]
+        if not faces:
+            self.recent.clear()
+            return
+        main = max(faces, key=lambda f: f["box"][2] * f["box"][3])
+        for face in faces:
+            scores = self.emotion.predict(face["crops"]["emotion"], smooth=False)["scores"]
+            if face is main:
+                self.recent.append((ctx.t, scores))
+                while self.recent and ctx.t - self.recent[0][0] > self.SMOOTH_S:
+                    self.recent.popleft()
+                scores = {k: sum(s[k] for _, s in self.recent) / len(self.recent) for k in scores}
+            label = max(scores, key=scores.get)
+            face["emotion"], face["emotion_score"] = label, scores[label]

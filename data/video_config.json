@@ -4,7 +4,7 @@
   "cameras": [
     { "cam_id": "cam_1",          "label": "CAM 1",             "place": "Corridor",  "folder": "cam_1",          "stream_id": "sCi8Jvd", "offset_s": 0 },
     { "cam_id": "cam_2",          "label": "CAM 2",             "place": "Classroom", "folder": "cam_2",          "stream_id": "pDHjQPf", "offset_s": 0 },
-    { "cam_id": "attendance_cam", "label": "Attendance camera", "place": "Doorway",   "folder": "attendance_cam", "stream_id": "2SiEwN8", "offset_s": 0 }
+    { "cam_id": "attendance_cam", "label": "ATT - Attendance Camera", "place": "Doorway", "folder": "attendance_cam", "stream_id": "2SiEwN8", "offset_s": 0 }
   ],
   "takes": [
     { "take": 1, "approx_seconds": 49,  "scenario": "TBC", "files": { "cam_1": "sCi8Jvd_1794809171451.webm", "cam_2": "pDHjQPf_1794809194988.webm", "attendance_cam": "2SiEwN8_1794809171205.webm" } },

@@ -150,6 +150,11 @@ export async function fetchLive() {
 }
 
 export const liveStreamUrl = (camId) => `/api/live/${camId}/stream`
+// Host removes a camera, even while a device is sending: the backend closes that device's connection.
+export async function removeLiveCamera(camId) {
+  const r = await fetch(`/api/live/${encodeURIComponent(camId)}/remove`, { method: 'POST' })
+  if (!r.ok) throw new Error(`Remove failed (${r.status})`)
+}
 export const cameraSocketUrl = (camId) =>
   `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/camera/${encodeURIComponent(camId)}`
 

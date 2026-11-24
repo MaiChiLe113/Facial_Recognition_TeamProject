@@ -16,7 +16,8 @@ class EmitEvents(Stage):
             data = {k: face.get(k) for k in ("liveness_score", "similarity", "emotion")}
             if face.get("live") is False:
                 ctx.events.append(Event("spoof", ctx.cam_id, ctx.t, global_id=face.get("global_id"), data=data))
-            elif face.get("live") and face.get("student_id"):
+            elif face.get("live") and face.get("student_id") and ctx.role == "attendance":
+                # Only the doorway checks people in; corridor / classroom recognition is shown, not logged.
                 ctx.events.append(Event("check_in", ctx.cam_id, ctx.t, global_id=face.get("global_id"),
                                         student_id=face["student_id"], data=data))
         # "in" / "out" come from the attendance rules (app/pipeline/attendance.py), not from one frame.

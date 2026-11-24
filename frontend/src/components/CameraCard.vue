@@ -6,7 +6,7 @@
 //             from the 1 s GET /api/live poll would trail a 10 fps picture by up to a second. With no device sending,
 //             the "+" opens the Camera page (/camera?cam=<cam_id>) on this device, which sends its camera to the host.
 // The slot below holds extra lines (the doorway camera's identity / liveness / emotion).
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   cam: { type: Object, required: true },
@@ -26,6 +26,9 @@ const canvas = ref(null)
 const ratio = ref('16 / 9')
 const onMeta = () => { frameT = null; const v = video.value; if (v?.videoWidth) ratio.value = `${v.videoWidth} / ${v.videoHeight}` }
 const onStreamLoad = (e) => { const i = e.target; if (i.naturalWidth) ratio.value = `${i.naturalWidth} / ${i.naturalHeight}` }
+// A removed / stopped live camera goes back to the default tile size (the stream had set its own shape).
+watch(() => props.stream, (s) => { if (!s) ratio.value = '16 / 9' })
+const emit = defineEmits(['remove'])
 defineExpose({ video })   // Home plays, pauses and syncs the videos in Recorded mode
 
 const openCamera = () => window.open(`/camera?cam=${encodeURIComponent(props.cam.cam_id)}`, '_blank')
@@ -113,6 +116,8 @@ onBeforeUnmount(() => cancelAnimationFrame(raf))
         <div class="cam-title">{{ cam.label }}</div>
         <div class="cam-place">{{ cam.place }}</div>
       </div>
+      <button v-if="live && stream" class="btn cam-remove" type="button" :aria-label="`Remove ${cam.label}`"
+        @click="emit('remove', cam.cam_id)">Remove</button>
     </header>
     <div class="cam-view" :style="{ aspectRatio: ratio }">
       <template v-if="live">

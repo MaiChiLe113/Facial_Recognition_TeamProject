@@ -9,7 +9,8 @@ import {
 
 // map: dashboard map (only its layout is used; live mode draws no people yet); trails (optional): [{ track_id, name, flagged, points: [[t, x, y], ...] }]
 // from presence verification, drawn as paths, red when the track is part of an alert.
-const props = defineProps({ map: { type: Object, required: true }, room: String, trails: { type: Array, default: null } })
+const props = defineProps({ map: { type: Object, required: true }, room: String, trails: { type: Array, default: null },
+  time: Number })   // playback position (s); dots of people not seen for a while are hidden
 
 const W = MAP_W, H = MAP_H
 const X = (f) => f * W
@@ -20,17 +21,54 @@ const Y = (f) => f * H
 const PALETTE = ['#2f6fb5', '#e07b1a', '#7a4fb3', '#1f9a8a', '#c2478f', '#8a6a1f', '#4a9a2f', '#5b6b80', '#b5872f', '#3b8fd0']
 const colorAt = (i) => PALETTE[i % PALETTE.length]
 
-const trailPaths = computed(() => (props.trails ?? [])
-  .map((tr, i) => ({ tr, color: colorAt(i) }))
-  .filter(({ tr }) => tr.points.length > 0)
-  .map(({ tr, color }) => {
-    const last = tr.points[tr.points.length - 1]
-    return { id: tr.track_id, name: tr.name, flagged: tr.flagged, color, x: X(last[1]), y: Y(last[2]),
-      d: tr.points.map(([, x, y], i) => `${i ? 'L' : 'M'}${X(x).toFixed(1)} ${Y(y).toFixed(1)}`).join(' ') }
+// One map object per person, not per camera. Presence verification gives one trail per camera track
+// ("cam_1:3", "cam_2:5"); tracks that carry the same name (door handoff) are the same person, so their points are
+// merged into one time-ordered trail. Unnamed tracks stay on their own. Grouping uses the full list, so the person
+// numbers (P1, P2...) and colours never change while the video plays.
+const people = computed(() => {
+  const groups = new Map()
+  for (const tr of props.trails ?? []) {
+    const key = tr.name ? `name:${tr.name}` : `track:${tr.track_id}`
+    if (!groups.has(key)) groups.set(key, { name: tr.name, tracks: [], points: [], flagged: false })
+    const g = groups.get(key)
+    g.tracks.push(tr.track_id)
+    g.points.push(...tr.points)
+    g.flagged ||= tr.flagged
+  }
+  return [...groups.values()].map((g, i) => ({ ...g, id: `P${i + 1}`, color: colorAt(i),
+    points: smooth(g.points.sort((a, b) => a[0] - b[0])) }))
+})
+
+// Two cameras can see the same person at the same moment (where their views overlap): average points closer
+// than STEP_S in time, so the merged trail does not zigzag between the two cameras' estimates.
+const STEP_S = 0.4
+function smooth(pts) {
+  const out = []
+  for (const p of pts) {
+    const last = out[out.length - 1]
+    if (last && p[0] - last.t0 < STEP_S) { last.n++; last.x += p[1]; last.y += p[2] }
+    else out.push({ t0: p[0], t: p[0], x: p[1], y: p[2], n: 1 })
+    out[out.length - 1].t = p[0]
+  }
+  return out.map((q) => [q.t, q.x / q.n, q.y / q.n])
+}
+
+// A person whose last point is older than GONE_S (left every camera's view) keeps a faint trail but loses the dot.
+const GONE_S = 2
+const now = computed(() => props.time ?? Math.max(0, ...people.value.flatMap((g) => g.points.map((p) => p[0]))))
+
+const trailPaths = computed(() => people.value
+  .filter((g) => g.points.length > 0)
+  .map((g) => {
+    const last = g.points[g.points.length - 1]
+    return { id: g.id, name: g.name, tracks: g.tracks, flagged: g.flagged, color: g.color,
+      gone: now.value - last[0] > GONE_S, x: X(last[1]), y: Y(last[2]),
+      d: g.points.map(([, x, y], i) => `${i ? 'L' : 'M'}${X(x).toFixed(1)} ${Y(y).toFixed(1)}`).join(' ') }
   }))
 
-// Legend: who is who (colour, ID, name).
-const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t.color, id: t.id, name: t.name, flagged: t.flagged })))
+// Legend: who is who (colour, person number, name, the camera tracks merged into it).
+const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t.color, id: t.id, name: t.name,
+  flagged: t.flagged, gone: t.gone, tracks: t.tracks.map((s) => s.replace(':', ' #')).join(', ') })))
 </script>
 
 <template>
@@ -54,15 +92,17 @@ const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t
         <title>{{ c.id }}</title>
       </g>
 
-      <g v-for="tr in trailPaths" :key="tr.id" class="map-trail" :class="{ flagged: tr.flagged }" :style="{ '--c': tr.color }">
+      <g v-for="tr in trailPaths" :key="tr.id" class="map-trail" :class="{ flagged: tr.flagged, gone: tr.gone }" :style="{ '--c': tr.color }">
         <path v-if="tr.d.includes('L')" :d="tr.d" />
-        <circle :cx="tr.x" :cy="tr.y" r="10" />
-        <text :x="tr.x" :y="tr.y - 16" class="rm-id">{{ tr.id }}</text>
-        <title>{{ tr.id }}{{ tr.name ? ` · ${tr.name}` : '' }}{{ tr.flagged ? ' · alert' : '' }}</title>
+        <template v-if="!tr.gone">
+          <circle :cx="tr.x" :cy="tr.y" r="10" />
+          <text :x="tr.x" :y="tr.y - 16" class="rm-id">{{ tr.name || tr.id }}</text>
+        </template>
+        <title>{{ tr.id }}{{ tr.name ? ` · ${tr.name}` : '' }} ({{ tr.tracks.join(', ') }}){{ tr.flagged ? ' · alert' : '' }}</title>
       </g>
     </svg>
     <ul v-if="legend.length" class="rm-legend" aria-label="People on the map">
-      <li v-for="l in legend" :key="l.key" :class="{ flagged: l.flagged }">
+      <li v-for="l in legend" :key="l.key" :class="{ flagged: l.flagged, gone: l.gone }" :title="`Camera tracks: ${l.tracks}`">
         <span class="rm-swatch" :style="{ background: l.color }" />
         <strong>{{ l.id }}</strong>
         <span v-if="l.name" class="muted">{{ l.name }}</span>
@@ -89,6 +129,8 @@ const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t
 .map-trail path { fill: none; stroke: var(--c); stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: round; opacity: 0.8; }
 .map-trail circle { fill: var(--c); stroke: #fff; stroke-width: 3; }
 /* Alert: the person keeps their colour, a dashed red halo marks the alert. */
+.map-trail.gone path { opacity: 0.3; }
+.rm-legend li.gone { opacity: 0.5; }
 .map-trail.flagged path { stroke-width: 5; opacity: 1; }
 .map-trail.flagged circle { stroke: var(--danger); stroke-width: 4; animation: map-blink 1s ease-in-out infinite; }
 @keyframes map-blink { 50% { opacity: 0.35; } }
