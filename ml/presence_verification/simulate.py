@@ -26,7 +26,7 @@ from pv_common import metres_per_unit
 
 WALK_MPS = (0.9, 1.8)            # walking speed range (m/s); recorded takes measure up to ~2.4 m/s with jitter
 NOISE_DF = 3                     # Student-t noise: mostly small, sometimes a box jumps (real p99 1-s step 2.3 m)
-DOOR_IN = (0.33, 0.875)          # just inside the door
+DOOR_IN = (0.33, 0.8165)         # just inside the door (centre of the door gap, room204_map.json)
 
 # Per-student anomaly types. "rule" ones are what R1-R5 are written for; "model" ones have no rule.
 STUDENT_ANOMALIES = {

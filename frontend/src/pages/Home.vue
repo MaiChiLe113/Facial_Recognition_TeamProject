@@ -240,15 +240,15 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
       <span class="mono muted">{{ fmtTime(duration) }}</span>
     </div>
 
-    <!-- Event log under the playback line (full width). -->
-    <EventLog v-if="recorded" class="demo-log" :events="takeEvents" :title="`Event log · take ${selected}`" />
-    <!-- Live: no live event feed yet, so the log starts blank (dash.events is mock data). -->
-    <EventLog v-else :events="[]" />
-
-    <div class="grid-bottom">
-      <ClassRoster :roster="roster" />
+    <!-- Event log and room map side by side under the playback line. -->
+    <div class="grid-log-map">
+      <EventLog v-if="recorded" class="demo-log" :events="takeEvents" :title="`Event log · take ${selected}`" />
+      <!-- Live: no live event feed yet, so the log starts blank (dash.events is mock data). -->
+      <EventLog v-else :events="[]" />
       <RoomMap :map="dash.map" :room="dash.course.room" :trails="trails" :time="hasVideo ? position : undefined" />
     </div>
+
+    <ClassRoster :roster="roster" />
 
     <template v-if="recorded">
       <PresencePanel :result="presence" :position="position" :live="hasVideo" />

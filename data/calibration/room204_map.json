@@ -24,37 +24,38 @@
  "door": {
   "x": 0.3,
   "y": [
-   0.789,
-   0.961
+   0.727,
+   0.906
   ],
   "centre": [
    0.3,
-   0.875
+   0.8165
   ],
-  "_note": "opening ~1.2 m (estimated from cam_2), ~0.3 m from the south wall (y = 1)"
+  "_note": "door gap from the FigJam map (wall segments end at Figma y 498 and 591 of the 520 px drawing); matches the hand-fitted cam_1 homography (jamb feet at y 0.716 / 0.920)"
  },
  "glass_window": {
   "x": 0.3,
   "y": [
    0.4,
-   0.76
-  ]
+   0.634
+  ],
+  "_note": "south edge from the cam_1 homography (window edge above the wall base at image x 632); north edge not visible, kept"
  },
  "cameras": {
   "cam_1": {
-   "x": 0.066,
-   "y": 0.269,
-   "_note": "derived by ground_model.py: in the corridor, ~0.85 m high, facing south-east at the corridor wall"
+   "x": 0.078,
+   "y": 0.347,
+   "_note": "from the hand-fitted cam_1 camera model (2026-11-24): corridor, ~0.73 m high, facing south-east"
   },
   "cam_2": {
-   "x": 0.791,
-   "y": 0.485,
-   "_note": "derived by ground_model.py: inside Room 204, ~1.13 m high, facing west at the corridor wall"
+   "x": 0.755,
+   "y": 0.795,
+   "_note": "from the hand-fitted cam_2 camera model (2026-11-24, with the take-1 table legs, Figma row 4 col 1): Room 204, ~0.83 m high, facing west (slightly north)"
   },
   "attendance_cam": {
-   "x": 0.32,
-   "y": 0.875,
-   "_note": "low, just inside the door, looking up at the door frame; sees faces, not feet"
+   "x": 0.41,
+   "y": 0.698,
+   "_note": "position from the FigJam map (node 19:119, ATT), on the front-left desk row near the door"
   }
  },
  "scale_per_m": {

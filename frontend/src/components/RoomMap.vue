@@ -4,7 +4,7 @@
 // x 0 left -> 1 right, y 0 top -> 1 bottom, as the homographies produce them.
 import { computed } from 'vue'
 import {
-  CAMERA, DESK, MAP_H, MAP_W, cameras, corridor, corridorLabel, desks, doorLabels, doorLeaves, room, roomLabel, walls,
+  CAMERA, MAP_H, MAP_W, cameras, corridor, corridorLabel, desks, doorLabels, doorLeaves, room, roomLabel, walls,
 } from '../roomLayout.js'
 
 // map: dashboard map (only its layout is used; live mode draws no people yet); trails (optional): [{ track_id, name, flagged, points: [[t, x, y], ...] }]
@@ -79,7 +79,7 @@ const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t
       <rect :x="room.x" :y="room.y" :width="room.w" :height="room.h" class="rm-area rm-room" />
       <text :x="corridorLabel.x" :y="corridorLabel.y" class="rm-title">Corridor</text>
       <text :x="roomLabel.x" :y="roomLabel.y" class="rm-title rm-title-mid">Room {{ props.room }}</text>
-      <rect v-for="([x, y], i) in desks" :key="i" :x="x" :y="y" :width="DESK.w" :height="DESK.h" rx="4" class="rm-desk" />
+      <rect v-for="([x, y, w, h], i) in desks" :key="i" :x="x" :y="y" :width="w" :height="h" rx="4" class="rm-desk" />
 
       <rect v-for="(w, i) in walls" :key="`wall${i}`" :x="w.x" :y="w.y" :width="w.w" :height="w.h" class="rm-wall" />
       <rect v-for="(d, i) in doorLeaves" :key="`leaf${i}`" :x="d.x" :y="d.y" :width="d.w" :height="d.h" rx="3"
@@ -105,7 +105,7 @@ const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t
       <li v-for="l in legend" :key="l.key" :class="{ flagged: l.flagged, gone: l.gone }" :title="`Camera tracks: ${l.tracks}`">
         <span class="rm-swatch" :style="{ background: l.color }" />
         <strong>{{ l.id }}</strong>
-        <span v-if="l.name" class="muted">{{ l.name }}</span>
+        <span class="muted">{{ l.name || 'Unknown' }}</span>
         <span v-if="l.flagged" class="rm-alert">Alert</span>
       </li>
     </ul>

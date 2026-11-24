@@ -7,7 +7,7 @@
 //
 // This is how the map is DRAWN. Positions of people and trails are fractions of the map (0..1) from the
 // homographies (data/calibration/), drawn at fraction * MAP_W / MAP_H. The door gap here (y 0.727 to 0.906)
-// is the Figma design; data/calibration/room204_map.json has it at 0.789 to 0.961.
+// is the Figma design and data/calibration/room204_map.json uses the same numbers.
 export const MAP_W = 920
 export const MAP_H = 520
 const FIGMA_ORIGIN = [48, 120]
@@ -34,19 +34,18 @@ export const doorLabels = [
   { text: 'Door', x: o([257, 132.68])[0], y: o([257, 132.68])[1] + 15 },
 ]
 
-export const DESK = { w: 92, h: 36 }
+// Desks: long tables (198 x 36), 4 rows x 2 columns, plus one small desk by CAM 2. [x, y, w, h] in Figma px.
+export const DESK = { w: 198, h: 36 }
 export const desks = [
-  [389, 193], [517.8, 193], [694, 193], [822.8, 193],
-  [389, 260.6], [517.8, 260.6], [694, 260.6], [822.8, 260.6],
-  [389, 328.2], [517.8, 328.2], [694.4, 328.2], [822.4, 328.2],
-  [389, 395.8], [517.8, 395.8], [694, 395.8], [822.8, 395.8],
-  [389, 463.4], [517.8, 463.4], [694, 463.4], [822.8, 463.4],
-  [822, 555],
-].map(o)
+  [389, 237], [694, 237],
+  [389, 315], [694, 315],
+  [389, 389], [694, 389],
+  [389, 463.4], [694, 462],
+].map(([x, y]) => [...o([x, y]), DESK.w, DESK.h]).concat([[...o([822, 555]), 92, 36]])
 
 export const CAMERA = { w: 72, h: 32 }
 export const cameras = [
   { id: 'cam_1', label: 'CAM 1', p: o([76, 193]) },
-  { id: 'cam_2', label: 'CAM 2', p: o([694, 559]) },
-  { id: 'attendance_cam', label: 'ATT', p: o([240, 599]) },
+  { id: 'cam_2', label: 'CAM 2', p: o([714, 557]) },
+  { id: 'attendance_cam', label: 'ATT', p: o([389, 467]) },
 ].map(({ id, label, p }) => ({ id, label, x: p[0], y: p[1] }))

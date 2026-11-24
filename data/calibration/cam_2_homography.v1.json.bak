@@ -1,0 +1,80 @@
+{
+ "cam_id": "cam_2",
+ "take": 3,
+ "frame_size": [
+  1280,
+  720
+ ],
+ "image_points": [
+  [
+   433.0,
+   592.0
+  ],
+  [
+   246.0,
+   590.0
+  ],
+  [
+   210.0,
+   647.0
+  ],
+  [
+   470.0,
+   591.0
+  ],
+  [
+   60.0,
+   716.0
+  ],
+  [
+   140.0,
+   652.0
+  ]
+ ],
+ "map_points": [
+  [
+   0.3174,
+   0.7274
+  ],
+  [
+   0.2759,
+   0.9197
+  ],
+  [
+   0.4148,
+   0.9029
+  ],
+  [
+   0.3212,
+   0.6894
+  ],
+  [
+   0.4982,
+   0.9532
+  ],
+  [
+   0.4145,
+   0.9517
+  ]
+ ],
+ "H": [
+  [
+   -7.183937698330574e-05,
+   -0.0019455682665948499,
+   1.0603281366861186
+  ],
+  [
+   0.0003928091348372958,
+   -0.0017531937623393,
+   0.5869832875457147
+  ],
+  [
+   7.934456111194959e-11,
+   -0.0023413213381140376,
+   1.0
+  ]
+ ],
+ "method": "hand calibration, calibrate_homography.py (6 floor points, frame: cam_2_frame.png; points from a fitted pinhole model (Claude): door jambs, open door leaf, back wall base, south wall base; f=760 px (cam_1 prior), height 1.22 m)",
+ "mean_error_map_px": 0.0,
+ "mean_loo_error_map_px": 0.0
+}
