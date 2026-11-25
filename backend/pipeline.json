@@ -1,13 +1,13 @@
 {
-  "_note": "Which stages run on each camera, in order, and which features are on. Stage and feature names come from @register_stage / @register_feature. Unknown names are reported in GET /api/pipeline/status, not crashed on.",
+  "_note": "Which stages run on each camera, in order, and which features are on. CAM 1 / CAM 2 only detect and track people (faces there are too small; the doorway names people through the door handoff); face checks run on the attendance camera. Stage and feature names come from @register_stage / @register_feature. Unknown names are reported in GET /api/pipeline/status, not crashed on.",
   "cameras": {
     "cam_1": "outside",
     "cam_2": "inside",
     "attendance_cam": "attendance"
   },
   "roles": {
-    "outside":    ["detect_people", "track", "match", "detect_faces", "liveness", "recognize", "emotion", "emit_events"],
-    "inside":     ["detect_people", "track", "match", "detect_faces", "liveness", "recognize", "emotion", "emit_events"],
+    "outside":    ["detect_people", "track", "match", "emit_events"],
+    "inside":     ["detect_people", "track", "match", "emit_events"],
     "attendance": ["detect_faces", "liveness", "glasses_detection", "recognize", "emotion", "emit_events"]
   },
   "options": {

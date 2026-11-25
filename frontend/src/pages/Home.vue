@@ -73,19 +73,19 @@ const startedAt = ref(0)
 const sessionEvents = ref([])     // newest first, EventLog shape { t, time, event, source }
 const sessionTrails = ref({})     // "<cam>:<id>" -> { track_id, name, flagged, points: [[t, x, y]] }
 const clock = ref(0)              // seconds since Start (map time)
-const SPOOF_EVERY_MS = 5000, UNKNOWN_EVERY_MS = 10000, GONE_AFTER_MS = 3000, MAX_POINTS = 900
+const SPOOF_EVERY_MS = 5000, UNKNOWN_EVERY_MS = 10000, MAX_POINTS = 900
 let seen = {}                     // what the previous poll showed, to report changes once
 
 const hms = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-function logEvent(source, event, now = Date.now()) {
-  sessionEvents.value = [{ t: (now - startedAt.value) / 1000, time: hms(now), event, source }, ...sessionEvents.value]
+function logEvent(source, event, now = Date.now(), key = null) {
+  sessionEvents.value = [{ t: (now - startedAt.value) / 1000, time: hms(now), event, source, key }, ...sessionEvents.value]
 }
 
 function startSession() {
   resetLive()
   sessionEvents.value = []
   sessionTrails.value = {}
-  seen = { connected: {}, people: {}, checkedIn: new Set(), inClass: new Set(), lastSpoof: {}, lastUnknown: 0 }
+  seen = { connected: {}, doorSeq: {}, checkedIn: new Set(), inClass: new Set(), lastSpoof: {}, lastUnknown: 0 }
   startedAt.value = Date.now()
   clock.value = 0
   started.value = true
@@ -103,18 +103,21 @@ function record(r) {
   for (const c of r.cameras ?? []) {
     if (!!seen.connected[c.cam_id] !== c.connected) logEvent(c.cam_id, c.connected ? 'Camera connected' : 'Camera disconnected', now)
     seen.connected[c.cam_id] = c.connected
-    const last = (seen.people[c.cam_id] ??= new Map())     // id -> when it was last seen
-    if (c.connected) {
-      for (const p of c.people ?? []) {
-        if (!last.has(p.id)) logEvent(c.cam_id, `ID ${p.id} appeared`, now)
-        last.set(p.id, now)
+    if (!c.connected) continue
+    // People on CAM 1 / CAM 2 are logged only when they cross the door (the backend reports each crossing once,
+    // numbered); the map already shows everyone else.
+    // A crossing is often logged before the doorway names the person (door handoff): its text then changes from
+    // "ID 7 entered…" to "Le Mai Chi (ID 7) entered…", and the entry already in the log is updated in place.
+    for (const d of c.door_events ?? []) {
+      const key = `${c.cam_id}:${d.seq}`
+      if (d.seq > (seen.doorSeq[c.cam_id] ?? 0)) {
+        seen.doorSeq[c.cam_id] = d.seq
+        if (d.t * 1000 >= startedAt.value) logEvent(c.cam_id, d.event, d.t * 1000, key)
+      } else {
+        const i = sessionEvents.value.findIndex((e) => e.key === key)
+        if (i >= 0 && sessionEvents.value[i].event !== d.event) sessionEvents.value[i] = { ...sessionEvents.value[i], event: d.event }
       }
     }
-    // A person missing from one poll is usually a missed detection: report "left" only after GONE_AFTER_MS.
-    for (const [id, t] of last) {
-      if (now - t > GONE_AFTER_MS) { logEvent(c.cam_id, `ID ${id} left the view`, now); last.delete(id) }
-    }
-    if (!c.connected) continue
 
     for (const f of c.faces ?? []) {
       if (f.live === false) {
@@ -136,6 +139,7 @@ function record(r) {
       if (!p.map) continue
       const key = `${c.cam_id}:${p.id}`
       const tr = (sessionTrails.value[key] ??= { track_id: key, name: null, flagged: false, points: [] })
+      if (p.name) tr.name = p.name                     // named by the door handoff: the map merges both cameras' trails
       tr.points.push([clock.value, p.map[0], p.map[1]])
       if (tr.points.length > MAX_POINTS) tr.points.shift()
     }
@@ -291,7 +295,8 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
             <li v-if="cam.cam_id !== 'attendance_cam'" class="ok">{{ peopleOf(cam.cam_id).length === 1 ? '1 person' : `${peopleOf(cam.cam_id).length} people` }} tracked
               <span class="muted">· {{ liveOf(cam.cam_id).fps }} fps</span></li>
             <li v-if="cam.cam_id === 'attendance_cam' && !facesOf(cam.cam_id).length" class="bad">No face in view</li>
-            <template v-for="(f, i) in facesOf(cam.cam_id)" :key="i">
+            <!-- Identity, liveness and emotion lines only on the doorway camera; CAM 1 / CAM 2 show people tracked. -->
+            <template v-for="(f, i) in (cam.cam_id === 'attendance_cam' ? facesOf(cam.cam_id) : [])" :key="i">
               <li :class="f.live !== false && f.name ? 'ok' : 'bad'">
                 {{ faceText(f) }}<template v-if="f.live !== false && !f.name"> — <RouterLink to="/add">please register</RouterLink></template>
               </li>
@@ -358,12 +363,13 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 .home-bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
 .home-bar h1 { justify-self: start; white-space: nowrap; }
 .bar-right { justify-self: end; justify-content: flex-end; }
-/* Segmented switch: grey track, the chosen source raised in white. */
+/* Segmented switch: grey track, the chosen source in the app's pink accent. */
 .segmented { display: inline-flex; background: #ecebe8; border-radius: 10px; padding: 3px; gap: 2px; }
 .segmented button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 500;
   padding: 6px 18px; border-radius: 8px; cursor: pointer; transition: background .15s, color .15s; }
 .segmented button:hover { color: var(--text); }
-.segmented button.active { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+.segmented button.active { background: linear-gradient(90deg, var(--accent), var(--accent-strong)); color: #2b2b2b; font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
 @media (max-width: 820px) {
   .home-bar { grid-template-columns: 1fr; justify-items: start; }
   .bar-right { justify-self: start; }

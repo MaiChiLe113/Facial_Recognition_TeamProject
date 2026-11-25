@@ -11,13 +11,17 @@ slow host lowers the frame rate instead of building a queue.
 import asyncio
 import threading
 import time
-from collections import Counter
+from collections import Counter, deque
 
 BOUNDARY = "frame"
 JPEG_QUALITY = 80
 STALE_SECONDS = 3.0          # a camera with no frame for this long shows as disconnected
 HOLD_SECONDS = 1.5           # a face box is the same face as one seen at most this long ago ...
 HOLD_IOU = 0.3               # ... when the two boxes overlap at least this much (name vote, see _vote_names)
+FORGET_PERSON_S = 10.0       # a person track not seen for this long is forgotten (door crossings)
+SMOOTH_ALPHA = 0.6           # live box smoothing: weight of the newest box (only past frames exist live, so it
+                             # trails by under 0.1 s at ~10 fps); boxes older than HOLD_SECONDS are not mixed in
+HANDOFF_S = 3.0              # door handoff: a check-in names the one track at the door within this many seconds of it
 
 _COLORS = [(66, 135, 245), (52, 199, 89), (255, 149, 0), (175, 82, 222), (255, 59, 48), (90, 200, 250)]   # BGR
 _OK, _BAD, _UNKNOWN = (80, 190, 80), (60, 60, 230), (0, 170, 255)
@@ -35,6 +39,10 @@ class LiveCamera:
         self.senders = 0
         self.face_tracks = []               # [{box, t, votes}] faces linked across frames (name vote)
         self.removed = 0                    # bumps when the host removes the camera; open senders are closed
+        self.people = {}                    # track id -> {"zone", "t"} (door crossings)
+        self.door_events = deque(maxlen=30)  # [{seq, t, id, event}] door crossings, newest last
+        self.door_seq = 0
+        self.door_seen = deque(maxlen=400)  # [(t, track id)] while a person stands in the door zone (door handoff)
 
     def remove(self):
         """Host pressed "Remove": drop the picture and status; camera_socket closes every sender (code 4001)."""
@@ -44,12 +52,15 @@ class LiveCamera:
 
     def clear(self):
         self.jpeg, self.summary, self.last_seen, self.fps, self.face_tracks = None, {}, 0.0, 0.0, []
+        self.people = {}
+        self.door_events.clear()
+        self.door_seen.clear()
 
     def describe(self):
         age = time.time() - self.last_seen if self.last_seen else None
         return {"cam_id": self.cam_id, "connected": age is not None and age < STALE_SECONDS,
                 "senders": self.senders, "fps": round(self.fps, 1), "seconds_since_frame": None if age is None else round(age, 1),
-                **self.summary}
+                **self.summary, "door_events": [_door_text(ev) for ev in self.door_events]}
 
 
 _cams = {}
@@ -76,12 +87,32 @@ def _names_for(role):
     return names
 
 
-def _label(img, x, y, text, color):
+def _smooth(state, box, now):
+    """Running average of one person's / face's box across frames (kept in `state`), so boxes stop jittering."""
+    prev = state.get("sbox")
+    if prev is not None and now - state.get("st", now) <= HOLD_SECONDS:
+        box = tuple(SMOOTH_ALPHA * b + (1 - SMOOTH_ALPHA) * p for b, p in zip(box, prev))
+    state["sbox"], state["st"] = tuple(box), now
+    return box
+
+
+def _draw_labels(img, labels):
+    """labels: [(x, y, w, h, text, color, priority)] of drawn boxes. Each label takes the first free spot of: above its
+    box, just inside its top, under it, then further down, so no two labels overlap (higher priority chooses first)."""
     import cv2
-    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
-    y0 = max(0, y - th - 8)
-    cv2.rectangle(img, (x, y0), (x + tw + 8, y0 + th + 8), color, -1)
-    cv2.putText(img, text, (x + 4, y0 + th + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
+    height, width = img.shape[:2]
+    placed = []
+    hits = lambda r: any(r[0] < q[0] + q[2] and q[0] < r[0] + r[2] and r[1] < q[1] + q[3] and q[1] < r[1] + r[3] for q in placed)
+    for x, y, w, h, text, color, _ in sorted(labels, key=lambda lab: -lab[6]):
+        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+        lw, lh = tw + 8, th + 8
+        lx = max(0, min(x, width - lw))
+        spots = [y - lh - 2, y + 2, y + h + 2] + [y + 2 + (i + 1) * (lh + 2) for i in range(8)]
+        ly = next((sy for sy in (max(0, min(v, height - lh)) for v in spots) if not hits((lx, sy, lw, lh))),
+                  max(0, y - lh - 2))
+        placed.append((lx, ly, lw, lh))
+        cv2.rectangle(img, (lx, ly), (lx + lw, ly + lh), color, -1)
+        cv2.putText(img, text, (lx + 4, ly + th + 3), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
 
 
 def _iou(a, b):
@@ -105,7 +136,9 @@ def _vote_names(cam, faces, now):
             cam.face_tracks.append(best)
         else:
             free.remove(best)
+        smoothed = _smooth(best, f["box"], now)   # link on the raw box, show the smoothed one
         best["box"], best["t"] = f["box"], now
+        f["box"] = smoothed
         if f.get("student_id"):
             best["votes"][f["student_id"]] += 1
         if f.get("live") is False or not best["votes"]:
@@ -141,18 +174,112 @@ def _to_map(cam_id, box, width, height):
     return [round(xy[0], 4), round(xy[1], 4)] if xy else None
 
 
-def _draw(img, ctx, names):
+_ZONE_OF = {}
+
+
+def _zone(xy):
+    """corridor / door / room for a map position (presence verification's zone_of), or None."""
+    if xy is None:
+        return None
+    if "zone_of" not in _ZONE_OF:
+        try:
+            from trajectories import zone_of          # on sys.path once _to_map has loaded the module
+            _ZONE_OF["zone_of"] = zone_of
+        except Exception:  # noqa: BLE001
+            _ZONE_OF["zone_of"] = None
+    return _ZONE_OF["zone_of"](*xy) if _ZONE_OF["zone_of"] else None
+
+
+# ---- door handoff: the doorway's check-in names the corridor / classroom track at the door (live link_names.py) ----
+_checkins = deque(maxlen=50)      # [(t, student_id, name)] named, live faces on the doorway camera
+_checkins_lock = threading.Lock()
+
+
+def _record_checkins(faces, names, now):
+    """Remember who the doorway camera recognises (after the name vote), for the door handoff."""
+    with _checkins_lock:
+        for f in faces:
+            sid = f.get("student_id")
+            if not sid or f.get("live") is False:
+                continue
+            if _checkins and _checkins[-1][1] == sid and now - _checkins[-1][0] < 1.0:
+                _checkins[-1] = (now, sid, names.get(sid, sid))
+            else:
+                _checkins.append((now, sid, names.get(sid, sid)))
+
+
+def _handoff(cam, now):
+    """Name this camera's track that stood in the door zone when someone checked in: only when exactly one track was
+    there within HANDOFF_S of the check-in (several people at the door: no name rather than a wrong one). A name
+    sticks to its track and is not given to a second live track on the same camera."""
+    with _checkins_lock:
+        recent = [c for c in _checkins if now - c[0] <= 2 * HANDOFF_S]
+    for t_c, sid, name in recent:
+        near = {tid for t, tid in cam.door_seen if abs(t - t_c) <= HANDOFF_S}
+        if len(near) != 1:
+            continue
+        st = cam.people.get(next(iter(near)))
+        if st is None or st.get("sid"):
+            continue
+        if any(o.get("sid") == sid and now - o["t"] <= STALE_SECONDS for o in cam.people.values()):
+            continue
+        st["sid"], st["name"] = sid, name
+        for ev in cam.door_events:                      # crossings logged before the name was known
+            if ev["id"] == next(iter(near)):
+                ev["name"] = name
+
+
+def _door_text(ev):
+    who = f"{ev['name']} (ID {ev['id']})" if ev.get("name") else f"ID {ev['id']}"
+    return {**ev, "event": f"{who} {ev['action']}"}
+
+
+def _door_crossing(cam, role, tid, zone, now):
+    """Update a person's zone. Returns "entered the classroom" / "left the classroom" when the track
+    moves between this camera's side of the door (corridor for the corridor camera, room for the classroom camera)
+    and the door zone, else None."""
+    st = cam.people.setdefault(tid, {"zone": None, "t": now})
+    st["t"] = now
+    if zone is None:
+        return None
+    prev, st["zone"] = st["zone"], zone
+    if zone == "door":
+        cam.door_seen.append((now, tid))
+    if prev is None or prev == zone:
+        return None
+    own = "corridor" if role == "outside" else "room"
+    if {prev, zone} == {"corridor", "room"}:
+        return "entered the classroom" if zone == "room" else "left the classroom"
+    if (prev, zone) == (own, "door"):
+        return "entered the classroom" if own == "corridor" else "left the classroom"
+    if (prev, zone) == ("door", own):
+        return "left the classroom" if own == "corridor" else "entered the classroom"
+    return None
+
+
+def _draw(img, ctx, names, role=None, cam=None, now=None):
     """Boxes and labels on the frame. Returns the JSON summary of what was found."""
     import cv2
     height, width = img.shape[:2]
-    people, faces = [], []
+    people, faces, labels = [], [], []
     for tr in ctx.tracks:
-        x, y, w, h = (int(v) for v in tr["box"])
         tid = tr.get("global_id", tr.get("local_id"))
+        state = cam.people.setdefault(tid, {"zone": None, "t": now}) if cam is not None else {}
+        x, y, w, h = (int(v) for v in _smooth(state, tr["box"], now))
+        xy = _to_map(ctx.cam_id, (x, y, w, h), width, height)
+        if cam is not None:
+            crossing = _door_crossing(cam, role, tid, _zone(xy), now)
+            if crossing:
+                cam.door_seq += 1
+                cam.door_events.append({"seq": cam.door_seq, "t": now, "id": tid, "action": crossing,
+                                        "name": cam.people[tid].get("name")})
         color = _COLORS[tid % len(_COLORS)] if tid is not None else _UNKNOWN
         cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
-        _label(img, x, y, f"ID {tid}", color)
-        people.append({"id": tid, "box": [x, y, w, h], "map": _to_map(ctx.cam_id, (x, y, w, h), width, height)})
+        person = cam.people.get(tid, {}) if cam is not None else {}
+        labels.append((x, y, w, h, f"ID {tid} | {person['name']}" if person.get("name") else f"ID {tid}", color,
+                       1 if person.get("name") else 0))
+        people.append({"id": tid, "box": [x, y, w, h], "map": xy, "name": person.get("name"),
+                       "student_id": person.get("sid")})
     for f in ctx.faces:
         x, y, w, h = (int(v) for v in f["box"])
         name = names.get(f.get("student_id")) if f.get("student_id") else None
@@ -162,12 +289,13 @@ def _draw(img, ctx, names):
         if f.get("emotion"):
             parts.append(f["emotion"])
         cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
-        _label(img, x, y, " | ".join(parts), color)
+        labels.append((x, y, w, h, " | ".join(parts), color, 2))
         faces.append({"box": [x, y, w, h], "name": name, "student_id": f.get("student_id"), "live": live,
                       "liveness_score": f.get("liveness_score"), "similarity": f.get("similarity"),
                       "emotion": f.get("emotion"), "held": bool(f.get("held"))})
         if "glasses" in f:
             faces[-1].update(glasses=f["glasses"], glasses_score=f["glasses_score"])
+    _draw_labels(img, labels)
     return {"people": people, "faces": faces}
 
 
@@ -186,7 +314,12 @@ def process(engine, cam_id, data):
         started = time.perf_counter()
         ctx = engine.process_frame(cam_id, img, now)
         _vote_names(cam, ctx.faces, now)
-        summary = _draw(img, ctx, names)
+        cam.people = {k: v for k, v in cam.people.items() if now - v["t"] <= FORGET_PERSON_S}
+        if pipeline.role == "attendance":
+            _record_checkins(ctx.faces, names, now)
+        summary = _draw(img, ctx, names, pipeline.role, cam, now)
+        if pipeline.role in ("outside", "inside"):
+            _handoff(cam, now)
         ok, jpeg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
         if cam.last_seen:
             cam.fps = 0.8 * cam.fps + 0.2 / max(now - cam.last_seen, 1e-3)

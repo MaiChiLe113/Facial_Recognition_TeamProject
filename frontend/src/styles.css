@@ -88,7 +88,9 @@ button, input, select, textarea { font: inherit; }
 .home > .event-log { margin-bottom: var(--space-5); }
 .grid-log-map { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: var(--space-5); align-items: stretch; margin-bottom: var(--space-5); }
 /* the log is at least as tall as the map (stretch), at most 640px, then scrolls */
-.grid-log-map > .event-log.event-log { min-height: 360px; max-height: 640px; overflow: auto; }
+/* Side by side, the map sets the row height and the log fills exactly that and scrolls inside, so new events never
+   resize the row or move the map. (contain: size keeps the log's own content out of the row height.) */
+.grid-log-map > .event-log.event-log { contain: size; min-height: 0; max-height: none; overflow: auto; }
 .grid-bottom { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; margin-bottom: var(--space-5); }
 .home > .card { margin-bottom: var(--space-5); }
 
@@ -245,7 +247,7 @@ tr.selected, tr.selected:hover { background: var(--yellow-soft); }
   .grid-top { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .main { padding: var(--space-5); }
   .grid-bottom, .grid-log-map { grid-template-columns: 1fr; }
-  .grid-log-map > .event-log.event-log { min-height: 0; max-height: 420px; }
+  .grid-log-map > .event-log.event-log { contain: none; min-height: 0; max-height: 420px; }
   .page-grid, .history-grid, .add-grid { grid-template-columns: 1fr; }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .demo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
