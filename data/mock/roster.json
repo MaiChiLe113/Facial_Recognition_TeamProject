@@ -60,7 +60,7 @@
         1
       ],
       "photo_folder": "AppliedML/Hồng Minh",
-      "student_card": null
+      "student_card": "AppliedML/student_card_image/HongMinh.jpg"
     },
     {
       "student_id_vn": "SWH01234",
@@ -71,7 +71,7 @@
         1
       ],
       "photo_folder": "AppliedML/Minh Thành",
-      "student_card": null
+      "student_card": "AppliedML/student_card_image/thanh.jpg"
     }
   ]
 }

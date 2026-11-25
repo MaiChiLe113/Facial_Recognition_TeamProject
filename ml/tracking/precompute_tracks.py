@@ -48,6 +48,27 @@ def to_box(cx, cy, w, h, frame_w, frame_h):
 # the glass in take 1) move >= 0.024 sideways or change width/height by >= 0.062.
 STATIC_MAX_MOVE_X, STATIC_MAX_MOVE_Y, STATIC_MAX_SIZE = 0.022, 0.035, 0.05
 
+# Box smoothing: YOLO's boxes jitter a few pixels from frame to frame, so each saved box is replaced by the mean of the
+# keyframes around it (SMOOTH_HALF on each side, centred, so no lag). Only keyframes no more than SMOOTH_MAX_GAP_S apart
+# are averaged together, so a track that pauses (occlusion) is not smeared across the gap.
+SMOOTH_HALF = 2                    # 5 keyframes = 0.5 s at the default every 3rd frame of 30 fps
+SMOOTH_MAX_GAP_S = 0.35
+
+
+def smooth_track(track, half=SMOOTH_HALF):
+    """Centred moving average of a track's keyframe boxes (in place), within runs without time gaps."""
+    kfs = track["keyframes"]
+    runs, start = [], 0
+    for i in range(1, len(kfs) + 1):
+        if i == len(kfs) or kfs[i]["t"] - kfs[i - 1]["t"] > SMOOTH_MAX_GAP_S:
+            runs.append((start, i))
+            start = i
+    boxes = [list(kf["box"]) for kf in kfs]
+    for a, b in runs:
+        for i in range(a, b):
+            window = boxes[max(a, i - half):min(b, i + half + 1)]
+            kfs[i]["box"] = [round(sum(v) / len(window), 4) for v in zip(*window)]
+
 
 def is_static(track):
     """True for a track that never moves or changes size: a picture or object, not a person."""
@@ -61,7 +82,7 @@ def is_static(track):
 
 
 def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_keyframes=5,
-        tracker="bytetrack.yaml", out_dir=REPO / "data" / "tracks", device=None, drop_static=True):
+        tracker="bytetrack.yaml", out_dir=REPO / "data" / "tracks", device=None, drop_static=True, smooth=True):
     tracks = {}  # track_id -> {"global_id": ..., "name": None, "keyframes": [...]}
 
     # TODO 1: load a small person detector.
@@ -104,6 +125,9 @@ def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_ke
     kept = [tr for tr in tracks.values() if len(tr["keyframes"]) >= min_keyframes]
     static = [tr["global_id"] for tr in kept if is_static(tr)] if drop_static else []
     kept = [tr for tr in kept if tr["global_id"] not in static]
+    if smooth:                                   # after the static check, which needs the raw boxes
+        for tr in kept:
+            smooth_track(tr)
     kept.sort(key=lambda tr: (tr["keyframes"][0]["t"], tr["global_id"]))
     keyframes = sum(len(tr["keyframes"]) for tr in kept)
     times = [kf["t"] for tr in kept for kf in tr["keyframes"]]
@@ -114,7 +138,7 @@ def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_ke
     out_path.write_text(json.dumps(out, indent=1), encoding="utf-8")
 
     stats = {
-        "cam_id": cam_id, "tracker": Path(tracker).stem + ("+static_filter" if drop_static else ""),
+        "cam_id": cam_id, "tracker": Path(tracker).stem + ("+static_filter" if drop_static else "") + ("+smooth" if smooth else ""),
         "ids_static": len(static), "static_ids": static, "video": Path(video_path).name, "device": device,
         "frames": frames, "fps_video": fps, "ids_raw": len(raw_ids),
         "ids_with_keyframes": len(tracks), "ids_kept": len(kept), "ids_dropped": len(raw_ids) - len(kept),
@@ -158,15 +182,16 @@ if __name__ == "__main__":
     p.add_argument("--eval-csv", default=None, help="append per-camera counts to this CSV (e.g. data/eval/tracking_baseline.csv)")
     p.add_argument("--real-people", nargs="*", default=[], metavar="CAM=N",
                    help="human-counted people per camera for --eval-csv, e.g. cam_1=4")
+    p.add_argument("--no-smooth", action="store_true", help="save YOLO's raw boxes (no moving average)")
     a = p.parse_args()
 
     take = configured_take() if a.take is None else a.take
     cams = camera_ids() if a.cam == "all" else [a.cam]
     print(f"take {take}, tracker {a.tracker}, model {a.model}, conf {a.conf}, every_n {a.every_n}, "
-          f"min_keyframes {a.min_keyframes}, drop_static {not a.keep_static}")
+          f"min_keyframes {a.min_keyframes}, drop_static {not a.keep_static}, smooth {not a.no_smooth}")
     out_dir = a.out_dir or REPO / "data" / "tracks" / f"take{take}"
     all_stats = [run(cam, video_path(cam, take), a.every_n, a.model, a.conf, a.min_keyframes, a.tracker, out_dir,
-                     drop_static=not a.keep_static)
+                     drop_static=not a.keep_static, smooth=not a.no_smooth)
                  for cam in cams]
     if a.eval_csv:
         real = {k: int(v) for k, v in (x.split("=", 1) for x in a.real_people)}

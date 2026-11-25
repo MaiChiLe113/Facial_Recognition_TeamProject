@@ -55,8 +55,10 @@ export function updateLive(liveStatus, now = Date.now()) {
     live[f.student_id] ??= {}
     live[f.student_id].checkIn ??= now
   }
-  for (const f of known(cams.cam_2)) {
-    const s = (live[f.student_id] ??= {})
+  // In class: a face recognised by the classroom camera, or a classroom track named by the door handoff.
+  const insidePeople = (cams.cam_2?.connected ? cams.cam_2.people ?? [] : []).filter((p) => p.student_id)
+  for (const x of [...known(cams.cam_2), ...insidePeople]) {
+    const s = (live[x.student_id] ??= {})
     s.entry ??= now
     s.lastInside = now
   }

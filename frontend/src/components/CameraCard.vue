@@ -86,21 +86,32 @@ function draw() {
   // Without requestVideoFrameCallback, hide the boxes while a seek is still loading its frame.
   if (!hasRvfc && v.seeking) return
   const now = shownTime(v)
+  const shown = []
   for (const tr of props.tracks.tracks) {
     const b = boxAt(tr, now)
     if (!b) continue
-    const [x, y, w, h] = [ox + b[0] * pw, oy + b[1] * ph, b[2] * pw, b[3] * ph]
-    const color = nameAt(tr, now) ? '#3fbf4f' : '#f2b233'
-    ctx.strokeStyle = color
+    shown.push({ x: ox + b[0] * pw, y: oy + b[1] * ph, w: b[2] * pw, h: b[3] * ph, named: !!nameAt(tr, now), text: labelOf(tr, now) })
+  }
+  for (const b of shown) {
+    ctx.strokeStyle = b.named ? '#3fbf4f' : '#f2b233'
     ctx.lineWidth = 2
-    ctx.strokeRect(x, y, w, h)
-    const text = labelOf(tr, now)
-    ctx.font = '600 13px system-ui, sans-serif'
-    const tw = ctx.measureText(text).width + 12
+    ctx.strokeRect(b.x, b.y, b.w, b.h)
+  }
+  // Labels after every box, so no box is drawn over a label. Named people choose first; each label takes the first
+  // free spot of: above its box, just inside its top, under it, then further down (no two labels overlap).
+  ctx.font = '600 13px system-ui, sans-serif'
+  const placed = []
+  const hits = (r) => placed.some((q) => r.x < q.x + q.w && q.x < r.x + r.w && r.y < q.y + q.h && q.y < r.y + r.h)
+  for (const b of [...shown].sort((a, c) => c.named - a.named)) {
+    const tw = ctx.measureText(b.text).width + 12, lh = 20
+    const x = Math.max(ox, Math.min(b.x, ox + pw - tw))
+    const spots = [b.y - lh - 2, b.y + 2, b.y + b.h + 2, ...Array.from({ length: 8 }, (_, i) => b.y + 2 + (i + 1) * (lh + 2))]
+    const y = spots.map((y0) => Math.max(oy, Math.min(y0, oy + ph - lh))).find((y0) => !hits({ x, y: y0, w: tw, h: lh })) ?? Math.max(oy, b.y - lh - 2)
+    placed.push({ x, y, w: tw, h: lh })
     ctx.fillStyle = 'rgba(30,30,30,0.85)'
-    ctx.fillRect(x, Math.max(0, y - 22), tw, 20)
+    ctx.fillRect(x, y, tw, lh)
     ctx.fillStyle = '#fff'
-    ctx.fillText(text, x + 6, Math.max(14, y - 8))
+    ctx.fillText(b.text, x + 6, y + 14)
   }
 }
 

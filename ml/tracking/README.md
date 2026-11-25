@@ -82,7 +82,7 @@ duration, and the three cameras within 1 s of each other. All 8 takes are conver
 ```bash
 for t in 1 2 3 4 5 6 7 8; do
   ml/.venv/bin/python ml/tracking/precompute_tracks.py --cam all --take $t \
-      --tracker ml/tracking/configs/bytetrack_long.yaml
+      --tracker ml/tracking/configs/botsort_reid.yaml
 done
 ```
 
@@ -117,7 +117,34 @@ ID until cross-camera matching replaces it. `attendance_cam` uses the same perso
 
 ### Tracker choice (E1 baseline)
 
-The committed `data/tracks/` files come from
+**Since 2026-11-25 the committed `data/tracks/` files come from `configs/botsort_reid.yaml` + the static filter + box
+smoothing** (the section below explains the earlier `bytetrack_long` choice, kept for the record).
+
+- `botsort_reid.yaml` = Ultralytics' BoT-SORT with `track_buffer: 90` (3 s, as `bytetrack_long`), `gmc_method: none`
+  (fixed cameras) and `with_reid: True`, `model: auto`: besides box motion, a lost person is matched again by
+  appearance, using the detector's own features (the DeepSORT idea; no extra model). `botsort_long.yaml` is the same
+  without ReID.
+- Box smoothing (`smooth_track` in `precompute_tracks.py`, on by default, `--no-smooth` turns it off): each saved box is
+  the centred mean of the 5 keyframes around it (0.5 s, no lag), never across a gap, applied after the static check.
+
+Extra IDs (IDs kept - real people; lower = fewer ID switches), all with the static filter:
+
+| take | cam_id | bytetrack_long | botsort_long | botsort_reid |
+| --- | --- | --- | --- | --- |
+| 1 | cam_1 | 5 | 5 | 5 |
+| 1 | cam_2 | 3 | 3 | 3 |
+| 1 | attendance_cam | 0 | 0 | 0 |
+| 3 | cam_1 | 8 | 8 | **7** |
+| 3 | cam_2 | 10 | 9 | **9** |
+| 3 | attendance_cam | 1 | 1 | 1 |
+
+ReID is never worse and saves 2 IDs on take 3 (three people at the door together); it processes ~27 fps instead of
+~50 on MPS, which does not matter offline. Most remaining extra IDs are people seen through the corridor glass and people
+fully hidden behind others in the classroom, which appearance cannot fix. Rows in `data/eval/tracking_baseline.csv`.
+The live tracker (`backend/app/pipeline/tracker.py`) still uses ByteTrack: BoT-SORT's ReID needs the detector's
+features, which the live detector does not pass on.
+
+Earlier choice: the committed `data/tracks/` files came from
 **`configs/bytetrack_long.yaml`** plus the static filter. That config is Ultralytics' `bytetrack.yaml` with `track_buffer: 90` instead of
 30, so a lost person is kept alive for ~3 s at 30 fps instead of ~1 s.
 
