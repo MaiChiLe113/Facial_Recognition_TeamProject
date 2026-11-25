@@ -1,8 +1,9 @@
-"""Backs the Features demo page: run the three basic models on one webcam frame.
+"""Backs the Features demo page: run selected models on one webcam frame.
 
     face_recognition  who is it (against the registered students, app/services/gallery.py)
     anti_spoofing     live or spoof (printed photo / phone screen)
     emotion           the facial expression
+    glasses_detection whether each face is wearing glasses
 
 The models come from ml/<feature>/infer.py + <feature>.pt (see app/core/ml_models.py). A feature
 whose weights or libraries are missing is reported in "errors" and the others still run.
@@ -16,7 +17,7 @@ from datetime import datetime
 from collections import deque
 
 from ..config import REPO_DIR
-from ..core.ml_models import FEATURES, crop_face, load_infer, weights_status
+from ..core.ml_models import DEMO_FEATURES, crop_face, load_infer, weights_status
 from . import gallery
 
 LIVENESS_FRAMES = 10
@@ -66,7 +67,7 @@ def _live_confidence(is_live, score, threshold):
 def status():
     """Per feature: are the weights where the app looks for them, and is the code importable."""
     out = []
-    for feature in FEATURES:
+    for feature in DEMO_FEATURES:
         info = weights_status(feature)
         try:
             load_infer(feature)
@@ -126,6 +127,14 @@ def analyze(image, features, client="default", threshold=None, liveness_threshol
             faces[0].update(live=is_live, liveness_score=score, liveness_confidence=confidence)
         run("anti_spoofing", live)
 
+    if "glasses_detection" in features and boxes:
+        def detect_glasses(infer):
+            for face, box in zip(faces, boxes):
+                crop = crop_face(image, box, "glasses_detection")
+                if crop is not None:
+                    face.update(infer.predict(crop))
+        run("glasses_detection", detect_glasses)
+
     if "face_recognition" in features and boxes:
         def recognise(infer):
             gallery.load_registered()
@@ -133,11 +142,12 @@ def analyze(image, features, client="default", threshold=None, liveness_threshol
                 for face in faces:
                     face.update(student_id=None, name=None, similarity=0.0, registered=False, loading=True)
                 return
-            faces_db, names = gallery.registered_faces()
+            profiles, names = gallery.registered_profiles()
             for face, box in zip(faces, boxes):
-                student_id, similarity = infer.identify(crop_face(image, box, "face_recognition"), faces_db, threshold)
+                crop = crop_face(image, box, "face_recognition")
+                student_id, similarity, cutoff = gallery.identify_face(infer, crop, profiles, threshold, face.get("glasses"))
                 face.update(student_id=student_id, name=names.get(student_id) if student_id else None,
-                            similarity=similarity, registered=bool(faces_db))
+                            similarity=similarity, registered=bool(profiles[0]), recognition_threshold=cutoff)
         run("face_recognition", recognise)
 
     if "emotion" in features:
@@ -168,7 +178,7 @@ def analyze(image, features, client="default", threshold=None, liveness_threshol
 
 def _warm_up():
     """Load every model whose weights file exists (so the first webcam frame is not slow), then the registered faces."""
-    for feature in FEATURES:
+    for feature in DEMO_FEATURES:
         try:
             if weights_status(feature)["found"]:
                 load_infer(feature)._load()
@@ -193,9 +203,12 @@ def frame_log_rows(result, features, client):
     rows = []
     for i, f in enumerate(result.get("faces", []), 1):
         x, y, w, h = f["box"]
+        cutoff = f.get("recognition_threshold")
+        if cutoff is None:
+            cutoff = result.get("threshold")
         rows.append({**base, "face": i, "name": cell(f.get("name")), "student_id": cell(f.get("student_id")),
                      "similarity": cell(f.get("similarity"), 4),
-                     "threshold": cell(result.get("threshold"), 4) if "similarity" in f else "", "live": cell(f.get("live")),
+                     "threshold": cell(cutoff, 4) if "similarity" in f else "", "live": cell(f.get("live")),
                      "liveness_score": cell(f.get("liveness_score"), 4),
                      "liveness_threshold": cell(result.get("liveness_threshold"), 4) if "live" in f else "", "emotion": cell(f.get("emotion")),
                      "emotion_score": cell(f.get("emotion_score"), 4),

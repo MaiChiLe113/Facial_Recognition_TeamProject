@@ -8,6 +8,7 @@ Each face is cut out once per model with that model's margin (ml_models.MARGIN, 
 face["crops"] = {"face_recognition": ..., "anti_spoofing": ..., "emotion": ...} (None when empty)."""
 from collections import deque
 
+from ...services.gallery import identify_face
 from ..ml_models import FEATURES, crop_face, load_infer
 from ..registry import register_stage
 from .base import Stage
@@ -51,20 +52,20 @@ class Liveness(Stage):
 
 @register_stage("recognize")
 class Recognize(Stage):
-    """Options: {"threshold": <from the ROC>}. The gallery {student_id: [embeddings]} is read from
-    shared["gallery"], which app/services/gallery.py keeps up to date (gallery.attach(engine) in main.py)."""
+    """Match against the complete gallery and its optional glasses-free view."""
 
     def setup(self):
         self.recognizer = load_infer("face_recognition")
         self.threshold = self.options.get("threshold")
 
     def process(self, ctx):
-        gallery = self.shared.get("gallery", {})
+        profiles = self.shared.get("face_profiles", (self.shared.get("gallery", {}), None))
         for face in ctx.faces:
             crop = face["crops"]["face_recognition"]
             if face.get("live") is False or crop is None:
                 continue                       # never identify a spoof
-            face["student_id"], face["similarity"] = self.recognizer.identify(crop, gallery, self.threshold)
+            student_id, score, cutoff = identify_face(self.recognizer, crop, profiles, self.threshold, face.get("glasses"))
+            face.update(student_id=student_id, similarity=score, recognition_threshold=cutoff)
 
 
 @register_stage("emotion")

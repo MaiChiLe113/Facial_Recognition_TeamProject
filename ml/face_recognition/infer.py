@@ -178,3 +178,8 @@ def identify(face_crop, gallery, threshold):
 def threshold():
     """The cosine threshold stored in the weights file (loads the model)."""
     return _load()["threshold"]
+
+
+def matching_strategy():
+    """The checkpoint's rule for combining a student's enrolled embeddings."""
+    return _load()["gallery_strategy"]

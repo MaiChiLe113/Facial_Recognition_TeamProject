@@ -225,6 +225,7 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
               </li>
               <li v-if="f.live != null" :class="f.live ? 'ok' : 'bad'">{{ f.live ? 'Liveness passed' : 'Spoof detected' }}</li>
               <li v-if="f.emotion" class="ok">Emotion: {{ capitalise(f.emotion) }}</li>
+              <li v-if="'glasses' in f" class="muted">{{ f.glasses ? 'Glasses detected' : 'No glasses detected' }}</li>
             </template>
           </ul>
         </template>

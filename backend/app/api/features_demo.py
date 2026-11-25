@@ -16,7 +16,7 @@ The body is the raw image (Content-Type image/jpeg), so no multipart library is 
 """
 from fastapi import APIRouter, HTTPException, Request
 
-from ..core.ml_models import FEATURES
+from ..core.ml_models import DEMO_FEATURES, FEATURES
 from ..services import features_demo as demo
 from ..services import gallery as registered_gallery
 
@@ -42,9 +42,9 @@ def status():
 async def infer(request: Request, features: str = ",".join(FEATURES), client: str = "default",
                 threshold: float | None = None, liveness_threshold: float | None = None):
     chosen = [f for f in features.split(",") if f]
-    unknown = [f for f in chosen if f not in FEATURES]
+    unknown = [f for f in chosen if f not in DEMO_FEATURES]
     if unknown:
-        raise HTTPException(400, f"Unknown feature(s): {', '.join(unknown)}. Known: {', '.join(FEATURES)}")
+        raise HTTPException(400, f"Unknown feature(s): {', '.join(unknown)}. Known: {', '.join(DEMO_FEATURES)}")
     if threshold is not None and not -1.0 <= threshold <= 1.0:    # also rejects nan
         raise HTTPException(400, "threshold must be a number between -1 and 1.")
     if liveness_threshold is not None and not 0.0 <= liveness_threshold <= 1.0:

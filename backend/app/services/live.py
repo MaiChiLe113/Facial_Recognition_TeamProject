@@ -139,6 +139,8 @@ def _draw(img, ctx, names):
         faces.append({"box": [x, y, w, h], "name": name, "student_id": f.get("student_id"), "live": live,
                       "liveness_score": f.get("liveness_score"), "similarity": f.get("similarity"),
                       "emotion": f.get("emotion"), "held": bool(f.get("held"))})
+        if "glasses" in f:
+            faces[-1].update(glasses=f["glasses"], glasses_score=f["glasses_score"])
     return {"people": people, "faces": faces}
 
 

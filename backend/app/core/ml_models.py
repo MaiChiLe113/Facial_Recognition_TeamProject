@@ -1,4 +1,4 @@
-"""Finds the inference code and weights of each basic feature in the repo's ml/ folder.
+"""Finds the inference code and weights of the camera features in the repo's ml/ folder.
 
 Convention: ml/<feature>/infer.py is the code and ml/<feature>/<feature>.pt is the weights file.
 
@@ -19,10 +19,11 @@ from ..config import REPO_DIR
 
 ML_DIR = REPO_DIR / "ml"
 FEATURES = ("face_recognition", "anti_spoofing", "emotion")
+DEMO_FEATURES = (*FEATURES, "glasses_detection")
 
 # Margin around a detected face box, per model, as a fraction of the box size on each side.
 # anti_spoofing was trained on crops with 25 % (ml/anti_spoofing/try_liveness.py); emotion scores the same on the raw box.
-MARGIN = {"face_recognition": 0.1, "anti_spoofing": 0.25, "emotion": 0.0}
+MARGIN = {"face_recognition": 0.1, "anti_spoofing": 0.25, "emotion": 0.0, "glasses_detection": 0.1}
 
 _modules = {}
 
@@ -42,8 +43,8 @@ def crop_face(image, box, feature):
 
 
 def _check(feature):
-    if feature not in FEATURES:
-        raise KeyError(f"Unknown feature '{feature}'. Known: {', '.join(FEATURES)}")
+    if feature not in DEMO_FEATURES:
+        raise KeyError(f"Unknown feature '{feature}'. Known: {', '.join(DEMO_FEATURES)}")
 
 
 def weights_file(feature):

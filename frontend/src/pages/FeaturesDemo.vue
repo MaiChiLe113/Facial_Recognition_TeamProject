@@ -1,5 +1,5 @@
 <script setup>
-// Live demo of the three basic features on this device's webcam: face recognition, anti-spoofing, emotion.
+// Live demo of the camera features on this device's webcam.
 // Tick the features to use; every ~0.4 s a frame goes to POST /api/features-demo/infer and the result is drawn
 // over the video. The models are the ones in ml/<feature>/ (weights <feature>.pt), run by the backend.
 // Recognition compares against the registered students: their enrolment photos on the shared Drive, the same
@@ -15,10 +15,11 @@ const FEATURES = [
   { key: 'face_recognition', label: 'Face recognition', hint: 'Who is it? Compared with the registered students (Drive photos).' },
   { key: 'anti_spoofing', label: 'Anti-spoofing', hint: 'Real face or a printed photo / phone screen?' },
   { key: 'emotion', label: 'Emotion', hint: 'Facial expression of each face.' },
+  { key: 'glasses_detection', label: 'Glasses detection', hint: 'Check for glasses on each detected face.' },
 ]
 const ICONS = { angry: '😠', disgust: '🤢', fear: '😨', happy: '😄', sad: '😢', surprise: '😮', neutral: '😐' }
 
-const selected = ref({ face_recognition: true, anti_spoofing: true, emotion: true })
+const selected = ref({ face_recognition: true, anti_spoofing: true, emotion: true, glasses_detection: false })
 const status = ref({})             // feature -> { found, code, error, expected_file }
 const backendUp = ref(true)
 const video = ref(null)
@@ -203,6 +204,7 @@ function nameTag(f) {
   let tag = null
   if (f.loading) tag = { text: 'Loading…', cls: 'wait' }
   else if ('similarity' in f) tag = f.name ? { text: f.name, cls: 'known' } : { text: 'Unknown', cls: 'unknown' }
+  else if ('glasses' in f && !emo) tag = { text: f.glasses ? 'Glasses' : 'No glasses', cls: 'wait' }
   if (!emo) return tag
   return tag ? { ...tag, text: `${tag.text} · ${emo}` } : { text: emo, cls: 'wait' }
 }
@@ -226,6 +228,12 @@ function lines(f) {
     else out.push({ cls: 'bad', text: f.registered ? `Unknown (${f.similarity.toFixed(2)})` : 'Unknown (nobody registered)' })
   }
   if (f.emotion) out.push({ cls: 'ok', text: `${ICONS[f.emotion] ?? ''} ${f.emotion}${pct(f.emotion_score)}` })
+  if ('glasses' in f) {
+    out.push({ cls: 'muted', text: f.glasses ? 'Glasses detected' : 'No glasses detected' })
+    if (f.glasses && f.live !== false && f.registered && !f.name && !f.loading) {
+      out.push({ cls: 'muted', text: 'If the lenses reflect light, turn away from the glare and try again.' })
+    }
+  }
   return out
 }
 </script>
@@ -280,7 +288,7 @@ function lines(f) {
               <strong>Recognition threshold: {{ recTh.shown.value.toFixed(2) }}
                 <span class="muted small">{{ recTh.custom.value == null ? '(model default)' : '(custom)' }}</span></strong>
               <small class="muted">A face is named only when its similarity is at least this. Higher = stricter (fewer wrong names, more
-                "Unknown"); lower = more lenient (more wrong names).
+                "Unknown"); lower = more lenient (more wrong names). Mixed enrolment uses a minimum of 0.74 for faces with glasses.
                 <template v-if="recTh.def.value != null">Model default: {{ recTh.def.value.toFixed(2) }}.</template></small>
               <span class="fd-slider">
                 <input type="range" :min="recTh.lo" :max="recTh.hi" step="0.01" :value="recTh.shown.value" @input="recTh.set($event.target.value)" />
@@ -357,7 +365,10 @@ function lines(f) {
             <p v-else-if="!registered.drive_root_exists" class="error small">The photo folder was not found. Put AppliedML/ in the repo folder, or set HAWKEYE_VIDEO_ROOT in backend/.env.</p>
             <ul class="fd-people">
               <li v-for="p in registered.people" :key="p.student_id">
-                <span class="grow">{{ p.name }} <span class="muted small">· {{ p.folder_photos }} photo{{ p.folder_photos === 1 ? '' : 's' }}</span></span>
+                <span class="grow">{{ p.name }}
+                  <span v-if="p.glasses_photos != null" class="muted small">· {{ p.glasses_photos }} with glasses, {{ p.no_glasses_photos }} without</span>
+                  <span v-else class="muted small">· {{ p.folder_photos }} photo{{ p.folder_photos === 1 ? '' : 's' }}</span>
+                </span>
               </li>
               <li v-if="!registered.people.length" class="empty">No registered face could be loaded.</li>
             </ul>

@@ -8,7 +8,7 @@
   "roles": {
     "outside":    ["detect_people", "track", "match", "detect_faces", "liveness", "recognize", "emotion", "emit_events"],
     "inside":     ["detect_people", "track", "match", "detect_faces", "liveness", "recognize", "emotion", "emit_events"],
-    "attendance": ["detect_faces", "liveness", "recognize", "emotion", "emit_events"]
+    "attendance": ["detect_faces", "liveness", "glasses_detection", "recognize", "emotion", "emit_events"]
   },
   "options": {
     "liveness":  { "frames": 10 },

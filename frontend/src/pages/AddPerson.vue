@@ -174,6 +174,7 @@ const courseName = (key) => courses.value?.find((c) => c.key_id === key)?.course
 
         <div class="field">
           <span>Face photos <em class="muted">{{ photos.length }} / {{ MAX_PHOTOS }} · at least {{ MIN_PHOTOS }}</em></span>
+          <small class="muted">If you sometimes wear glasses, include clear photos with and without them.</small>
           <div class="dropzone" @dragover.prevent @drop.prevent="onDrop">
             <div class="drop-actions">
               <button class="btn" type="button" :disabled="photos.length >= MAX_PHOTOS" @click="fileInput.click()">Upload photos</button>

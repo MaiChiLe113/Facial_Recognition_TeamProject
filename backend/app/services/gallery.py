@@ -4,8 +4,8 @@ The same enrolment photos the recorded takes on Home are named from. For every s
 `photo_folder` and the `student_card` image are embedded with ml/face_recognition and kept in memory. They are found
 under a folder that contains AppliedML/<name>/ and AppliedML/student_card_image/: the mounted Google Drive or a copy
 downloaded into the repo (see _enrolment_root); photos uploaded on the Add person page live in data/photos/.
-Embeddings are cached on disk (data/raw/face_embeddings.npz, keyed by file path, size, date and model), so only new
-or changed photos cost time after the first load; the backend loads them in the background when it starts.
+Embeddings and optional eyewear labels are cached on disk (data/raw/face_embeddings.npz). Keys include the photo and
+model fingerprints. The backend loads the gallery in the background at startup.
 
     load_registered(force=False)   embed the photos (returns at once if a load is already running)
     registered_faces()             ({student_id: [embedding, ...]}, {student_id: name}) for the live cameras
@@ -30,9 +30,11 @@ MAX_SIDE = 1600      # phone photos are shrunk before the face search
 SEARCH_SIDES = (1600, 960, 640, 480)   # a face that fills a close-up is found at a smaller size
 MIN_FACE_PX = 24     # smallest face accepted in an enrolment photo (at the search size)
 EMBEDDING_CACHE = DATA_DIR / "raw" / "face_embeddings.npz"
+GLASSES_RECOGNITION_FLOOR = 0.74  # calibrated on development identities with the checked-in centroid model
 
 _lock = threading.Lock()
 _gallery = {}        # student_id_vn -> [embedding, ...]
+_without_glasses = {} # alternate gallery when mixed eyewear enrolment is available
 _people = {}         # student_id_vn -> {"student_id", "name", "folder_photos" (images in the member's folder),
                      #                   "photos" (embedded and used for recognition), "total" (folder images + card)}
 _skipped = []        # [{"student", "file", "reason"}]
@@ -49,17 +51,18 @@ def is_loading():
 
 
 def attach(engine):
-    """Keep engine.shared["gallery"] equal to the registered faces from now on (and start a load if none ran)."""
+    """Keep the engine's profiles current and start a load if none ran."""
     _engines.append(engine)
-    engine.shared["gallery"] = registered_faces()[0]
+    _publish()
     if not _loaded:
         threading.Thread(target=load_registered, daemon=True, name="gallery-load").start()
 
 
 def _publish():
-    gallery = registered_faces()[0]
+    profiles, _ = registered_profiles()
     for engine in _engines:
-        engine.shared["gallery"] = gallery
+        engine.shared["gallery"] = profiles[0]
+        engine.shared["face_profiles"] = profiles
 
 
 def _enrolment_root():
@@ -99,13 +102,25 @@ def _face_crop(image):
 
 def _signature():
     """Changes when the model or the face finder changes, which invalidates the cached embeddings."""
-    w = weights_status("face_recognition")["weights"]
+    def stamp(feature):
+        try:
+            stat = os.stat(weights_status(feature)["weights"])
+            return f"{stat.st_size}-{stat.st_mtime_ns}"
+        except OSError:
+            return "none"
+
+    model = stamp("face_recognition")
+    glasses = stamp("glasses_detection")
+    suffix = f"|glasses={glasses}" if glasses != "none" else ""
+    return f"{model}|yunet{suffix}"
+
+
+def _eyewear(crop):
+    """Use a label when the optional model is available; otherwise keep general face matching."""
     try:
-        st = os.stat(w)
-        model = f"{st.st_size}-{st.st_mtime_ns}"
-    except OSError:
-        model = "none"
-    return f"{model}|yunet"        # the face finder is always the pipeline's YuNet now
+        return load_infer("glasses_detection").predict(crop)["glasses"]
+    except Exception:  # noqa: BLE001 - an optional classifier must not block enrolment or recognition
+        return None
 
 
 def _read_cache():
@@ -114,7 +129,11 @@ def _read_cache():
     try:
         with np.load(EMBEDDING_CACHE, allow_pickle=False) as z:
             keys, vecs, ok = json.loads(str(z["keys"])), z["vectors"], z["found"]
-        return {k: (vecs[i] if ok[i] else None) for i, k in enumerate(keys)}
+            eyewear = z["eyewear"] if "eyewear" in z.files else np.full(len(keys), -1)
+        return {
+            k: (vecs[i], None if eyewear[i] < 0 else bool(eyewear[i])) if ok[i] else None
+            for i, k in enumerate(keys)
+        }
     except Exception:  # noqa: BLE001 - no cache yet, or a damaged one: start again
         return {}
 
@@ -125,10 +144,13 @@ def _write_cache(cache):
     try:
         EMBEDDING_CACHE.parent.mkdir(parents=True, exist_ok=True)
         keys = list(cache)
-        vecs = np.stack([cache[k] if cache[k] is not None else np.zeros(512, np.float32) for k in keys]) if keys \
+        pairs = [cache[k] for k in keys]
+        vecs = np.stack([pair[0] if pair is not None else np.zeros(512, np.float32) for pair in pairs]) if keys \
             else np.zeros((0, 512), np.float32)
+        eyewear = np.array([-1 if pair is None or pair[1] is None else int(pair[1]) for pair in pairs], dtype=np.int8)
         tmp = EMBEDDING_CACHE.with_name(EMBEDDING_CACHE.stem + ".tmp.npz")
-        np.savez(tmp, keys=json.dumps(keys), vectors=vecs, found=np.array([cache[k] is not None for k in keys]))
+        np.savez(tmp, keys=json.dumps(keys), vectors=vecs, found=np.array([p is not None for p in pairs]),
+                 eyewear=eyewear)
         tmp.replace(EMBEDDING_CACHE)
     except Exception:  # noqa: BLE001 - a read-only disk only costs speed
         pass
@@ -147,6 +169,7 @@ def load_registered(force=False):
         root = _enrolment_root()
         sig = _signature()
         infer = load_infer("face_recognition")
+        with_eyewear = weights_status("glasses_detection")["found"]
         students = list_students()
 
         plan = []                    # (student, folder_photos, [files])
@@ -176,7 +199,7 @@ def load_registered(force=False):
         def work(f):
             try:
                 crop = _face_crop(_read_photo(f))
-                cache[keys[f]] = infer.embed(crop) if crop is not None else None
+                cache[keys[f]] = (infer.embed(crop), _eyewear(crop) if with_eyewear else None) if crop is not None else None
             except Exception as e:  # noqa: BLE001 - one bad photo (e.g. HEIC without pillow-heif) must not stop the rest
                 errors[f] = f"{type(e).__name__}: {e}"[:120]
 
@@ -186,9 +209,10 @@ def load_registered(force=False):
             live_keys = {k for k in keys.values() if k}
             _write_cache({k: v for k, v in cache.items() if k in live_keys})
 
-        gallery, people, skipped = {}, {}, []
+        gallery, without_glasses, people, skipped = {}, {}, {}, []
+        has_mixed_profiles = False
         for st, folder_photos, files in plan:
-            vectors = []
+            references = []
             for f in files:
                 k = keys.get(f)
                 if k is None or not f.is_file():
@@ -198,13 +222,26 @@ def load_registered(force=False):
                 elif cache.get(k) is None:
                     skipped.append({"student": st["name"], "file": f.name, "reason": "no face found"})
                 else:
-                    vectors.append(cache[k])
+                    references.append(cache[k])
+            vectors = [vector for vector, _ in references]
             if vectors:
-                gallery[st["student_id_vn"]] = vectors
+                sid = st["student_id_vn"]
+                gallery[sid] = vectors
+                bare = [vector for vector, glasses in references if glasses is False]
+                mixed = bool(bare) and any(glasses is True for _, glasses in references)
+                without_glasses[sid] = bare if mixed else vectors
+                has_mixed_profiles |= mixed
             people[st["student_id_vn"]] = {"student_id": st["student_id_vn"], "name": st["name"],
                                            "folder_photos": folder_photos, "photos": len(vectors), "total": len(files)}
+            glasses_count = sum(glasses is True for _, glasses in references)
+            bare_count = sum(glasses is False for _, glasses in references)
+            if glasses_count or bare_count:
+                people[st["student_id_vn"]].update(glasses_photos=glasses_count, no_glasses_photos=bare_count)
         with _lock:
             _gallery.clear(); _gallery.update(gallery)
+            _without_glasses.clear()
+            if has_mixed_profiles:
+                _without_glasses.update(without_glasses)
             _people.clear(); _people.update(people)
             _skipped[:] = skipped
         _publish()
@@ -222,6 +259,28 @@ def registered_faces():
     ({student_id: [embedding, ...]}, {student_id: name}). Empty until the first load has finished."""
     with _lock:
         return {sid: list(v) for sid, v in _gallery.items()}, {sid: p["name"] for sid, p in _people.items()}
+
+
+def registered_profiles():
+    """Snapshot both gallery views from the same completed enrolment load."""
+    with _lock:
+        full = {sid: list(vectors) for sid, vectors in _gallery.items()}
+        bare = {sid: list(vectors) for sid, vectors in _without_glasses.items()}
+        return (full, bare or None), {sid: p["name"] for sid, p in _people.items()}
+
+
+def identify_face(infer, crop, profiles, threshold, glasses=None):
+    """Match a face and return its identity, score and optional per-face cutoff."""
+    full, bare = profiles
+    if bare is not None and infer.matching_strategy() == "centroid":
+        glasses = _eyewear(crop) if glasses is None else glasses
+        if glasses is False:
+            full = bare
+        elif glasses is True:
+            current = infer.threshold() if threshold is None else threshold
+            threshold = max(current, GLASSES_RECOGNITION_FLOOR)
+    student_id, score = infer.identify(crop, full, threshold)
+    return student_id, score, threshold
 
 
 _reload_wanted = threading.Event()
