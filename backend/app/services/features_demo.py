@@ -4,6 +4,7 @@
     anti_spoofing     live or spoof (printed photo / phone screen)
     emotion           the facial expression
     glasses_detection whether each face is wearing glasses
+    gesture           the hand gesture of every hand in the frame: result["hands"]
 
 The models come from ml/<feature>/infer.py + <feature>.pt (see app/core/ml_models.py). A feature
 whose weights or libraries are missing is reported in "errors" and the others still run.
@@ -160,7 +161,17 @@ def analyze(image, features, client="default", threshold=None, liveness_threshol
                 face.update(emotion=result["label"], emotion_score=result.get("score"))
         run("emotion", feel)
 
+    hands = []
+    if "gesture" in features:
+        def gesture(infer):                  # whole frame, not face crops; boxes as fractions like the faces
+            for hand in infer.predict(image):
+                x, y, w, h = hand["box"]
+                hands.append({"label": hand["label"], "score": hand["score"], "box": [x / width, y / height, w / width, h / height]})
+        run("gesture", gesture)
+
     result = {"faces": faces, "errors": errors, "ms": round((time.perf_counter() - start) * 1000, 1)}
+    if "gesture" in features:
+        result["hands"] = hands
     if "face_recognition" in features:
         try:                                 # the value actually used: the custom one, else the weights' own
             result["threshold"] = threshold if threshold is not None else float(load_infer("face_recognition").threshold())

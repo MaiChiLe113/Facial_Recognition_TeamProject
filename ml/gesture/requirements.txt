@@ -1,0 +1,16 @@
+# Gesture detection: training (gesture_training.ipynb) and infer.py. For GPU training install torch from https://pytorch.org (CUDA build).
+#
+# mediapipe itself depends on opencv-contrib-python, a second OpenCV package next to the team's opencv-python (root
+# requirements.txt: "one OpenCV package only"). Both provide cv2, and mediapipe works with opencv-python, so install it
+# without its dependencies and add the ones it needs here:
+#   pip install --no-deps mediapipe==1.2.3
+#   pip install -r ml/gesture/requirements.txt
+absl-py
+flatbuffers>=2.0
+sounddevice>=0.4.4
+torch>=2.2
+numpy>=1.26
+pandas>=2.0
+pyarrow>=14          # reads the HaGRID annotations .parquet
+scikit-learn>=1.4
+matplotlib>=3.8
