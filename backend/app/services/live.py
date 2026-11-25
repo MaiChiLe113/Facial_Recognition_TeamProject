@@ -115,9 +115,36 @@ def _vote_names(cam, faces, now):
         f["student_id"] = top
 
 
+_projection = {}
+
+
+def _to_map(cam_id, box, width, height):
+    """Map position (fractions of the Room 204 map) of a person box in pixels, from the calibrated floor homographies
+    (ml/presence_verification/trajectories.to_map, the same projection as the recorded trails), or None when the
+    camera has no homography, the feet are not visible, or the module cannot load."""
+    if "to_map" not in _projection:
+        try:
+            import sys
+            from ..config import REPO_DIR
+            folder = str(REPO_DIR / "ml" / "presence_verification")
+            if folder not in sys.path:
+                sys.path.insert(0, folder)
+            from trajectories import to_map            # noqa: E402 (ml/ module, imported by path)
+            _projection["to_map"] = to_map
+        except Exception:  # noqa: BLE001 - no map positions, the rest of live mode still works
+            _projection["to_map"] = None
+    to_map = _projection["to_map"]
+    if to_map is None:
+        return None
+    x, y, w, h = box
+    xy = to_map(cam_id, [x / width, y / height, w / width, h / height])
+    return [round(xy[0], 4), round(xy[1], 4)] if xy else None
+
+
 def _draw(img, ctx, names):
     """Boxes and labels on the frame. Returns the JSON summary of what was found."""
     import cv2
+    height, width = img.shape[:2]
     people, faces = [], []
     for tr in ctx.tracks:
         x, y, w, h = (int(v) for v in tr["box"])
@@ -125,7 +152,7 @@ def _draw(img, ctx, names):
         color = _COLORS[tid % len(_COLORS)] if tid is not None else _UNKNOWN
         cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
         _label(img, x, y, f"ID {tid}", color)
-        people.append({"id": tid, "box": [x, y, w, h]})
+        people.append({"id": tid, "box": [x, y, w, h], "map": _to_map(ctx.cam_id, (x, y, w, h), width, height)})
     for f in ctx.faces:
         x, y, w, h = (int(v) for v in f["box"])
         name = names.get(f.get("student_id")) if f.get("student_id") else None

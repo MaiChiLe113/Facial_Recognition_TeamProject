@@ -244,7 +244,6 @@ function lines(f) {
       <h1>Features demo</h1>
       <div class="topbar-right">
         <span v-if="latency != null" class="muted">{{ latency }} ms / frame</span>
-        <span v-if="!backendUp" class="badge">Backend offline</span>
       </div>
     </header>
 

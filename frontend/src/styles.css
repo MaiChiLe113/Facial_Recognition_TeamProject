@@ -125,7 +125,10 @@ td { padding: 10px var(--space-4); border-top: 1px solid var(--line); vertical-a
   padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); margin-bottom: var(--space-3); }
 .roster thead { background: var(--green-soft); }
 .student { display: flex; align-items: center; gap: 10px; }
-.student strong { display: block; font-weight: 600; }
+.student strong { display: block; font-weight: 600; white-space: nowrap; }
+/* Wide tables (class roster, recorded takes) scroll sideways inside their card on narrow screens. */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.table-scroll > table { min-width: 640px; }
 .avatar { width: 38px; height: 38px; border-radius: 8px; background: var(--line); display: grid; place-content: center; font-weight: 600; font-size: 13px; flex: none; }
 .tag { display: inline-block; font-size: 11px; color: var(--warning-text); background: var(--yellow-soft); border-radius: 4px; padding: 1px 6px; margin-top: 2px; }
 /* Roster status capsule: green = checked in / in class, amber = left, red = not seen. */
@@ -182,6 +185,11 @@ td { padding: 10px var(--space-4); border-top: 1px solid var(--line); vertical-a
 .input { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 8px 12px; min-height: 36px; font: inherit; font-size: 14px; color: inherit; min-width: 0; }
 .input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent-strong); }
 .input.compact { padding: 6px 10px; width: auto; }
+/* Drop-downs: our own chevron, inset from the edge (the native arrow sat on the border, next to the button beside it). */
+select.input { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b6b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; }
+select.input.compact { padding-right: 30px; }
 .actions { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; padding-top: var(--space-2); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 a.btn { color: inherit; text-decoration: none; }
