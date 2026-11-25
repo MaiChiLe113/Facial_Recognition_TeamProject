@@ -63,14 +63,14 @@ Live mode calls `process_frame` for every frame a phone sends over `/ws/camera/{
 
 ## When someone replaces a model's `.pt` file
 
-Applies to `ml/face_recognition/face_recognition.pt`, `ml/anti_spoofing/anti_spoofing.pt`, `ml/emotion/emotion.pt` (or the `HAWKEYE_<FEATURE>_WEIGHTS` override). Weights are never committed (see `.gitignore`); teammates copy the file in by hand.
+Applies to `ml/face_recognition/face_recognition.pt`, `ml/anti_spoofing/anti_spoofing.pt`, `ml/emotion/emotion.pt`, `ml/gesture/gesture.pt` (or the `HAWKEYE_<FEATURE>_WEIGHTS` override). Weights are never committed (see `.gitignore`); teammates copy the file in by hand.
 
 What the app does by itself:
 - **Threshold:** face recognition and anti-spoofing keep their decision threshold *inside* the `.pt` (chosen on validation data: ROC / EER). Nothing in the app hard-codes it. The Features demo page shows it as "Model default" (from `GET /api/features-demo/status`, field `threshold`) and logs the value actually used in the CSV (`threshold`, `liveness_threshold`).
 - **Face gallery cache:** `data/raw/face_embeddings.npz` is rebuilt automatically when the face recognition `.pt` changes (the cache key is the file size + modified time, see `services/gallery.py`). The first request afterwards re-embeds every enrolment photo, so expect a delay once.
 
 What a person or agent must do:
-1. **Keep the contract of `infer.py`.** The app calls `face_recognition.infer.identify()` / `threshold()`, `anti_spoofing.infer.check()` (and reads `infer._load()["threshold"]`, because it has no public accessor), `emotion.infer.predict()` / `reset()`. If the new model needs a different input size, normalisation or crop margin, change it inside `infer.py` or the checkpoint, and update `MARGIN` in `backend/app/core/ml_models.py` if it must change.
+1. **Keep the contract of `infer.py`.** The app calls `face_recognition.infer.identify()` / `threshold()`, `anti_spoofing.infer.check()` (and reads `infer._load()["threshold"]`, because it has no public accessor), `emotion.infer.predict()` / `reset()`, `gesture.infer.predict()` (whole frame -> list of hands). If the new model needs a different input size, normalisation or crop margin, change it inside `infer.py` or the checkpoint, and update `MARGIN` in `backend/app/core/ml_models.py` if it must change.
 2. **Store the threshold in the checkpoint** (`payload["threshold"]` for recognition, `ckpt["threshold"]` for anti-spoofing). Choose it on the DEV/validation split, never on the evaluation split. A checkpoint without it breaks loading.
 3. **Tell users to press Reset on the threshold sliders.** A custom threshold is stored in each browser (`localStorage` keys `hawkeye.faceThreshold`, `hawkeye.livenessThreshold`) and survives a model change, but it was tuned for the *old* model. A custom value that suited the old model can be wrong for the new one.
 4. **Check on the Features demo page** (`/features-demo`): the feature shows no "weights missing" tag, "Model default" is the number you expect, and a known student is named while a stranger shows "Unknown". For anti-spoofing, also try a printed photo and a phone screen, not only a real face.

@@ -16,16 +16,20 @@ const FEATURES = [
   { key: 'anti_spoofing', label: 'Anti-spoofing', hint: 'Real face or a printed photo / phone screen?' },
   { key: 'emotion', label: 'Emotion', hint: 'Facial expression of each face.' },
   { key: 'glasses_detection', label: 'Glasses detection', hint: 'Check for glasses on each detected face.' },
+  { key: 'gesture', label: 'Gesture', hint: 'Hand gesture of each hand (👍 ✌️ ✋ ✊ ☝️ 👌 …).' },
 ]
 const ICONS = { angry: '😠', disgust: '🤢', fear: '😨', happy: '😄', sad: '😢', surprise: '😮', neutral: '😐' }
+const HAND_ICONS = { like: '👍', dislike: '👎', peace: '✌️', peace_inverted: '✌️', palm: '✋', stop: '✋', stop_inverted: '✋', fist: '✊',
+  one: '☝️', ok: '👌', call: '🤙', rock: '🤘', mute: '🤫', four: '🖐️', three: '🤟', three2: '🤟', two_up: '✌️', two_up_inverted: '✌️', no_gesture: '🖐️' }
 
-const selected = ref({ face_recognition: true, anti_spoofing: true, emotion: true, glasses_detection: false })
+const selected = ref({ face_recognition: true, anti_spoofing: true, emotion: true, glasses_detection: false, gesture: false })
 const status = ref({})             // feature -> { found, code, error, expected_file }
 const backendUp = ref(true)
 const video = ref(null)
 const camOn = ref(false)
 const camError = ref('')
 const faces = ref([])
+const hands = ref([])              // gesture: one { label, score, box } per hand
 const errors = ref({})
 const latency = ref(null)
 const saveLog = ref(false)         // save the session to logs/*.csv when the camera turns off
@@ -134,6 +138,7 @@ async function stopCamera() {
   stream = null
   camOn.value = false
   faces.value = []
+  hands.value = []
   errors.value = {}
   latency.value = null
   if (!wasOn) return
@@ -174,6 +179,7 @@ async function tick() {
     if (run !== cameraRun) return                // the camera was turned off (or on again) while waiting: drop it
     backendUp.value = !r.offline
     faces.value = r.faces || []
+    hands.value = r.hands || []
     errors.value = r.errors || {}
     latency.value = r.ms ?? null
     if (camOn.value && r.log_rows) sessionRows.value.push(...r.log_rows)
@@ -185,6 +191,7 @@ async function tick() {
 function toggle(key) {
   selected.value[key] = !selected.value[key]
   if (!chosen.value.length) faces.value = []
+  if (!selected.value.gesture) hands.value = []
 }
 
 // ---- drawing ----
@@ -263,11 +270,17 @@ function lines(f) {
             <div v-for="(f, i) in faces" :key="i" class="fd-box" :class="tone(f)" :style="boxStyle(f)">
               <span v-if="nameTag(f)" class="fd-name" :class="nameTag(f).cls">{{ nameTag(f).text }}</span>
             </div>
+            <div v-for="(h, i) in hands" :key="'h' + i" class="fd-box hand" :style="boxStyle(h)">
+              <span class="fd-name hand">{{ HAND_ICONS[h.label] ?? '' }} {{ h.label }}</span>
+            </div>
           </div>
           <ul v-for="(f, i) in faces" :key="'t' + i" class="checks fd-lines">
             <li v-for="(l, j) in lines(f)" :key="j" :class="l.cls">{{ faces.length > 1 ? `Face ${i + 1}: ` : '' }}{{ l.text }}</li>
           </ul>
-          <p v-if="camOn && !faces.length && chosen.length" class="empty">No face found. Face the camera in good light.</p>
+          <ul v-if="hands.length" class="checks fd-lines">
+            <li v-for="(h, i) in hands" :key="i" class="ok">Hand {{ i + 1 }}: {{ HAND_ICONS[h.label] ?? '' }} {{ h.label }}{{ pct(h.score) }}</li>
+          </ul>
+          <p v-if="camOn && !faces.length && chosen.some((k) => k !== 'gesture')" class="empty">No face found. Face the camera in good light.</p>
           <p v-if="camOn && !chosen.length" class="empty">Select at least one feature.</p>
           <p v-for="(msg, key) in errors" :key="key" class="error">{{ key }}: {{ msg }}</p>
         </section>
@@ -398,6 +411,8 @@ function lines(f) {
 .fd-name.known { background: var(--green); }
 .fd-name.unknown { background: var(--danger); }
 .fd-name.wait { background: var(--muted); }
+.fd-box.hand { border-color: #f0a020; }
+.fd-name.hand { background: #f0a020; }
 .fd-lines { padding: 0; margin: 10px 0 0; }
 .fd-log { max-height: 340px; overflow: auto; }
 .fd-log table { width: 100%; border-collapse: collapse; font-size: 13px; }

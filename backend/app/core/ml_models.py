@@ -19,7 +19,7 @@ from ..config import REPO_DIR
 
 ML_DIR = REPO_DIR / "ml"
 FEATURES = ("face_recognition", "anti_spoofing", "emotion")
-DEMO_FEATURES = (*FEATURES, "glasses_detection")
+DEMO_FEATURES = (*FEATURES, "glasses_detection", "gesture")
 
 # Margin around a detected face box, per model, as a fraction of the box size on each side.
 # anti_spoofing was trained on crops with 25 % (ml/anti_spoofing/try_liveness.py); emotion scores the same on the raw box.

@@ -15,7 +15,7 @@ All work goes on **`feature/backend-structure`**. Don't create other branches, m
   - Room map (`RoomMap.vue`, layout from FigJam in `roomLayout.js`): one object per person (P1, P2…), not per camera: presence-verification trails with the same name are merged across cam_1 / cam_2 (points within 0.4 s averaged); unnamed tracks stay separate until the matcher gives cross-camera IDs. Dot hidden 2 s after the person's last point; legend shows colour, P-number, name, merged camera tracks; red ring = alert.
 - Home **Class roster** status comes from the cameras (`rosterStatus.js`), demo only, never saved to the DB: everyone starts Not seen; check-in = the attendance camera recognised them (Recorded: track `name_from` up to the playback position; Live: a live, named face in `GET /api/live`); In class / Left / entry / exit / duration from cam_2 (Recorded: named cam_2 tracks; Live: recognised on cam_2, Left after 30 s unseen). Live state is kept in the page until reload.
 - **History** (`/history`): past sessions, roster per session, editable Attended/Status (saved via PATCH).
-- **Features demo** (`/features-demo`): webcam → face recognition / anti-spoofing / emotion, threshold sliders (per browser, `localStorage`), session log optionally saved to `logs/features_demo_<time>.csv`.
+- **Features demo** (`/features-demo`): webcam → face recognition / anti-spoofing / emotion (+ extra ticks: glasses detection, hand gesture with orange hand boxes), threshold sliders (per browser, `localStorage`), session log optionally saved to `logs/features_demo_<time>.csv`.
 - **Add person** (`/add`): form + 1–20 photos → `POST /api/students`.
 - **Camera** (`/camera`, full screen, phones): sends JPEG frames over `WS /ws/camera/{cam_id}`.
 - **System log** (`/system`, gear icon under Features demo): each inference model's version label (`ml/model_versions.json`), last modified time, size, SHA-256, and the change history in `logs/model_changes.jsonl`.
@@ -35,6 +35,7 @@ All work goes on **`feature/backend-structure`**. Don't create other branches, m
 - Face recognition: triplet + cosine, threshold 0.5254 (in the checkpoint), holdout AUC 0.954.
 - Anti-spoofing: MobileNetV2, threshold 0.0239; not yet tried on printed photos / phone screens.
 - Emotion: ResNet-18 on FER2013 + AffectNet; FER2013 test acc 0.707, AffectNet 0.661.
+- Gesture (`ml/gesture/`): MediaPipe Hand Landmarker (pre-trained, `hand_landmarker.task`, finds the hand's 21 points) + our MLP on the normalised points, HaGRID 30k sample split by person: test acc 0.9745 (logistic regression 0.8805). `predict(frame)` -> one `{label, score, box}` per hand; in `DEMO_FEATURES`, result `hands` on `/api/features-demo/infer`. Not in the root `requirements.txt`: `mediapipe` depends on `opencv-contrib-python`, a second OpenCV; install with `pip install --no-deps mediapipe` plus the packages in `ml/gesture/requirements.txt`.
 - Presence verification + door audit (Đức Mạnh's innovation): `ml/presence_verification/` (README, PLAN, TEST, 19 unit tests).
 - Tracks precomputed for takes 1–8 in `data/tracks/take<N>/` (YOLO11n + ByteTrack, names by door handoff).
 
