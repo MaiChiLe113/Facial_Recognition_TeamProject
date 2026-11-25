@@ -42,6 +42,8 @@ const STATUS_CHOICES = Object.keys(STATUS).filter((k) => k !== 'placeholder')
         <span v-if="saveError" class="save-error">{{ saveError }} · </span>{{ enrolled }} enrolled · {{ inClass }} in class
       </span>
     </header>
+    <!-- Wide table: it scrolls sideways inside the card on narrow screens instead of spilling out of the page. -->
+    <div class="table-scroll">
     <table>
       <thead>
         <tr>
@@ -87,5 +89,6 @@ const STATUS_CHOICES = Object.keys(STATUS).filter((k) => k !== 'placeholder')
         </tr>
       </tbody>
     </table>
+    </div>
   </section>
 </template>

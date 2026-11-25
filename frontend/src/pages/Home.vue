@@ -6,19 +6,19 @@
 //   Recorded      one of the recorded takes played in sync, with its precomputed track boxes (/api/tracks), the take's
 //                 event log, presence verification + door audit and the map trails. (This was the MultiCam page, /demo,
 //                 which now redirects here: /?source=recorded&take=N.)
-// Class roster and room map are shown in both modes.
+// Class roster and room map are shown in both modes. In Live, the event log, the map trails and the roster only run
+// after Start (a session); before it they stay empty, and Stop freezes them.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { demoTakes, fetchDashboard, fetchDemoConfig, fetchLive, fetchPresence, fetchTracks, liveStreamUrl, removeLiveCamera } from '../api.js'
 import CameraCard from '../components/CameraCard.vue'
 import ClassRoster from '../components/ClassRoster.vue'
 import EventLog from '../components/EventLog.vue'
-import QrButton from '../components/QrButton.vue'
 import PresencePanel from '../components/PresencePanel.vue'
 import RoomMap from '../components/RoomMap.vue'
 import { useSyncedPlayback } from '../composables/useSyncedPlayback.js'
 import { clockOf, eventsFromTracks } from '../takeEvents.js'
-import { liveRoster, recordedRoster, updateLive } from '../rosterStatus.js'
+import { liveRoster, recordedRoster, resetLive, updateLive } from '../rosterStatus.js'
 
 const ORDER = ['cam_1', 'cam_2', 'attendance_cam']
 const POLL_MS = 1000
@@ -58,8 +58,88 @@ async function poll() {
   if (wasOffline && !r.offline) epoch.value = Date.now()
   wasOffline = r.offline
   live.value = r
-  updateLive(r)
+  if (started.value && !recorded.value) {
+    updateLive(r)
+    record(r)
+  }
   timer = setTimeout(poll, POLL_MS)
+}
+
+// ---------------- live session (Start / Stop) ----------------
+// Before Start nothing is recorded: the log, the map and the roster are empty. Start resets them; each poll then adds
+// events (connections, check-ins, spoofs, people appearing / leaving) and map points. Stop keeps what was recorded.
+const started = ref(false)
+const startedAt = ref(0)
+const sessionEvents = ref([])     // newest first, EventLog shape { t, time, event, source }
+const sessionTrails = ref({})     // "<cam>:<id>" -> { track_id, name, flagged, points: [[t, x, y]] }
+const clock = ref(0)              // seconds since Start (map time)
+const SPOOF_EVERY_MS = 5000, UNKNOWN_EVERY_MS = 10000, GONE_AFTER_MS = 3000, MAX_POINTS = 900
+let seen = {}                     // what the previous poll showed, to report changes once
+
+const hms = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+function logEvent(source, event, now = Date.now()) {
+  sessionEvents.value = [{ t: (now - startedAt.value) / 1000, time: hms(now), event, source }, ...sessionEvents.value]
+}
+
+function startSession() {
+  resetLive()
+  sessionEvents.value = []
+  sessionTrails.value = {}
+  seen = { connected: {}, people: {}, checkedIn: new Set(), inClass: new Set(), lastSpoof: {}, lastUnknown: 0 }
+  startedAt.value = Date.now()
+  clock.value = 0
+  started.value = true
+  logEvent('Hawkeye', 'Session started')
+  if (live.value) record(live.value)
+}
+function stopSession() {
+  started.value = false
+  logEvent('Hawkeye', 'Session stopped')
+}
+
+function record(r) {
+  const now = Date.now()
+  clock.value = (now - startedAt.value) / 1000
+  for (const c of r.cameras ?? []) {
+    if (!!seen.connected[c.cam_id] !== c.connected) logEvent(c.cam_id, c.connected ? 'Camera connected' : 'Camera disconnected', now)
+    seen.connected[c.cam_id] = c.connected
+    const last = (seen.people[c.cam_id] ??= new Map())     // id -> when it was last seen
+    if (c.connected) {
+      for (const p of c.people ?? []) {
+        if (!last.has(p.id)) logEvent(c.cam_id, `ID ${p.id} appeared`, now)
+        last.set(p.id, now)
+      }
+    }
+    // A person missing from one poll is usually a missed detection: report "left" only after GONE_AFTER_MS.
+    for (const [id, t] of last) {
+      if (now - t > GONE_AFTER_MS) { logEvent(c.cam_id, `ID ${id} left the view`, now); last.delete(id) }
+    }
+    if (!c.connected) continue
+
+    for (const f of c.faces ?? []) {
+      if (f.live === false) {
+        if (now - (seen.lastSpoof[c.cam_id] ?? 0) > SPOOF_EVERY_MS) logEvent(c.cam_id, 'Spoof detected', now)
+        seen.lastSpoof[c.cam_id] = now
+      } else if (f.name && c.cam_id === 'attendance_cam' && !seen.checkedIn.has(f.student_id)) {
+        seen.checkedIn.add(f.student_id)
+        logEvent(c.cam_id, `${f.name} checked in`, now)
+      } else if (f.name && c.cam_id === 'cam_2' && !seen.inClass.has(f.student_id)) {
+        seen.inClass.add(f.student_id)
+        logEvent(c.cam_id, `${f.name} seen in class`, now)
+      } else if (!f.name && c.cam_id === 'attendance_cam' && now - seen.lastUnknown > UNKNOWN_EVERY_MS) {
+        seen.lastUnknown = now
+        logEvent(c.cam_id, 'Unknown face at the door', now)
+      }
+    }
+
+    for (const p of c.people ?? []) {
+      if (!p.map) continue
+      const key = `${c.cam_id}:${p.id}`
+      const tr = (sessionTrails.value[key] ??= { track_id: key, name: null, flagged: false, points: [] })
+      tr.points.push([clock.value, p.map[0], p.map[1]])
+      if (tr.points.length > MAX_POINTS) tr.points.shift()
+    }
+  }
 }
 const liveOf = (camId) => live.value?.cameras.find((c) => c.cam_id === camId) ?? null
 // Remove a live camera (also while its device is still sending), then refresh at once so the tile goes idle.
@@ -68,7 +148,6 @@ async function removeCam(camId) {
   await poll()
 }
 const streamOf = (camId) => (liveOf(camId)?.connected ? `${liveStreamUrl(camId)}?e=${epoch.value}` : undefined)
-const senderUrl = computed(() => live.value?.host_urls?.[0] ?? 'https://<this computer\'s IP>:5173/camera')
 const connected = computed(() => live.value?.cameras.filter((c) => c.connected).length ?? 0)
 // Every camera runs face recognition, liveness and emotion (always on); only the doorway checks people in.
 const facesOf = (camId) => liveOf(camId)?.faces ?? []
@@ -143,7 +222,7 @@ const roster = computed(() => {
 
 // Map trails from presence verification, drawn up to the playback position while a video plays.
 const trails = computed(() => {
-  if (!recorded.value) return null
+  if (!recorded.value) return started.value || sessionEvents.value.length ? Object.values(sessionTrails.value) : null
   const all = presence.value?.trails ?? []
   // Nothing is drawn until the take plays; Restart and a new take start from an empty map (position 0).
   if (!hasVideo.value) return all.map((tr) => ({ ...tr, points: [] }))
@@ -175,39 +254,32 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 <template>
   <div v-if="!dash || !demo" class="loading">Loading Hawkeye…</div>
   <div v-else class="home">
-    <header class="topbar">
-      <h1>{{ dash.course.id }} · Room {{ dash.course.room }}
-        <span v-if="recorded" class="accent"> · Take {{ selected }}</span></h1>
-      <div class="topbar-right">
-        <QrButton :url="live?.host_urls?.[0]" />
-        <div class="source-switch" role="group" aria-label="Camera source">
-          <button class="btn" :class="{ active: !recorded }" :aria-pressed="!recorded" @click="setSource('live')">Live</button>
-          <button class="btn" :class="{ active: recorded }" :aria-pressed="recorded" @click="setSource('recorded')">Recorded</button>
-          <select v-if="recorded" class="input compact" aria-label="Recorded take" :value="selected"
-            @change="choose(Number($event.target.value))">
+    <!-- Same layout in both sources: source switch, the one main button, its extras, then the source's status. -->
+    <!-- Three columns: title | the Live / Recorded switch, fixed in the middle | that source's controls on the right.
+         The switch never moves when the source changes. -->
+    <header class="topbar home-bar">
+      <h1>{{ dash.course.id }} · Room {{ dash.course.room }}</h1>
+      <div class="segmented" role="tablist" aria-label="Camera source">
+        <button role="tab" :class="{ active: !recorded }" :aria-selected="!recorded" @click="setSource('live')">Live</button>
+        <button role="tab" :class="{ active: recorded }" :aria-selected="recorded" @click="setSource('recorded')">Recorded</button>
+      </div>
+      <div class="demo-controls bar-right">
+        <template v-if="recorded">
+          <!-- One button: loads and plays the take the first time, then pauses / resumes it. -->
+          <select class="input compact" aria-label="Recorded take" :value="selected" @change="choose(Number($event.target.value))">
             <option v-for="t in takes" :key="t.take" :value="t.take">Take {{ t.take }}</option>
           </select>
-        </div>
-        <div v-if="recorded" class="demo-controls">
-          <!-- One button: loads and plays the take the first time, then pauses / resumes it. -->
-          <button class="btn primary" @click="hasVideo ? togglePause() : playTake()">
-            {{ playing ? '❚❚ Pause' : `▶ Play take ${selected}` }}
-          </button>
-          <button v-if="hasVideo" class="btn" @click="restart">Restart</button>
-        </div>
+          <button class="btn" :disabled="!hasVideo" @click="restart">Restart</button>
+          <button class="btn primary" @click="hasVideo ? togglePause() : playTake()">{{ playing ? '❚❚ Pause' : '▶ Play' }}</button>
+        </template>
         <template v-else>
-          <span v-if="live?.offline" class="badge">Backend offline</span>
-          <span v-else-if="live" class="muted">{{ connected }} of {{ live.cameras.length }} cameras sending</span>
+          <span class="muted">{{ connected }} of {{ live?.cameras.length ?? 3 }} cameras sending<template v-if="started"> · since {{ hms(startedAt) }}</template></span>
+          <button class="btn primary" @click="started ? stopSession() : startSession()">{{ started ? '■ Stop' : '▶ Start' }}</button>
         </template>
       </div>
     </header>
 
     <div v-if="recorded && message" class="notice"><span>{{ message }}</span></div>
-    <div v-if="!recorded" class="notice">
-      <span>On a phone or laptop on the <b>same Wi-Fi</b>, open <strong>{{ senderUrl }}</strong> and pick a camera, or press
-        <strong>+</strong> on a tile to use this device. Or press <strong>QR</strong> and scan it. First time on a device: see the
-        <RouterLink to="/guide/lan">Wi-Fi demo guide</RouterLink>.</span>
-    </div>
 
     <div class="grid-top">
       <CameraCard v-for="cam in cameras" :key="cam.cam_id" :ref="(el) => { cards[cam.cam_id] = el }" :cam="cam"
@@ -218,7 +290,7 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
           <ul class="checks">
             <li v-if="cam.cam_id !== 'attendance_cam'" class="ok">{{ peopleOf(cam.cam_id).length === 1 ? '1 person' : `${peopleOf(cam.cam_id).length} people` }} tracked
               <span class="muted">· {{ liveOf(cam.cam_id).fps }} fps</span></li>
-            <li v-if="!facesOf(cam.cam_id).length" class="bad">No face in view</li>
+            <li v-if="cam.cam_id === 'attendance_cam' && !facesOf(cam.cam_id).length" class="bad">No face in view</li>
             <template v-for="(f, i) in facesOf(cam.cam_id)" :key="i">
               <li :class="f.live !== false && f.name ? 'ok' : 'bad'">
                 {{ faceText(f) }}<template v-if="f.live !== false && !f.name"> — <RouterLink to="/add">please register</RouterLink></template>
@@ -243,9 +315,10 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
     <!-- Event log and room map side by side under the playback line. -->
     <div class="grid-log-map">
       <EventLog v-if="recorded" class="demo-log" :events="takeEvents" :title="`Event log · take ${selected}`" />
-      <!-- Live: no live event feed yet, so the log starts blank (dash.events is mock data). -->
-      <EventLog v-else :events="[]" />
-      <RoomMap :map="dash.map" :room="dash.course.room" :trails="trails" :time="hasVideo ? position : undefined" />
+      <!-- Live: the session's events, recorded from the cameras between Start and Stop (empty before Start). -->
+      <EventLog v-else :events="sessionEvents" :title="started ? 'Event log · live' : 'Event log'" />
+      <RoomMap :map="dash.map" :room="dash.course.room" :trails="trails"
+        :time="recorded ? (hasVideo ? position : undefined) : clock" />
     </div>
 
     <ClassRoster :roster="roster" />
@@ -258,6 +331,7 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
           <h2>Recorded takes</h2>
           <span class="muted">{{ takes.length }} takes · click one, then Play</span>
         </header>
+        <div class="table-scroll">
         <table>
           <thead>
             <tr><th>Take</th><th>Length</th><th>Scenario</th><th>Files</th></tr>
@@ -273,7 +347,24 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
             </tr>
           </tbody>
         </table>
+        </div>
       </section>
     </template>
   </div>
 </template>
+
+<style scoped>
+.home-bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
+.home-bar h1 { justify-self: start; white-space: nowrap; }
+.bar-right { justify-self: end; justify-content: flex-end; }
+/* Segmented switch: grey track, the chosen source raised in white. */
+.segmented { display: inline-flex; background: #ecebe8; border-radius: 10px; padding: 3px; gap: 2px; }
+.segmented button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 14px; font-weight: 500;
+  padding: 6px 18px; border-radius: 8px; cursor: pointer; transition: background .15s, color .15s; }
+.segmented button:hover { color: var(--text); }
+.segmented button.active { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+@media (max-width: 820px) {
+  .home-bar { grid-template-columns: 1fr; justify-items: start; }
+  .bar-right { justify-self: start; }
+}
+</style>
