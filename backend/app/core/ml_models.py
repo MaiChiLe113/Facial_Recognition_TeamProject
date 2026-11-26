@@ -23,7 +23,8 @@ DEMO_FEATURES = (*FEATURES, "glasses_detection", "gesture")
 
 # Margin around a detected face box, per model, as a fraction of the box size on each side.
 # anti_spoofing was trained on crops with 25 % (ml/anti_spoofing/try_liveness.py); emotion scores the same on the raw box.
-MARGIN = {"face_recognition": 0.1, "anti_spoofing": 0.25, "emotion": 0.0, "glasses_detection": 0.1}
+MARGIN = {"face_recognition": 0.1, "anti_spoofing": 0.25, "emotion": 0.0, "glasses_detection": 0.1, "face_quality": 0.1}
+ENROL_FEATURES = ("face_quality",)   # used by the Add person face scan (app/services/enrol.py), not the Features demo
 
 _modules = {}
 
@@ -43,8 +44,8 @@ def crop_face(image, box, feature):
 
 
 def _check(feature):
-    if feature not in DEMO_FEATURES:
-        raise KeyError(f"Unknown feature '{feature}'. Known: {', '.join(DEMO_FEATURES)}")
+    if feature not in DEMO_FEATURES and feature not in ENROL_FEATURES:
+        raise KeyError(f"Unknown feature '{feature}'. Known: {', '.join((*DEMO_FEATURES, *ENROL_FEATURES))}")
 
 
 def weights_file(feature):

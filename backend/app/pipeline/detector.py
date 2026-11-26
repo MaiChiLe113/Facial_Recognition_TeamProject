@@ -102,6 +102,12 @@ def detect_people(frame, conf=PERSON_CONF):
 
 def detect_faces(frame, conf=FACE_CONF, min_size=MIN_FACE_PX):
     """Return [(x, y, w, h, score), ...] in pixels for every face in the frame, largest first."""
+    return [f[:5] for f in detect_faces_landmarks(frame, conf, min_size)]
+
+
+def detect_faces_landmarks(frame, conf=FACE_CONF, min_size=MIN_FACE_PX):
+    """Like detect_faces, plus YuNet's 5 landmarks: [(x, y, w, h, score, [(x, y) * 5]), ...] in pixels, largest
+    first. Landmark order: right eye, left eye, nose tip, right mouth corner, left mouth corner (subject's sides)."""
     if frame is None or getattr(frame, "size", 0) == 0:
         return []
     import cv2
@@ -123,5 +129,6 @@ def detect_faces(frame, conf=FACE_CONF, min_size=MIN_FACE_PX):
         x, y, w, h = (float(v) / scale for v in row[:4])
         x, y, w, h = _clip(x, y, w, h, width, height)
         if min(w, h) >= min_size:
-            faces.append((x, y, w, h, float(row[-1])))
+            marks = [(float(row[4 + 2 * i]) / scale, float(row[5 + 2 * i]) / scale) for i in range(5)]
+            faces.append((x, y, w, h, float(row[-1]), marks))
     return sorted(faces, key=lambda f: f[2] * f[3], reverse=True)

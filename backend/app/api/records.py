@@ -24,9 +24,14 @@ def students():
 
 @router.post("/api/students", status_code=201)
 def create_student(name: str = Form(...), student_id_vn: str = Form(...), student_id_au: str = Form(""),
-                   year: str = Form(""), courses: str = Form("[]"), photos: list[UploadFile] = File(...)):
-    """Register a student from the Add person page: details + face photos (multipart form).
-    Photos go to data/photos/<student_id_vn>/; the face gallery reloads so the student is recognised right away."""
+                   year: str = Form(""), courses: str = Form("[]"), photos: Optional[list[UploadFile]] = File(None),
+                   enrol_session: str = Form("")):
+    """Register a student from the Add person page: details + face photos (multipart form), or, instead of photos,
+    enrol_session = the id of a finished AI face scan (POST /api/enrol/..., app/services/enrol.py).
+    Photos go to data/photos/<student_id_vn>/ (a scan also writes scan.json there); the face gallery reloads so the
+    student is recognised right away."""
+    from ..services import enrol
+    photos = photos or []
     sid, name, au = student_id_vn.strip().upper(), name.strip(), student_id_au.strip()
     if not name:
         raise HTTPException(422, "name is empty")
@@ -40,7 +45,17 @@ def create_student(name: str = Form(...), student_id_vn: str = Form(...), studen
             raise ValueError
     except ValueError:
         raise HTTPException(422, "courses must be a JSON list of course keys, e.g. [1, 2]")
-    if not 1 <= len(photos) <= MAX_PHOTOS:
+    scan = None
+    if enrol_session:
+        if photos:
+            raise HTTPException(422, "send photos or enrol_session, not both")
+        try:
+            scan = enrol.get(enrol_session.strip())
+        except KeyError:
+            raise HTTPException(404, "scan session not found or expired; scan the face again") from None
+        if not any(scan["slots"].values()):
+            raise HTTPException(422, "the scan has no accepted face photos yet")
+    elif not 1 <= len(photos) <= MAX_PHOTOS:
         raise HTTPException(422, f"send 1 to {MAX_PHOTOS} photos")
     for p in photos:
         if Path(p.filename or "").suffix.lower() not in IMAGE_EXT:
@@ -53,6 +68,8 @@ def create_student(name: str = Form(...), student_id_vn: str = Form(...), studen
         shutil.rmtree(folder)       # left over from an earlier failed registration
     folder.mkdir(parents=True)
     try:
+        if scan is not None:
+            enrol.save(scan, folder)
         for i, p in enumerate(photos, 1):
             data = p.file.read(MAX_PHOTO_BYTES + 1)
             if len(data) > MAX_PHOTO_BYTES:
@@ -68,6 +85,8 @@ def create_student(name: str = Form(...), student_id_vn: str = Form(...), studen
             raise HTTPException(422, str(e)) from e
         raise
 
+    if scan is not None:
+        enrol.drop(scan["id"])
     from ..services import gallery
     gallery.roster_changed()                       # the new student is recognised once the photos are embedded
     return saved
