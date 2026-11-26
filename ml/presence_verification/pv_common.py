@@ -26,9 +26,13 @@ def room_map():
 
 
 @lru_cache(maxsize=None)
-def homography(cam_id):
-    """3x3 image-pixel -> map-fraction homography of cam_1 / cam_2."""
-    path = DATA / "calibration" / f"{cam_id}_homography.json"
+def homography(cam_id, live=False):
+    """3x3 image-pixel -> map-fraction homography of cam_1 / cam_2.
+    live=True: the current camera pose (<cam>_homography_live.json, falls back to the recorded one);
+    otherwise the pose of the recorded takes (<cam>_homography.json)."""
+    path = DATA / "calibration" / f"{cam_id}_homography_live.json"
+    if not (live and path.is_file()):
+        path = DATA / "calibration" / f"{cam_id}_homography.json"
     return np.array(json.loads(path.read_text(encoding="utf-8"))["H"], dtype=float)
 
 

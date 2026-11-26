@@ -23,7 +23,8 @@ data/
   ground_truth/     who appears when, per take (take1.csv, take3.csv), for evaluation
   calibration/      first frames, Room 204 floor map, camera -> map homographies
   eval/             experiment results (tracking_baseline.csv)
-ml/                 training code per model; ml/tracking/ = detection, tracking, naming (see its README)
+ml/                 training code per model; ml/tracking/ = detection, tracking, naming (see its README);
+                    ml/aruco/ = floor calibration from ArUco markers
 ```
 
 ## Run it

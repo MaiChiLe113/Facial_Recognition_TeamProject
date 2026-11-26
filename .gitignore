@@ -54,3 +54,6 @@ data/photos/
 
 # mkcert certificate for the Wi-Fi demo (docs/LAN_DEMO.md); the key is private
 frontend/certs/
+
+# backups written by ml/aruco/apply_calibration.py and calibrate_homography.py
+data/calibration/*.bak
