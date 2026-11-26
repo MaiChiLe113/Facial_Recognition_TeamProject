@@ -48,6 +48,17 @@ def discard(sid: str):
     enrol.drop(sid)
 
 
+@router.post("/session/{sid}/fail")
+def fail(sid: str, reason: str = Form(...), attempts: int = Form(3), reasons: str = Form("{}")):
+    import json
+    try:
+        counts = json.loads(reasons)
+    except ValueError:
+        counts = {}
+    enrol.fail(_session(sid), reason, attempts, counts if isinstance(counts, dict) else {})
+    return enrol.summary(_session(sid))
+
+
 @router.get("/session/{sid}/still/{slot}/{index}")
 def still(sid: str, slot: str, index: int):
     s = _session(sid)

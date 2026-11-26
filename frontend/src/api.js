@@ -178,6 +178,14 @@ export async function fetchScan(sessionId) {
   try { return await getJson(`/api/enrol/session/${sessionId}`) } catch (e) { return { error: String(e) } }
 }
 
+export function failScan(sessionId, reason, attempts, reasons) {
+  const form = new FormData()
+  form.append('reason', reason)
+  form.append('attempts', String(attempts))
+  form.append('reasons', JSON.stringify(reasons || {}))
+  return scanCall(`/api/enrol/session/${sessionId}/fail`, form)
+}
+
 export function discardScan(sessionId) {
   return fetch(`/api/enrol/session/${sessionId}`, { method: 'DELETE' }).catch(() => null)
 }

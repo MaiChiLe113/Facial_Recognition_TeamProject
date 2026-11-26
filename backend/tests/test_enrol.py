@@ -111,7 +111,15 @@ class Analyse(unittest.TestCase):
             self.f.faces = [face(yaw)]
             enrol.analyse(self.s, frame(), final=True)
         self.assertEqual(enrol.missing_slots(self.s)[0], "left")
-        self.assertEqual(enrol.analyse(self.s, frame())["hint"], "turn your head to your left")
+        self.assertEqual(enrol.analyse(self.s, frame())["hint"], "left side: turn your head to your left a bit more")
+
+    def test_overshoot_says_turn_back_not_other_side(self):
+        self.assertEqual(enrol._hint(["left"], 60, 0), "left side: a little less, turn back slightly")
+        self.assertEqual(enrol._hint(["right"], -60, 0), "right side: a little less, turn back slightly")
+        self.assertEqual(enrol._hint(["left"], 8, 0), "left side: turn your head to your left a bit more")
+        self.assertEqual(enrol._hint(["right"], 20, 0), "right side: turn your head to your right")
+        self.assertEqual(enrol._hint(["up"], 0, -50), "chin up: a little less")
+        self.assertEqual(enrol._hint(["down"], 0, 0), "chin down: tilt your chin down")
 
     def test_fills_all_slots(self):
         poses = {"front": (0, 0), "left": (25, 0), "right": (-25, 0), "up": (0, -20), "down": (0, 20)}
@@ -142,6 +150,17 @@ class Api(unittest.TestCase):
 
     def jpeg(self):
         return cv2.imencode(".jpg", frame())[1].tobytes()
+
+    def test_failed_scan_is_marked_and_logged(self):
+        sid = self.client.post("/api/enrol/session").json()["session_id"]
+        with patch.object(enrol, "FAIL_LOG", Path(self.tmp.name) / "logs" / "enrol_failures.jsonl"):
+            r = self.client.post(f"/api/enrol/session/{sid}/fail",
+                                 data={"reason": "no_face", "attempts": "3", "reasons": '{"no_face": 40}'})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["failed"]["reason"], "no_face")
+        self.assertEqual(r.json()["failed"]["attempts"], 3)
+        line = json.loads((Path(self.tmp.name) / "logs" / "enrol_failures.jsonl").read_text(encoding="utf-8"))
+        self.assertEqual((line["session_id"], line["reasons"]), (sid, {"no_face": 40}))
 
     def test_scan_then_register(self):
         sid = self.client.post("/api/enrol/session").json()["session_id"]

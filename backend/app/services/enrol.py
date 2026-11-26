@@ -39,6 +39,7 @@ SECOND_FACE_RATIO = 0.5    # another face this big (vs the largest) refuses the 
 MIN_POSE_GAP = 4.0          # degrees: stills of one slot must differ this much in yaw or pitch (else the better one stays)
 LIVENESS_WINDOW = 10        # crops averaged for liveness
 SESSION_TTL = 30 * 60
+FAIL_LOG = None             # logs/enrol_failures.jsonl in the repo when None (tests point it elsewhere)
 VIDEO_FPS = 5.0
 VIDEO_MAX_S = 60
 VIDEO_MAX_BYTES = 300 * 2**20
@@ -109,19 +110,32 @@ def slot_for(yaw, pitch):
 
 
 def _hint(missing, yaw, pitch):
-    """Tell the person which way to move towards the first missing slot (their own left / right)."""
+    """Tell the person how to reach the first missing slot (their own left / right). Each hint names that slot, and
+    overshooting it says "a little less", so "turn back" is never mistaken for "now do the other side"."""
     if not missing:
         return "done"
-    (y0, y1), (p0, p1) = SLOTS[missing[0]]
-    if yaw < y0:
-        return "turn your head to your left"
-    if yaw > y1:
-        return "turn your head to your right"
-    if pitch < p0:
-        return "tilt your head down"
-    if pitch > p1:
-        return "tilt your head up"
-    return "hold still"
+    target = missing[0]
+    (y0, y1), (p0, p1) = SLOTS[target]
+    if target == "front":
+        return "look straight at the camera" if not (y0 <= yaw <= y1 and p0 <= pitch <= p1) else "hold still"
+    if target in ("left", "right"):
+        if not p0 <= pitch <= p1:
+            return f"{target} side: keep your chin level"
+        far = yaw > y1 if target == "left" else yaw < y0          # past the slot, away from the camera
+        if far:
+            return f"{target} side: a little less, turn back slightly"
+        if y0 <= yaw <= y1:
+            return "hold still"
+        return f"{target} side: turn your head to your {target}" + (" a bit more" if (yaw > 5 if target == "left" else yaw < -5) else "")
+    # up / down
+    if not y0 <= yaw <= y1:
+        return f"chin {target}: face the camera first"
+    far = pitch < p0 if target == "up" else pitch > p1
+    if far:
+        return f"chin {target}: a little less"
+    if p0 <= pitch <= p1:
+        return "hold still"
+    return f"chin {target}: tilt your chin {target}" + (" a bit more" if (pitch < -3 if target == "up" else pitch > 3) else "")
 
 
 # ---- sessions ---------------------------------------------------------------------------------------------
@@ -131,7 +145,7 @@ def new_session(source="live"):
     sid = uuid.uuid4().hex[:16]
     with _lock:
         _sessions[sid] = {"id": sid, "source": source, "created": time.time(), "slots": {k: [] for k in SLOTS},
-                          "crops": [], "liveness": None, "duplicate": None, "frames": 0}
+                          "crops": [], "liveness": None, "duplicate": None, "frames": 0, "failed": None}
     return sid
 
 
@@ -164,8 +178,30 @@ def summary(s):
     _, thr, model = quality_model()
     return {"session_id": s["id"], "source": s["source"], "model": model, "threshold": round(thr, 4),
             "per_slot": PER_SLOT, "missing": missing_slots(s), "done": not missing_slots(s),
-            "liveness": s["liveness"], "duplicate": s["duplicate"], "frames": s["frames"],
+            "liveness": s["liveness"], "duplicate": s["duplicate"], "frames": s["frames"], "failed": s.get("failed"),
             "slots": {k: [_public(e) for e in v] for k, v in s["slots"].items()}}
+
+
+def fail(s, reason, attempts, reasons=None):
+    """Mark the scan failed (the page gave up after `attempts` attempts) and append it to logs/enrol_failures.jsonl."""
+    import json
+    s["failed"] = {"reason": reason, "attempts": attempts, "reasons": reasons or {},
+                   "time": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    entry = {"session_id": s["id"], "source": s["source"], "frames": s["frames"],
+             "kept": sum(len(v) for v in s["slots"].values()), "missing": missing_slots(s), **s["failed"]}
+    log = FAIL_LOG or _repo_dir() / "logs" / "enrol_failures.jsonl"
+    try:
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError:
+        pass  # logging must not break the scan
+    return entry
+
+
+def _repo_dir():
+    from ..config import REPO_DIR
+    return REPO_DIR
 
 
 def _public(e):

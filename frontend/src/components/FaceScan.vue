@@ -5,11 +5,13 @@
 // frame is sent again with final=true and kept. Upload video: the backend samples the video and does the same.
 // Emits 'update' with the scan summary (session_id, missing, done, slots) so the form can submit enrol_session.
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
-import { discardScan, fetchScan, scanStillUrl, sendScanFrame, startScan, uploadScanVideo } from '../api.js'
+import { discardScan, failScan, fetchScan, scanStillUrl, sendScanFrame, startScan, uploadScanVideo } from '../api.js'
 
 const emit = defineEmits(['update'])
 const SLOT_LABEL = { front: 'Straight', left: 'Turn left', right: 'Turn right', up: 'Chin up', down: 'Chin down' }
-const PREVIEW_W = 640, PREVIEW_MS = 250, TIMEOUT_S = 60
+// No overall time limit: an attempt fails when no new photo is kept for ATTEMPT_S seconds (no face, too dark, not live…).
+// The scan retries automatically; after MAX_ATTEMPTS failed attempts it stops and the backend logs the failure.
+const PREVIEW_W = 640, PREVIEW_MS = 250, ATTEMPT_S = 10, MAX_ATTEMPTS = 3
 
 const mode = ref('live')              // 'live' | 'video'
 const summary = ref(null)
@@ -21,7 +23,9 @@ const elapsed = ref(0)
 const videoEl = ref(null)
 const fileInput = ref(null)
 const camInfo = ref('')
-let stream = null, timer = null, started = 0, inFlight = false
+const failedAttempts = ref(0)
+const failed = ref(null)              // { reason, attempts } once the scan gave up
+let stream = null, timer = null, inFlight = false, attemptStart = 0, keptAtStart = 0, reasonCounts = {}
 
 const sid = computed(() => summary.value?.session_id)
 const kept = computed(() => (summary.value ? Object.values(summary.value.slots).reduce((n, v) => n + v.length, 0) : 0))
@@ -44,6 +48,7 @@ async function startLive() {
     error.value = 'The camera needs HTTPS (or localhost). On a phone, open the app through the Wi-Fi demo link (docs/LAN_DEMO.md).'
     return
   }
+  if (failed.value) await restart()
   if (!(await ensureSession('live'))) return
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -58,7 +63,7 @@ async function startLive() {
   await videoEl.value.play().catch(() => {})
   const s = stream.getVideoTracks()[0].getSettings()
   camInfo.value = s.width ? `${s.width}×${s.height}` : ''
-  started = Date.now()
+  newAttempt()
   timer = setInterval(tick, PREVIEW_MS)
 }
 
@@ -78,9 +83,29 @@ function grab(maxW) {
   return new Promise((res) => c.toBlob(res, 'image/jpeg', maxW ? 0.8 : 0.95))
 }
 
+function newAttempt() { attemptStart = Date.now(); keptAtStart = kept.value; reasonCounts = {} }
+
+async function attemptFailed() {
+  const top = Object.entries(reasonCounts).filter(([k]) => k !== 'ok').sort((a, b) => b[1] - a[1])[0]
+  const reason = top ? top[0] : 'no_progress'
+  failedAttempts.value += 1
+  if (failedAttempts.value < MAX_ATTEMPTS) {
+    error.value = `Attempt ${failedAttempts.value} of ${MAX_ATTEMPTS} failed (${REASON_TEXT[reason] ?? reason}). Retrying…`
+    newAttempt()
+    return
+  }
+  stopLive()
+  failed.value = { reason, attempts: failedAttempts.value }
+  error.value = `Scan failed after ${MAX_ATTEMPTS} attempts: ${REASON_TEXT[reason] ?? reason}. Fix it and press Start again, or upload a video.`
+  const r = await failScan(sid.value, reason, failedAttempts.value, reasonCounts)
+  if (!r.error) setSummary(r)
+}
+
 async function tick() {
-  elapsed.value = Math.round((Date.now() - started) / 1000)
-  if (elapsed.value >= TIMEOUT_S || summary.value?.done) { stopLive(); return }
+  if (summary.value?.done) { stopLive(); return }
+  if (kept.value > keptAtStart) { newAttempt(); if (error.value.startsWith('Attempt')) error.value = '' }
+  elapsed.value = Math.round((Date.now() - attemptStart) / 1000)
+  if (elapsed.value >= ATTEMPT_S) { await attemptFailed(); return }
   if (inFlight) return
   inFlight = true
   try {
@@ -89,10 +114,11 @@ async function tick() {
     const r = await sendScanFrame(sid.value, blob)
     if (r.error) { error.value = r.error; if (r.status === 404) stopLive(); return }
     last.value = r
+    if (r.reason) reasonCounts[r.reason] = (reasonCounts[r.reason] || 0) + 1
     if (r.accepted && summary.value.missing.includes(r.slot)) {
       const full = await grab(0)                       // the full-resolution still for the gallery
       const k = full && (await sendScanFrame(sid.value, full, true))
-      if (k && !k.error) last.value = k
+      if (k && !k.error) last.value = { ...k, stillRejected: !k.kept }
     }
     const s = await fetchScan(sid.value)
     if (!s.error) setSummary(s)
@@ -119,7 +145,7 @@ async function onVideo(e) {
 async function restart() {
   stopLive()
   if (sid.value) discardScan(sid.value)
-  summary.value = null; last.value = null; error.value = ''
+  summary.value = null; last.value = null; error.value = ''; failed.value = null; failedAttempts.value = 0
   emit('update', null)
 }
 function switchMode(m) { if (m !== mode.value) { restart(); mode.value = m } }
@@ -132,8 +158,23 @@ const boxStyle = computed(() => {
   if (!b || !running.value) return null
   return { left: `${(1 - b[0] - b[2]) * 100}%`, top: `${b[1] * 100}%`, width: `${b[2] * 100}%`, height: `${b[3] * 100}%` }  // preview is mirrored
 })
+// Meter state: green = this frame is being kept, amber = quality passes but another check fails, red = quality too low
+const meterState = computed(() => {
+  const r = last.value
+  if (!r || r.quality == null) return 'low'
+  if (r.accepted && !r.stillRejected && (r.kept || summary.value?.missing.includes(r.slot))) return 'good'
+  return r.quality >= (summary.value?.threshold ?? 1) ? 'warn' : 'low'
+})
+const meterReason = computed(() => {
+  const r = last.value
+  if (!r || r.quality == null) return ''
+  if (meterState.value === 'good') return 'kept'
+  if (r.accepted && r.stillRejected) return 'still rejected (moved?)'
+  if (r.accepted) return r.kept === false && r.slot && summary.value?.missing.includes(r.slot) ? 'same view' : `${SLOT_LABEL[r.slot] ?? r.slot} slot full`
+  return REASON_TEXT[r.reason] ?? r.reason
+})
 const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several faces', too_small: 'too far',
-  too_dark: 'too dark', too_bright: 'too bright', not_live: 'not live', between_poses: 'between poses', low_quality: 'low quality' }
+  too_dark: 'too dark', too_bright: 'too bright', not_live: 'not live', between_poses: 'between poses', low_quality: 'low quality', no_progress: 'no new photo' }
 </script>
 
 <template>
@@ -149,14 +190,15 @@ const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several fa
         <div v-if="boxStyle" class="scan-box" :class="last?.accepted ? 'good' : 'bad'" :style="boxStyle" />
         <div class="scan-hint">{{ last?.hint ?? 'Look at the camera' }}</div>
         <div class="scan-meter" :title="`quality ${last?.quality ?? '—'} / threshold ${summary?.threshold}`">
-          <span :style="{ width: `${Math.round((last?.quality ?? 0) * 100)}%` }" :class="{ good: (last?.quality ?? 0) >= (summary?.threshold ?? 1) }" />
+          <span :style="{ width: `${Math.round((last?.quality ?? 0) * 100)}%` }" :class="meterState" />
           <i :style="{ left: `${(summary?.threshold ?? 0) * 100}%` }" />
+          <em v-if="meterReason" class="scan-reason" :class="meterState">{{ meterReason }}</em>
         </div>
       </div>
       <div class="drop-actions">
-        <button v-if="!running" class="btn primary" type="button" @click="startLive">{{ summary ? 'Continue scan' : 'Start face scan' }}</button>
+        <button v-if="!running" class="btn primary" type="button" @click="startLive">{{ failed ? 'Start again' : summary ? 'Continue scan' : 'Start face scan' }}</button>
         <button v-else class="btn" type="button" @click="stopLive">Pause</button>
-        <span v-if="running" class="muted small">{{ elapsed }} / {{ TIMEOUT_S }} s<template v-if="camInfo"> · camera {{ camInfo }}</template></span>
+        <span v-if="running" class="muted small">attempt {{ failedAttempts + 1 }}/{{ MAX_ATTEMPTS }} · {{ elapsed }} / {{ ATTEMPT_S }} s without a new photo<template v-if="camInfo"> · camera {{ camInfo }}</template></span>
       </div>
     </div>
 
@@ -207,8 +249,11 @@ const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several fa
 .scan-hint { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); background: rgba(0, 0, 0, .65); color: #fff;
   padding: 6px 14px; border-radius: 999px; font-weight: 600; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
 .scan-meter { position: absolute; left: 12px; right: 12px; bottom: 10px; height: 8px; background: rgba(255, 255, 255, .25); border-radius: 4px; }
-.scan-meter span { display: block; height: 100%; background: var(--amber); border-radius: 4px; transition: width .2s; }
+.scan-meter span { display: block; height: 100%; background: var(--danger); border-radius: 4px; transition: width .2s; }
+.scan-meter span.warn { background: var(--amber); }
 .scan-meter span.good { background: #6ad16a; }
+.scan-reason { position: absolute; right: 0; bottom: 12px; font-size: 12px; font-style: normal; font-weight: 600; color: #fff;
+  background: rgba(0, 0, 0, .55); padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
 .scan-meter i { position: absolute; top: -3px; width: 2px; height: 14px; background: #fff; }
 .scan-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-2); }
 .scan-slot { border: 1px solid var(--line); border-radius: 8px; padding: var(--space-2); }
