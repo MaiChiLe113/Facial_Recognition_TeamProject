@@ -87,6 +87,14 @@ against the gallery, and the page warns when the person already looks registered
 `data/photos/<student id>/` as before, with a `scan.json` that records the pose, quality, liveness and glasses of each
 photo plus the model versions and the threshold used.
 
+The quality model is given an **eye-aligned crop** (`infer.align_crop`) framed like the Kaggle training images:
+eyes level, eye distance 0.189 of the side, eye midpoint at (0.50, 0.43), measured with YuNet on 400 clean training
+crops. Those crops are loose (the YuNet box covers only about 42 % of the side), while the detector box with a 0.1
+margin covers about 83 %, and tighter crops score lower (on 27 webcam frames, median 0.66 at margin 0 vs 0.75 at 0.3).
+Switching to the aligned crop changed little in practice: median 0.712 → 0.719 on those frames, 11 % → 26 % above 0.78,
+and the same 78 % above 0.65. So the framing explains only part of the gap between the Kaggle images and the webcam;
+the rest needs retraining on in-domain crops.
+
 If `face_quality.pt` is missing, the scan falls back to the heuristic at 0.35.
 
 Smoke test (2026-11-26): a video made from Đức Mạnh's webcam photos, posted to `/api/enrol/video`, gave liveness

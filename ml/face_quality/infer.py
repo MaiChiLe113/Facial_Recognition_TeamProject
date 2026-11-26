@@ -7,6 +7,7 @@ Predicts how useful a face crop is to the team's recogniser (ml/face_recognition
 Weights: ml/face_quality/face_quality.pt (override with HAWKEYE_FACE_QUALITY_WEIGHTS).
 A face crop is an HxWx3 uint8 OpenCV array (BGR), cut like the recogniser's crops.
 
+    align_crop(image, marks) -> crop framed like the training images (use this for camera frames)
     score(face_crop)      -> float in [0, 1]
     score_batch(crops)    -> np.ndarray of floats
     threshold()           -> accept threshold (float), info() -> metadata of the weights
@@ -25,6 +26,29 @@ import numpy as np
 _DEFAULT_WEIGHTS = Path(__file__).resolve().parent / "face_quality.pt"
 INPUT_SIZE = 112
 MEAN, STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+
+# Framing of the Kaggle training crops, measured with YuNet on 400 clean crops (medians): the eye distance is 0.189 of
+# the crop side and the eye midpoint sits at (0.501, 0.428). The crops are loose (the YuNet box is only ~42 % of the
+# side), so a tight detector box scores lower than it should; align_crop reproduces the training framing.
+EYE_DIST, EYE_X, EYE_Y = 0.189, 0.501, 0.428
+ALIGN_SIZE = 128
+
+
+def align_crop(image, marks, size=ALIGN_SIZE):
+    """Rotate so the eyes are level and cut a square framed like the training crops.
+    marks: YuNet landmarks [(x, y) * 5] in image pixels (right eye, left eye, ...)."""
+    import cv2
+    (rx, ry), (lx, ly) = marks[0], marks[1]
+    ang = np.arctan2(ly - ry, lx - rx)
+    dist = float(np.hypot(lx - rx, ly - ry)) or 1.0
+    s = EYE_DIST * size / dist
+    cx, cy = (rx + lx) / 2, (ry + ly) / 2
+    c, si = s * np.cos(-ang), s * np.sin(-ang)
+    m = np.array([[c, -si, 0.0], [si, c, 0.0]])
+    m[:, 2] = (EYE_X * size, EYE_Y * size) - m[:, :2] @ (cx, cy)
+    return cv2.warpAffine(image, m, (size, size), flags=cv2.INTER_AREA if s < 1 else cv2.INTER_LINEAR,
+                          borderMode=cv2.BORDER_REPLICATE)
+
 
 _lock = threading.Lock()
 _state: dict = {}

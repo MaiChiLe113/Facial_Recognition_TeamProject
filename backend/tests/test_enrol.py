@@ -44,13 +44,16 @@ class Fakes:
     def __init__(self, test, quality=0.9, live=True):
         self.quality, self.live, self.faces = quality, live, [face()]
         infers = {"anti_spoofing": type("A", (), {"check": staticmethod(lambda crops: {"live": self.live, "score": 0.9 if self.live else 0.1})}),
+                  "face_quality": type("Q", (), {"align_crop": staticmethod(lambda img, marks: img[:128, :128])}),
                   "glasses_detection": type("G", (), {"predict": staticmethod(lambda c: {"glasses": False, "glasses_score": 0.1})}),
                   "face_recognition": type("R", (), {"identify": staticmethod(lambda c, g, t: (None, 0.2)),
                                                      "threshold": staticmethod(lambda: 0.69)})}
         for p in (patch.object(enrol, "_infer", lambda f: infers[f]),
                   patch.object(enrol, "quality_model", lambda: (lambda c: self.quality, 0.5, "face_quality")),
                   patch("app.pipeline.detector.detect_faces_landmarks", lambda *a, **k: self.faces),
-                  patch.object(gallery, "registered_faces", lambda: ({}, {}))):
+                  patch.object(gallery, "registered_faces", lambda: ({}, {})),
+                  patch.object(enrol, "CALIB_FRAMES", 0),
+                  patch.object(enrol, "DETECT_W", 10**6)):   # the fake detector answers in full-frame pixels
             p.start()
             test.addCleanup(p.stop)
 
@@ -68,7 +71,8 @@ class Pose(unittest.TestCase):
         self.assertEqual(enrol.slot_for(-25, 0), "right")
         self.assertEqual(enrol.slot_for(0, -20), "up")
         self.assertEqual(enrol.slot_for(0, 20), "down")
-        self.assertIsNone(enrol.slot_for(12, 0))           # between front and right
+        self.assertEqual(enrol.slot_for(13, 0), "left")      # no dead zone next to front
+        self.assertIsNone(enrol.slot_for(25, -30))         # turned and chin up at once: no slot
 
 
 class Analyse(unittest.TestCase):
@@ -94,7 +98,7 @@ class Analyse(unittest.TestCase):
     def test_refusals(self):
         cases = [("several_faces", dict(faces=[face(), face(size=200)])), ("no_face", dict(faces=[])),
                  ("too_small", dict(faces=[face(size=60)])), ("low_quality", dict(quality=0.2)),
-                 ("not_live", dict(live=False)), ("between_poses", dict(faces=[face(yaw=12)]))]
+                 ("not_live", dict(live=False)), ("between_poses", dict(faces=[face(yaw=25, pitch=-30)]))]
         for reason, over in cases:
             with self.subTest(reason):
                 s = enrol.get(enrol.new_session())
@@ -112,6 +116,20 @@ class Analyse(unittest.TestCase):
             enrol.analyse(self.s, frame(), final=True)
         self.assertEqual(enrol.missing_slots(self.s)[0], "left")
         self.assertEqual(enrol.analyse(self.s, frame())["hint"], "left side: turn your head to your left a bit more")
+
+    def test_calibrates_on_the_persons_own_straight_pose(self):
+        with patch.object(enrol, "CALIB_FRAMES", 3):
+            s = enrol.get(enrol.new_session())
+            self.f.faces = [face(0, 12)]              # this face reads 12 deg "down" when looking straight
+            for i in range(3):
+                r = enrol.analyse(s, frame(), final=True)
+                if i < 2:
+                    self.assertEqual(r["reason"], "calibrating")
+                    self.assertFalse(r["kept"])
+            self.assertEqual(r["slot"], "front")
+            self.assertTrue(r["kept"])
+            self.f.faces = [face(0, 32)]              # 20 deg further down than this person's straight
+            self.assertEqual(enrol.analyse(s, frame())["slot"], "down")
 
     def test_overshoot_says_turn_back_not_other_side(self):
         self.assertEqual(enrol._hint(["left"], 60, 0), "left side: a little less, turn back slightly")

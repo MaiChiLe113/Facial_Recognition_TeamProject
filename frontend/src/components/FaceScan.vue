@@ -169,12 +169,12 @@ const meterReason = computed(() => {
   const r = last.value
   if (!r || r.quality == null) return ''
   if (meterState.value === 'good') return 'kept'
-  if (r.accepted && r.stillRejected) return 'still rejected (moved?)'
+  if (r.stillRejected) return r.accepted ? 'same view: move slightly' : `still: ${REASON_TEXT[r.reason] ?? r.reason}`
   if (r.accepted) return r.kept === false && r.slot && summary.value?.missing.includes(r.slot) ? 'same view' : `${SLOT_LABEL[r.slot] ?? r.slot} slot full`
   return REASON_TEXT[r.reason] ?? r.reason
 })
 const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several faces', too_small: 'too far',
-  too_dark: 'too dark', too_bright: 'too bright', not_live: 'not live', between_poses: 'between poses', low_quality: 'low quality', no_progress: 'no new photo' }
+  too_dark: 'too dark', too_bright: 'too bright', not_live: 'not live', between_poses: 'between poses', low_quality: 'low quality', no_progress: 'no new photo', calibrating: 'calibrating: look straight', same_view: 'same view: move slightly' }
 </script>
 
 <template>

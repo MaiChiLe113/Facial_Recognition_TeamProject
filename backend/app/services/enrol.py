@@ -25,16 +25,21 @@ from datetime import datetime
 import numpy as np
 
 SLOTS = {   # name -> (yaw range, pitch range) in degrees, named from the PERSON's side (what the hints say):
-    "front": ((-10, 10), (-10, 10)),      # yaw > 0 = nose towards the image right = head turned to the person's left
-    "left": ((15, 45), (-15, 15)),        # pitch < 0 = chin up
-    "right": ((-45, -15), (-15, 15)),
-    "up": ((-12, 12), (-40, -8)),
-    "down": ((-12, 12), (8, 40)),
+    "front": ((-12, 12), (-10, 10)),      # yaw > 0 = nose towards the image right = head turned to the person's left
+    "left": ((12, 55), (-20, 20)),        # pitch < 0 = chin up
+    "right": ((-55, -12), (-20, 20)),     # ranges touch: no dead zone between front and the sides / up / down
+    "up": ((-12, 12), (-45, -10)),
+    "down": ((-12, 12), (10, 45)),
 }
+# The landmark pose is rough and its zero differs per face (pitch most), so each session first measures the person's
+# own "looking straight" pose and reports yaw / pitch relative to it.
+CALIB_FRAMES = 4            # frontal-looking frames averaged (median) for the baseline
+CALIB_MAX = (25, 30)        # |raw yaw|, |raw pitch| a frame may have to count as "looking straight"
 PER_SLOT = 3
 MIN_FACE_PX = 110           # face box height in the full-resolution still (phone / 1080p)
 MIN_FACE_PX_LOW = 80        # for a 720p (or smaller) camera
 BRIGHTNESS = (60, 200)      # mean grey level of the face crop
+DETECT_W = 640              # face detection width (the live preview size)
 SECOND_FACE_RATIO = 0.5    # another face this big (vs the largest) refuses the frame
 MIN_POSE_GAP = 4.0          # degrees: stills of one slot must differ this much in yaw or pitch (else the better one stays)
 LIVENESS_WINDOW = 10        # crops averaged for liveness
@@ -145,7 +150,8 @@ def new_session(source="live"):
     sid = uuid.uuid4().hex[:16]
     with _lock:
         _sessions[sid] = {"id": sid, "source": source, "created": time.time(), "slots": {k: [] for k in SLOTS},
-                          "crops": [], "liveness": None, "duplicate": None, "frames": 0, "failed": None}
+                          "crops": [], "liveness": None, "duplicate": None, "frames": 0, "failed": None,
+                          "calib": [], "baseline": None}
     return sid
 
 
@@ -179,6 +185,7 @@ def summary(s):
     return {"session_id": s["id"], "source": s["source"], "model": model, "threshold": round(thr, 4),
             "per_slot": PER_SLOT, "missing": missing_slots(s), "done": not missing_slots(s),
             "liveness": s["liveness"], "duplicate": s["duplicate"], "frames": s["frames"], "failed": s.get("failed"),
+            "baseline": s.get("baseline"),
             "slots": {k: [_public(e) for e in v] for k, v in s["slots"].items()}}
 
 
@@ -219,7 +226,12 @@ def analyse(s, image, final=False, t=None):
     h, w = image.shape[:2]
     s["frames"] += 1
     out = {"faces": 0, "accepted": False, "kept": False, "frame_size": [w, h], "t": t}
-    faces = detect_faces_landmarks(image, min_size=24)
+    # YuNet runs on a copy at most DETECT_W wide, like the live preview, so a full-resolution still finds the same face
+    # (on large frames with a big face it sometimes found none); boxes and landmarks are scaled back
+    k = min(1.0, DETECT_W / w)
+    small = image if k == 1.0 else cv2.resize(image, (round(w * k), round(h * k)), interpolation=cv2.INTER_AREA)
+    faces = [(fx / k, fy / k, fw / k, fh / k, fc, [(px / k, py / k) for px, py in fm])
+             for fx, fy, fw, fh, fc, fm in detect_faces_landmarks(small, min_size=max(12, round(24 * k)))]
     out["faces"] = len(faces)
     # people far behind (a classroom) are ignored; a second face at least half the size means someone close by
     if faces:
@@ -230,17 +242,33 @@ def analyse(s, image, final=False, t=None):
     if len(faces) > 1:
         return {**out, "hint": "only one person in the frame", "reason": "several_faces"}
     x, y, bw, bh, conf, marks = faces[0]
-    yaw, pitch = head_pose(marks)
+    raw_yaw, raw_pitch = head_pose(marks)
+    if s["baseline"] is None:
+        if CALIB_FRAMES <= 0:
+            s["baseline"] = (0.0, 0.0)
+        elif abs(raw_yaw) <= CALIB_MAX[0] and abs(raw_pitch) <= CALIB_MAX[1]:
+            s["calib"].append((raw_yaw, raw_pitch))
+            if len(s["calib"]) >= CALIB_FRAMES:
+                s["baseline"] = tuple(round(float(np.median([c[i] for c in s["calib"]])), 1) for i in (0, 1))
+    if s["baseline"] is None:
+        return {**out, "yaw": raw_yaw, "pitch": raw_pitch, "reason": "calibrating",
+                "hint": f"look straight at the camera ({len(s['calib'])}/{CALIB_FRAMES})", "missing": missing,
+                "done": not missing, "duplicate": s["duplicate"]}
+    yaw, pitch = round(raw_yaw - s["baseline"][0], 1), round(raw_pitch - s["baseline"][1], 1)
     crop = crop_face(image, (x, y, bw, bh), "face_quality")
     grey = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     bright = float(grey.mean())
     scorer, thr, model = quality_model()
-    q = float(scorer(crop)) if scorer else heuristic(crop, bh, yaw, pitch)
+    # the trained model sees an eye-aligned crop framed like its Kaggle training images (much looser than the box)
+    q = float(scorer(_infer("face_quality").align_crop(image, marks))) if scorer else heuristic(crop, bh, yaw, pitch)
     slot = slot_for(yaw, pitch)
 
-    live_crop = crop_face(image, (x, y, bw, bh), "anti_spoofing")
-    s["crops"] = (s["crops"] + [live_crop])[-LIVENESS_WINDOW:]
-    if final or len(s["crops"]) % 3 == 0:            # liveness every 3rd preview frame and on every still
+    # Live scan: liveness comes from the preview frames only. Re-checking it on the full-resolution still mixed crop
+    # sizes in the window and often flipped it to "not live". A video has no preview, so every sampled frame counts.
+    live_still = final and s["source"] == "live" and s["crops"]
+    if not live_still:
+        s["crops"] = (s["crops"] + [crop_face(image, (x, y, bw, bh), "anti_spoofing")])[-LIVENESS_WINDOW:]
+    if not live_still and (final or len(s["crops"]) % 3 == 0):   # every 3rd preview frame, every video frame
         try:
             s["liveness"] = {k: (round(v, 4) if isinstance(v, float) else v)
                              for k, v in _infer("anti_spoofing").check(s["crops"]).items()}
@@ -265,6 +293,8 @@ def analyse(s, image, final=False, t=None):
         reason, hint = "between_poses", _hint(missing, yaw, pitch)
     elif q < thr:
         reason, hint = "low_quality", "hold still (image not sharp enough)"
+    elif slot in missing and not _would_keep(s, slot, q, yaw, pitch):
+        reason, hint = "same_view", "got this angle: move your head slightly for another view"
     else:
         reason = "ok"
         hint = "hold still" if slot in missing else _hint(missing, yaw, pitch)
@@ -302,13 +332,25 @@ def duplicate_of(crop):
         return None
 
 
+def _near(entries, yaw, pitch):
+    return [e for e in entries if abs(e["yaw"] - yaw) < MIN_POSE_GAP and abs(e["pitch"] - pitch) < MIN_POSE_GAP]
+
+
+def _would_keep(s, slot, q, yaw, pitch):
+    """False when a still like this would not be kept: nearly the same view as a better kept still, or the slot is
+    full of better ones."""
+    entries = s["slots"][slot]
+    near = _near(entries, yaw, pitch)
+    if near:
+        return q > max(e["quality"] for e in near)
+    return len(entries) < PER_SLOT or q > min(e["quality"] for e in entries)
+
+
 def _keep(s, slot, image, crop, info, glasses):
     import cv2
     entries = s["slots"][slot]
-    near = [e for e in entries if abs(e["yaw"] - info["yaw"]) < MIN_POSE_GAP and abs(e["pitch"] - info["pitch"]) < MIN_POSE_GAP]
-    if near and info["quality"] <= max(e["quality"] for e in near):
-        return False                 # nearly the same view as a better kept still
-    if not near and len(entries) >= PER_SLOT and info["quality"] <= min(e["quality"] for e in entries):
+    near = _near(entries, info["yaw"], info["pitch"])
+    if not _would_keep(s, slot, info["quality"], info["yaw"], info["pitch"]):
         return False
     ok, jpeg = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 95])
     entry = {"slot": slot, "quality": info["quality"], "yaw": info["yaw"], "pitch": info["pitch"],
