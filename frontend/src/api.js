@@ -120,7 +120,8 @@ export async function updateAttendance(sessionId, studentId, changes) {
   }
 }
 
-// form: FormData with name, student_id_vn, student_id_au, year, courses (JSON list of course keys), photos (files)
+// form: FormData with name, student_id_vn, student_id_au, year, courses (JSON list of course keys), and either
+// photos (files) or enrol_session (id of a finished face scan, see the scan helpers below)
 export async function createStudent(form) {
   let res
   try {
@@ -130,11 +131,66 @@ export async function createStudent(form) {
   }
   const body = await res.json().catch(() => null)
   if (res.ok) return { ok: true, student: body }
-  if (res.status === 404 || res.status === 405 || (res.status >= 500 && !body)) {
+  if (((res.status === 404 || res.status === 405) && !body?.detail) || (res.status >= 500 && !body)) {
     return { ok: false, offline: true, message: 'POST /api/students is not built on the backend yet, so nothing was saved.' }
   }
   return { ok: false, message: body?.detail ? String(body.detail) : `The backend answered ${res.status}.` }
 }
+
+// ---- AI face scan for Add person (backend/app/api/enrol.py) ------------------------------------
+//   POST /api/enrol/session            -> summary { session_id, model, threshold, per_slot, missing, done, slots, ... }
+//   POST /api/enrol/frame (multipart)  -> analysis { faces, box, yaw, pitch, slot, quality, reason, hint, kept, ... }
+//   POST /api/enrol/video (multipart)  -> summary + frame_reasons
+//   GET  /api/enrol/session/{id}/still/{slot}/{i}  kept still (JPEG)
+// The scan needs the backend (the models run there); with the backend down these return { error }.
+async function scanCall(url, form) {
+  try {
+    const res = await fetch(url, { method: 'POST', body: form })
+    const body = await res.json().catch(() => null)
+    return res.ok ? body : { error: body?.detail ? String(body.detail) : `The backend answered ${res.status}.`, status: res.status }
+  } catch {
+    return { error: 'The face scan needs the backend, and it is not running.', offline: true }
+  }
+}
+
+export function startScan(source = 'live') {
+  const form = new FormData()
+  form.append('source', source)
+  return scanCall('/api/enrol/session', form)
+}
+
+export function sendScanFrame(sessionId, blob, final = false) {
+  const form = new FormData()
+  form.append('session_id', sessionId)
+  form.append('final', final ? 'true' : 'false')
+  form.append('image', blob, 'frame.jpg')
+  return scanCall('/api/enrol/frame', form)
+}
+
+export function uploadScanVideo(sessionId, file) {
+  const form = new FormData()
+  form.append('session_id', sessionId)
+  form.append('video', file, file.name)
+  return scanCall('/api/enrol/video', form)
+}
+
+export async function fetchScan(sessionId) {
+  try { return await getJson(`/api/enrol/session/${sessionId}`) } catch (e) { return { error: String(e) } }
+}
+
+export function failScan(sessionId, reason, attempts, reasons) {
+  const form = new FormData()
+  form.append('reason', reason)
+  form.append('attempts', String(attempts))
+  form.append('reasons', JSON.stringify(reasons || {}))
+  return scanCall(`/api/enrol/session/${sessionId}/fail`, form)
+}
+
+export function discardScan(sessionId) {
+  return fetch(`/api/enrol/session/${sessionId}`, { method: 'DELETE' }).catch(() => null)
+}
+
+export const scanStillUrl = (sessionId, slot, i) => `/api/enrol/session/${sessionId}/still/${slot}/${i}`
 
 // ---- Live cameras over Wi-Fi (backend/app/api/live.py) -------------------------------------------
 //   GET /api/live -> { cameras: [{ cam_id, label, place, role, connected, senders, fps, people, faces, frame_ms }],

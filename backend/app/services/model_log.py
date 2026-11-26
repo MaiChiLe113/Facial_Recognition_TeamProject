@@ -35,6 +35,7 @@ def models():
         ("face_recognition", "Face recognition", weights_file("face_recognition")),
         ("anti_spoofing", "Anti-spoofing (liveness)", weights_file("anti_spoofing")),
         ("emotion", "Emotion", weights_file("emotion")),
+        ("face_quality", "Face quality (AI enrolment scan)", weights_file("face_quality")),
         ("presence_verification", "Presence verification + door audit",
          _env_path("HAWKEYE_PRESENCE_VERIFICATION_WEIGHTS", REPO_DIR / "ml" / "presence_verification" / "presence_verification.joblib")),
         ("face_detector", "Face detector (YuNet)",

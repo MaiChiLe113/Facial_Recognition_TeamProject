@@ -57,3 +57,7 @@ frontend/certs/
 
 # backups written by ml/aruco/apply_calibration.py and calibrate_homography.py
 data/calibration/*.bak
+
+ml/face_quality/KE_HOACH.md
+ml/face_quality/RESUME.md
+ml/face_quality/TEST.md
