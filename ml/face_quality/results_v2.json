@@ -1,0 +1,117 @@
+{
+ "test_people": [
+  "Hồng Minh",
+  "Mai Chi"
+ ],
+ "n_test": 338,
+ "n_train_team": 897,
+ "failure_rate_at_0": 0.5207100591715976,
+ "recogniser_threshold": 0.6922129522578123,
+ "methods": {
+  "v2 (fine-tuned)": {
+   "spearman": 0.6211193548973546,
+   "spearman_clean": 0.07008547008547007,
+   "pAUC_0_30": 0.43996780200391145
+  },
+  "v1": {
+   "spearman": 0.5829148984669706,
+   "spearman_clean": -0.03111111111111111,
+   "pAUC_0_30": 0.44177533625866666
+  },
+  "heuristic": {
+   "spearman": 0.24092012525776188,
+   "spearman_clean": -0.012649572649572649,
+   "pAUC_0_30": 0.4733239082557774
+  }
+ },
+ "kaggle_val_spearman": {
+  "v1": 0.7225004181251046,
+  "v2": 0.7253408323352081,
+  "n": 2000
+ },
+ "threshold": {
+  "value": 0.81,
+  "rule": "lowest t with failure rate(score >= t) <= 1.1 x clean failure rate, on held-out team crops",
+  "target_failure": 0.12692307692307694,
+  "clean_failure": 0.11538461538461539,
+  "accepted_clean": 0.11538461538461539,
+  "accepted_by_damage": {
+   "clean": 0.11538461538461539,
+   "blur": 0.0,
+   "motion": 0.0,
+   "noise": 0.0,
+   "jpeg": 0.06896551724137931,
+   "downscale": 0.1282051282051282,
+   "dark": 0.0,
+   "bright": 0.03333333333333333,
+   "occlusion": 0.0,
+   "pose": 0.0
+  }
+ },
+ "history": [
+  {
+   "epoch": 1,
+   "train_loss": 0.007485574744641781,
+   "team_train_spearman": 0.8354376783040721,
+   "kaggle_val_spearman": 0.7131912942978236,
+   "team_test_spearman": 0.6027704259792542,
+   "seconds": 12.28973937034607
+  },
+  {
+   "epoch": 2,
+   "train_loss": 0.005462572135341664,
+   "team_train_spearman": 0.906011657135834,
+   "kaggle_val_spearman": 0.7183548790887196,
+   "team_test_spearman": 0.614707609395047,
+   "seconds": 9.199460506439209
+  },
+  {
+   "epoch": 3,
+   "train_loss": 0.0048149183190738165,
+   "team_train_spearman": 0.9300450808028031,
+   "kaggle_val_spearman": 0.7194487033621758,
+   "team_test_spearman": 0.605430591813868,
+   "seconds": 9.60436224937439
+  },
+  {
+   "epoch": 4,
+   "train_loss": 0.004471599647464851,
+   "team_train_spearman": 0.9453504835558553,
+   "kaggle_val_spearman": 0.721952899988225,
+   "team_test_spearman": 0.6311714254681978,
+   "seconds": 9.09179401397705
+  },
+  {
+   "epoch": 5,
+   "train_loss": 0.0043875626257310315,
+   "team_train_spearman": 0.952236040141228,
+   "kaggle_val_spearman": 0.7243609660902415,
+   "team_test_spearman": 0.6245039186946417,
+   "seconds": 9.821222066879272
+  },
+  {
+   "epoch": 6,
+   "train_loss": 0.0042394836278011406,
+   "team_train_spearman": 0.9540529825795391,
+   "kaggle_val_spearman": 0.7243772815943205,
+   "team_test_spearman": 0.6179675556105959,
+   "seconds": 9.526795148849487
+  },
+  {
+   "epoch": 7,
+   "train_loss": 0.0041070550028234724,
+   "team_train_spearman": 0.9563179796745328,
+   "kaggle_val_spearman": 0.7251723237930808,
+   "team_test_spearman": 0.6227089282903511,
+   "seconds": 9.410370111465454
+  },
+  {
+   "epoch": 8,
+   "train_loss": 0.004070886573754251,
+   "team_train_spearman": 0.9574586834681731,
+   "kaggle_val_spearman": 0.7253408323352081,
+   "team_test_spearman": 0.6211193548973546,
+   "seconds": 9.411847591400146
+  }
+ ]
+}
