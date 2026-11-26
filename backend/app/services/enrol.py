@@ -68,7 +68,9 @@ def quality_model():
     from ..core.ml_models import weights_file
     if weights_file("face_quality").is_file():
         q = _infer("face_quality")
-        return q.score, QUALITY_THRESHOLD_WEBCAM, "face_quality"
+        # v2+ (04_finetune_team.ipynb) chose its threshold on webcam / phone crops: use it; v1's 0.78 was Kaggle-only
+        thr = q.threshold() if q.info().get("threshold_domain") == "webcam" else QUALITY_THRESHOLD_WEBCAM
+        return q.score, thr, "face_quality"
     return None, 0.35, "heuristic"
 
 
