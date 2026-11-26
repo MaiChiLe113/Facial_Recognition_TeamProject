@@ -1,12 +1,13 @@
 <script setup>
-// Register a student: details, courses and 10–20 face photos (upload or webcam). The only way to register.
-// The backend saves the photos to data/photos/<student_id_vn>/ and computes the face embeddings
-// (TODO, Thuận Minh: recognizer.embed). This page only collects and sends them.
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+// Register a student: details, courses and an AI face scan (components/FaceScan.vue: live camera or an uploaded
+// video; the backend keeps the best photo per head pose, checks liveness and duplicates). The only way to register.
+// The backend saves the scan's photos + scan.json to data/photos/<student_id_vn>/ and embeds them for recognition.
+import { computed, onMounted, ref } from 'vue'
+import FaceScan from '../components/FaceScan.vue'
 import { createStudent, fetchCourses, fetchStudents } from '../api.js'
 import { initials } from '../format.js'
 
-const MIN_PHOTOS = 10, MAX_PHOTOS = 20
+const MIN_PHOTOS = 10      // kept scan photos needed to register (a full scan keeps 15)
 
 const courses = ref(null)
 const students = ref([])
@@ -16,8 +17,9 @@ const saving = ref(false)
 
 const empty = () => ({ name: '', student_id_vn: '', student_id_au: '', year: '', courses: [] })
 const form = ref(empty())
-const photos = ref([])            // [{ file, url }]
-const fileInput = ref(null)
+const scan = ref(null)            // summary from FaceScan (session_id, slots, missing, done, liveness, duplicate)
+const scanner = ref(null)
+const scanCount = computed(() => (scan.value ? Object.values(scan.value.slots).reduce((n, v) => n + v.length, 0) : 0))
 
 onMounted(loadLists)
 async function loadLists() {
@@ -34,63 +36,12 @@ const errors = computed(() => {
   if (!/^SWH\d{5}$/i.test(f.student_id_vn.trim())) e.student_id_vn = 'Format: SWH followed by 5 digits, e.g. SWH02701.'
   else if (students.value.some((s) => s.student_id_vn.toUpperCase() === f.student_id_vn.trim().toUpperCase())) e.student_id_vn = 'This student is already registered.'
   if (f.student_id_au && !/^\d{9}$/.test(f.student_id_au.trim())) e.student_id_au = '9 digits, e.g. 105547489.'
-  if (photos.value.length < MIN_PHOTOS) e.photos = `Add at least ${MIN_PHOTOS} photos (${photos.value.length} so far).`
+  if (scanCount.value < MIN_PHOTOS) e.photos = `Scan the face until at least ${MIN_PHOTOS} photos are kept (${scanCount.value} so far).`
+  else if (scan.value?.liveness?.live === false) e.photos = 'The liveness check failed: scan a real face again.'
   return e
 })
 const touched = ref(false)
 const valid = computed(() => Object.keys(errors.value).length === 0)
-
-// ---- photos ----
-function addFiles(files) {
-  for (const file of files) {
-    if (!file.type.startsWith('image/') || photos.value.length >= MAX_PHOTOS) continue
-    photos.value.push({ file, url: URL.createObjectURL(file) })
-  }
-}
-function onPick(e) { addFiles([...e.target.files]); e.target.value = '' }
-function onDrop(e) { addFiles([...e.dataTransfer.files]) }
-function removePhoto(i) {
-  URL.revokeObjectURL(photos.value[i].url)
-  photos.value.splice(i, 1)
-}
-
-// ---- webcam capture ----
-const camVideo = ref(null)
-const camOn = ref(false)
-const camError = ref('')
-let stream = null
-
-async function startCamera() {
-  camError.value = ''
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false })
-    camOn.value = true
-    await nextTick()                 // the <video> appears once camOn is true
-    camVideo.value.srcObject = stream
-  } catch (e) {
-    camError.value = `Camera not available (${e.name || e}). Upload photos instead.`
-  }
-}
-function stopCamera() {
-  stream?.getTracks().forEach((t) => t.stop())
-  stream = null
-  camOn.value = false
-}
-function capture() {
-  const v = camVideo.value
-  if (!v?.videoWidth || photos.value.length >= MAX_PHOTOS) return
-  const c = document.createElement('canvas')
-  c.width = v.videoWidth
-  c.height = v.videoHeight
-  c.getContext('2d').drawImage(v, 0, 0)
-  c.toBlob((blob) => {
-    if (blob) addFiles([new File([blob], `webcam_${Date.now()}.jpg`, { type: 'image/jpeg' })])
-  }, 'image/jpeg', 0.92)
-}
-onBeforeUnmount(() => {
-  stopCamera()
-  photos.value.forEach((p) => URL.revokeObjectURL(p.url))
-})
 
 // ---- submit ----
 async function submit() {
@@ -104,14 +55,14 @@ async function submit() {
   data.append('student_id_au', f.student_id_au.trim())
   data.append('year', f.year.trim())
   data.append('courses', JSON.stringify(f.courses))
-  photos.value.forEach((p) => data.append('photos', p.file, p.file.name))
+  data.append('enrol_session', scan.value.session_id)
   saving.value = true
   const r = await createStudent(data)
   saving.value = false
-  result.value = r.ok ? { ok: true, message: `${f.name.trim()} registered with ${photos.value.length} photos.` } : r
+  result.value = r.ok ? { ok: true, message: `${f.name.trim()} registered with ${scanCount.value} scanned photos.` } : r
   if (r.ok) {
-    photos.value.forEach((p) => URL.revokeObjectURL(p.url))
-    photos.value = []
+    scan.value = null
+    scanner.value?.restart()
     form.value = empty()
     touched.value = false
     loadLists()
@@ -173,49 +124,30 @@ const courseName = (key) => courses.value?.find((c) => c.key_id === key)?.course
         </fieldset>
 
         <div class="field">
-          <span>Face photos <em class="muted">{{ photos.length }} / {{ MAX_PHOTOS }} · at least {{ MIN_PHOTOS }}</em></span>
-          <small class="muted">If you sometimes wear glasses, include clear photos with and without them.</small>
-          <div class="dropzone" @dragover.prevent @drop.prevent="onDrop">
-            <div class="drop-actions">
-              <button class="btn" type="button" :disabled="photos.length >= MAX_PHOTOS" @click="fileInput.click()">Upload photos</button>
-              <button v-if="!camOn" class="btn" type="button" @click="startCamera">Use webcam</button>
-              <button v-else class="btn" type="button" @click="stopCamera">Close webcam</button>
-              <span class="muted small">or drop image files here</span>
-            </div>
-            <input ref="fileInput" type="file" accept="image/*" multiple hidden @change="onPick" />
-            <small v-if="camError" class="error">{{ camError }}</small>
-
-            <div v-if="camOn" class="capture">
-              <div class="cam-view"><video ref="camVideo" autoplay muted playsinline /></div>
-              <button class="btn primary" type="button" :disabled="photos.length >= MAX_PHOTOS" @click="capture">Capture photo</button>
-            </div>
-
-            <div v-if="photos.length" class="thumbs">
-              <figure v-for="(p, i) in photos" :key="p.url" class="thumb">
-                <img :src="p.url" :alt="`Photo ${i + 1}`" />
-                <button type="button" class="thumb-remove" :aria-label="`Remove photo ${i + 1}`" @click="removePhoto(i)">×</button>
-              </figure>
-            </div>
-            <div class="progress"><span :style="{ width: `${Math.min(100, (photos.length / MIN_PHOTOS) * 100)}%` }" /></div>
+          <span>Face scan <em class="muted">{{ scanCount }} photos kept · at least {{ MIN_PHOTOS }}</em></span>
+          <small class="muted">The camera guides you through 5 head poses and keeps the sharpest photos automatically.
+            Photos and screens are refused. If you sometimes wear glasses, scan once with them on.</small>
+          <div class="dropzone">
+            <FaceScan ref="scanner" @update="scan = $event" />
           </div>
           <small v-if="touched && errors.photos" class="error">{{ errors.photos }}</small>
         </div>
 
         <div class="actions">
           <button class="btn primary" type="submit" :disabled="saving">{{ saving ? 'Saving…' : '+ Register student' }}</button>
-          <span class="muted small">Embeddings are computed on the backend after saving.</span>
+          <span class="muted small">The scanned photos are embedded on the backend after saving.</span>
         </div>
       </form>
 
       <div class="side">
         <section class="card panel">
-          <header class="card-head"><h2>Photo checklist</h2></header>
+          <header class="card-head"><h2>Scan tips</h2></header>
           <ul class="checks tips">
-            <li>Face the camera straight on</li>
-            <li>Turn about 30° left and right</li>
-            <li>With and without glasses</li>
-            <li>Two different lighting setups</li>
-            <li>Only one face in each photo</li>
+            <li>Use a phone (better camera) through the Wi-Fi demo link</li>
+            <li>Face a window or a lamp, not a bright background</li>
+            <li>Follow the hint: straight, left, right, chin up, chin down</li>
+            <li>Move slowly; a green box means the photo is good</li>
+            <li>Only one person close to the camera</li>
           </ul>
         </section>
 
