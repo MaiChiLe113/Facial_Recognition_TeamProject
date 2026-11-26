@@ -30,7 +30,7 @@ The team design doc is the source of truth for scope and marking. It is a Claude
 ## Hard rules
 
 1. **Who built what (for context only; anyone may edit any file).**
-   - Đức Mạnh: `frontend/`, `backend/app/main.py`, `backend/app/api/`, `backend/app/services/`, `backend/app/core/`, `backend/app/db/`, `backend/app/pipeline/attendance.py` (with Mai Chi), `ml/presence_verification/` and `backend/app/features/presence_verification/`
+   - Đức Mạnh: `frontend/`, `backend/app/main.py`, `backend/app/api/`, `backend/app/services/`, `backend/app/core/`, `backend/app/db/`, `backend/app/pipeline/attendance.py` (with Mai Chi), `ml/presence_verification/` and `backend/app/features/presence_verification/`, `ml/face_quality/`, `frontend/src/components/FaceScan.vue`
    - Mai Chi: `backend/app/pipeline/{detector,tracker,matcher}.py`
    - Thuận Minh `ml/face_recognition/`, Hồng Minh `ml/anti_spoofing/`, Minh Thành `ml/emotion/`: each holds `infer.py` and the weights `<feature>.pt`; the app finds them through `backend/app/core/ml_models.py`
 

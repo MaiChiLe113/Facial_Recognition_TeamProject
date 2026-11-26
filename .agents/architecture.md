@@ -63,7 +63,7 @@ Live mode calls `process_frame` for every frame a phone sends over `/ws/camera/{
 
 ## When someone replaces a model's `.pt` file
 
-Applies to `ml/face_recognition/face_recognition.pt`, `ml/anti_spoofing/anti_spoofing.pt`, `ml/emotion/emotion.pt`, `ml/gesture/gesture.pt` (or the `HAWKEYE_<FEATURE>_WEIGHTS` override). Weights are never committed (see `.gitignore`); teammates copy the file in by hand.
+Applies to `ml/face_recognition/face_recognition.pt`, `ml/anti_spoofing/anti_spoofing.pt`, `ml/emotion/emotion.pt`, `ml/gesture/gesture.pt`, `ml/face_quality/face_quality.pt` (or the `HAWKEYE_<FEATURE>_WEIGHTS` override). Weights are never committed (see `.gitignore`); teammates copy the file in by hand.
 
 What the app does by itself:
 - **Threshold:** face recognition and anti-spoofing keep their decision threshold *inside* the `.pt` (chosen on validation data: ROC / EER). Nothing in the app hard-codes it. The Features demo page shows it as "Model default" (from `GET /api/features-demo/status`, field `threshold`) and logs the value actually used in the CSV (`threshold`, `liveness_threshold`).
@@ -76,6 +76,8 @@ What a person or agent must do:
 4. **Check on the Features demo page** (`/features-demo`): the feature shows no "weights missing" tag, "Model default" is the number you expect, and a known student is named while a stranger shows "Unknown". For anti-spoofing, also try a printed photo and a phone screen, not only a real face.
 5. **Update the numbers written in `.agents/status.md`** (selected model, threshold, AUC) so the next agent does not read stale values, and do not commit the `.pt`.
 6. The `recognize` stage option `threshold` in `backend/pipeline.json` is `null` (use the model's own). If someone set a number there for the old model, change it back or re-tune it.
+
+**Face quality** depends on the recogniser: its labels come from `face_recognition` v1. When `face_recognition.pt` changes, re-run `ml/face_quality/01_build_labels.ipynb` → 02 → 03, then bump `face_quality` in `ml/model_versions.json`. The enrolment scan's threshold is `QUALITY_THRESHOLD_WEBCAM` in `backend/app/services/enrol.py` (not the checkpoint's value).
 
 ## Model versions (System log page)
 

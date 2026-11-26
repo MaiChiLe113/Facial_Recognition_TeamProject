@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-24. Update this file at the end of every step: change the current state, don't append a diary.
+Last updated: 2026-11-26. Update this file at the end of every step: change the current state, don't append a diary.
 
 ## Branch
 
@@ -16,7 +16,7 @@ All work goes on **`feature/backend-structure`**. Don't create other branches, m
 - Home **Class roster** status comes from the cameras (`rosterStatus.js`), demo only, never saved to the DB: everyone starts Not seen; check-in = the attendance camera recognised them (Recorded: track `name_from` up to the playback position; Live: a live, named face in `GET /api/live`); In class / Left / entry / exit / duration from cam_2 (Recorded: named cam_2 tracks; Live: recognised on cam_2, Left after 30 s unseen). Live state is kept in the page until reload.
 - **History** (`/history`): past sessions, roster per session, editable Attended/Status (saved via PATCH).
 - **Features demo** (`/features-demo`): webcam → face recognition / anti-spoofing / emotion (+ extra ticks: glasses detection, hand gesture with orange hand boxes), threshold sliders (per browser, `localStorage`), session log optionally saved to `logs/features_demo_<time>.csv`.
-- **Add person** (`/add`): form + 1–20 photos → `POST /api/students`.
+- **Add person** (`/add`): form + AI face scan (`FaceScan.vue`, tabs Live scan | Upload video) → `POST /api/students` with `enrol_session`. The scan fills 5 pose slots × 3 photos, scoring each frame with `ml/face_quality` (see its README). Not yet tried on a phone.
 - **Camera** (`/camera`, full screen, phones): sends JPEG frames over `WS /ws/camera/{cam_id}`.
 - **System log** (`/system`, gear icon under Features demo): each inference model's version label (`ml/model_versions.json`), last modified time, size, SHA-256, and the change history in `logs/model_changes.jsonl`.
 - **Wi-Fi demo guide** (`/guide/lan`): renders `docs/LAN_DEMO.md` with `marked` (`?raw` import, hot-reloads in dev).
@@ -29,6 +29,7 @@ All work goes on **`feature/backend-structure`**. Don't create other branches, m
 - `pipeline/detector.py` (YOLO11n people, YuNet faces) and `pipeline/tracker.py` (BYTETracker, 3 s buffer) are implemented; `matcher.py` (`GlobalMatcher`) is still a stub.
 - `services/gallery.py` owns the registered faces (Drive enrolment photos + uploads), cached in `data/raw/face_embeddings.npz`, kept in `engine.shared["gallery"]`.
 - `core/ml_models.py`: `MARGIN` per model (recognition 0.1, anti-spoofing 0.25, emotion 0.0) and `crop_face()`, shared by the Features demo and the attendance-camera stages.
+- AI enrolment scan: `api/enrol.py` (`/api/enrol/session|frame|video|session/{id}|session/{id}/still/{slot}/{i}`) + `services/enrol.py` (pose from YuNet landmarks, liveness, quality, duplicate check, `scan.json`). Quality threshold 0.65 for webcam frames (`QUALITY_THRESHOLD_WEBCAM`); the checkpoint's 0.78 was chosen on Kaggle crops. HEVC videos need FFmpeg on PATH.
 - Presence verification plug-in: `GET /api/features/presence_verification/take/{take}`, `/model`, `/live` (needs `presence_verification.joblib`, rebuild with `ml/presence_verification/train.py`).
 
 **Models** (`ml/<feature>/infer.py` + `<feature>.pt`, loaded through `core/ml_models.py`)
@@ -36,10 +37,11 @@ All work goes on **`feature/backend-structure`**. Don't create other branches, m
 - Anti-spoofing: MobileNetV2, threshold 0.0239; not yet tried on printed photos / phone screens.
 - Emotion: ResNet-18 on FER2013 + AffectNet; FER2013 test acc 0.707, AffectNet 0.661.
 - Gesture (`ml/gesture/`): MediaPipe Hand Landmarker (pre-trained, `hand_landmarker.task`, finds the hand's 21 points) + our MLP on the normalised points, HaGRID 30k sample split by person: test acc 0.9745 (logistic regression 0.8805). `predict(frame)` -> one `{label, score, box}` per hand; in `DEMO_FEATURES`, result `hands` on `/api/features-demo/infer`. Not in the root `requirements.txt`: `mediapipe` depends on `opencv-contrib-python`, a second OpenCV; install with `pip install --no-deps mediapipe` plus the packages in `ml/gesture/requirements.txt`.
-- Presence verification + door audit (Đức Mạnh's innovation): `ml/presence_verification/` (README, PLAN, TEST, 19 unit tests).
+- Face quality (Đức Mạnh's innovation): MobileNetV3-Small, labels from face_recognition v1; EDC pAUC 79.37 vs heuristic 80.80 vs feature norm 81.45 on camera-like pairs; val Spearman 0.728.
+- Presence verification + door audit (team feature): `ml/presence_verification/` (README, PLAN, TEST, 19 unit tests).
 - Tracks precomputed for takes 1–8 in `data/tracks/take<N>/` (YOLO11n + ByteTrack, names by door handoff).
 
-**Tests:** `backend/tests/` (unittest), 50 of 51 pass; `test_every_camera_processes_a_frame` fails only when `ultralytics` is missing from the venv. `npm run build` passes.
+**Tests:** `backend/tests/` (unittest), 73 pass (2026-11-26); `test_every_camera_processes_a_frame` fails only when `ultralytics` is missing from the venv. `npm run build` passes.
 
 ## Open issues
 
