@@ -29,7 +29,7 @@ All work goes on **`feature/backend-structure`**. Don't create other branches, m
 - `pipeline/detector.py` (YOLO11n people, YuNet faces) and `pipeline/tracker.py` (BYTETracker, 3 s buffer) are implemented; `matcher.py` (`GlobalMatcher`) is still a stub.
 - `services/gallery.py` owns the registered faces (Drive enrolment photos + uploads), cached in `data/raw/face_embeddings.npz`, kept in `engine.shared["gallery"]`.
 - `core/ml_models.py`: `MARGIN` per model (recognition 0.1, anti-spoofing 0.25, emotion 0.0) and `crop_face()`, shared by the Features demo and the attendance-camera stages.
-- AI enrolment scan: `api/enrol.py` (`/api/enrol/session|frame|video|session/{id}|session/{id}/still/{slot}/{i}`) + `services/enrol.py` (pose from YuNet landmarks, liveness, quality, duplicate check, `scan.json`). Quality threshold 0.65 for webcam frames (`QUALITY_THRESHOLD_WEBCAM`); the checkpoint's 0.78 was chosen on Kaggle crops. HEVC videos need FFmpeg on PATH.
+- AI enrolment scan: `api/enrol.py` (`/api/enrol/session|frame|video|session/{id}|session/{id}/still/{slot}/{i}`) + `services/enrol.py` (pose from YuNet landmarks, liveness, quality, duplicate check, `scan.json`). Quality threshold from the checkpoint when it is `threshold_domain: "webcam"` (v2: 0.58), else `QUALITY_THRESHOLD_WEBCAM` 0.65. HEVC videos need FFmpeg on PATH.
 - Presence verification plug-in: `GET /api/features/presence_verification/take/{take}`, `/model`, `/live` (needs `presence_verification.joblib`, rebuild with `ml/presence_verification/train.py`).
 
 **Models** (`ml/<feature>/infer.py` + `<feature>.pt`, loaded through `core/ml_models.py`)
@@ -37,7 +37,7 @@ All work goes on **`feature/backend-structure`**. Don't create other branches, m
 - Anti-spoofing: MobileNetV2, threshold 0.0239; not yet tried on printed photos / phone screens.
 - Emotion: ResNet-18 on FER2013 + AffectNet; FER2013 test acc 0.707, AffectNet 0.661.
 - Gesture (`ml/gesture/`): MediaPipe Hand Landmarker (pre-trained, `hand_landmarker.task`, finds the hand's 21 points) + our MLP on the normalised points, HaGRID 30k sample split by person: test acc 0.9745 (logistic regression 0.8805). `predict(frame)` -> one `{label, score, box}` per hand; in `DEMO_FEATURES`, result `hands` on `/api/features-demo/infer`. Not in the root `requirements.txt`: `mediapipe` depends on `opencv-contrib-python`, a second OpenCV; install with `pip install --no-deps mediapipe` plus the packages in `ml/gesture/requirements.txt`.
-- Face quality (Đức Mạnh's innovation): MobileNetV3-Small, labels from face_recognition v1; EDC pAUC 79.37 vs heuristic 80.80 vs feature norm 81.45 on camera-like pairs; val Spearman 0.728.
+- Face quality (Đức Mạnh's innovation): **v2** in the app, MobileNetV3-Small, Kaggle then team photos + recorded-video faces (`06_backbones.ipynb`), threshold 0.58 in the checkpoint. On held-out team video faces ≥ 80 px: EDC pAUC 32.21 vs v1 35.95 vs heuristic 32.72; bigger backbones did not help. Full record: `.agents/FACE_QUALITY.md`.
 - Presence verification + door audit (team feature): `ml/presence_verification/` (README, PLAN, TEST, 19 unit tests).
 - Tracks precomputed for takes 1–8 in `data/tracks/take<N>/` (YOLO11n + ByteTrack, names by door handoff).
 
