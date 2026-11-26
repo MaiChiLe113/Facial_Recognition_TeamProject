@@ -4,7 +4,7 @@ Only for the presence verification + door audit module and the floor-map calibra
 Design and results: `ml/presence_verification/README.md`, `PLAN.md` (Vietnamese), `TEST.md`. This file is the
 running state: what changed lately, what is open, what to do next. Update it when you finish a step.
 
-Last updated: 2026-11-24.
+Last updated: 2026-11-25.
 
 ## The module in short
 
@@ -23,10 +23,11 @@ Last updated: 2026-11-24.
 | Map geometry for the ML code | `data/calibration/room204_map.json` (fractions 0–1 of the 920×520 drawing; door gap y 0.727–0.906, same as Figma) |
 | Map drawing for the web | `frontend/src/roomLayout.js` (Figma px; 8 long tables 198×36, cameras at their Figma positions) |
 | Map image for the click tool | `data/calibration/room204_map.png` (crop of the Figma drawing) |
-| Homographies (image px → map fraction) | `data/calibration/cam_1_homography.json`, `cam_2_homography.json` |
+| Homographies (image px → map fraction) | `data/calibration/cam_N_homography.json` (recorded takes), `cam_N_homography_live.json` (live); made by `ml/aruco/` |
 | Hand-calibration tool | `ml/tracking/calibrate_homography.py` (click floor point on frame, then on map; `g` grid, `s` save, `--load`, `--video`) |
 
 The map scale (`scale_per_m` x 0.0875, y 0.143) is an assumption, never measured. Figma desks are approximate.
+The ArUco calibration below replaces the 2026-11-24 fits; the next three sections are the history before it.
 
 ## Calibration done on 2026-11-24
 
@@ -41,8 +42,7 @@ then saved as point pairs + H in the usual JSON format (scripts were in the sess
   as image-column constraints (feet below the frame). Focal fixed near cam_1's (otherwise degenerate).
   f 760 px, height 0.83 m, at map (0.755, 0.795). Cost: north jamb ~26 px off, leaf ~14–20 px (Figma tables and door
   do not fully agree). A free map aspect gave a non-physical room (4.1 m deep) and was rejected.
-- Backups: `cam_1_homography.json.bak` / `cam_2_homography.json.bak` = original estimates;
-  `cam_2_homography.v1.json.bak`, `.v2.json.bak` = earlier cam_2 hand fits. Not committed.
+- The old `.bak` fits were removed from the repo during the ArUco clean-up (git history keeps them).
 - `simulate.py`: `DOOR_IN` moved to the new door centre (0.33, 0.8165).
 
 ## Open problems
@@ -65,6 +65,15 @@ then saved as point pairs + H in the usual JSON format (scripts were in the sess
 2. Feet from pose keypoints (ankles); head + height prior when the feet are hidden.
 3. Optional: small model on the residual error.
 4. Kalman filter per person, fuse cam_1 + cam_2 at the door, keep points inside the map.
+
+## ArUco calibration (2026-11-25, in the app)
+
+Code, inputs, measuring steps, results and limits: `ml/aruco/` (read its `README.md`; it also says how to rerun the chain
+and how to keep `MEASURING.md`, `data/result.yaml` and the plan pictures in sync). Development finished; drafts removed.
+- The app reads `data/calibration/`: `cam_N_homography_live.json` = survey-day pose, used by
+  `backend/app/services/live.py` (`to_map(..., live=True)`); `cam_N_homography.json` = pose of the recorded takes.
+- `room204_map.json`: door, glass, cameras and desk D7 measured; other desks moved with D7, spacing not measured.
+- Open: CAM 2 accuracy away from the door (leave-one-out 20-60 cm); desk constraint for tracking (open problem 1).
 
 ## How to check
 

@@ -1,0 +1,79 @@
+# Room 204 measurements. Fill in the numbers after each ':' (metres, to the cm, e.g. 2.37).
+# Leave a line empty if not measured yet. Then run:  python ml/aruco/survey.py
+# The "# N." headers are the step numbers of MEASURING.md (drawn in figures/plan_A..D.png).
+# Names: O = floor under CAM 1, P0 = spot on the room wall straight across from O,
+# M3 = centre of marker 3, D7 = top-left corner of desk D7 (near the room wall, far from the door),
+# door_top / door_top_in = door edge on the corridor side / room side.
+# Steps 1, 5, 6, 14 and 21 have nothing to write here.
+
+# --- A. Preparation
+# 2.
+x_wall:       2.955    # O -> P0, at a right angle to the room wall
+# 3.
+wall_thickness:   0.085 # measured in the doorway
+# 4. y of the wall edges = tape from P0 (y = 0) along the wall base, towards the door (negative if above P0)
+glass_top: 0.307
+glass_bottom: 2.485
+door_top: 3
+door_bottom: 4.11
+
+# --- B. Markers: straight tape between the two points
+# 7. Marker 4
+O-M4: 2.95
+P0-M4: 1.58
+# 8. Marker 5
+O-M5: 3.2
+P0-M5: 3.05
+# 9. Marker 6
+O-M6: 3.91
+P0-M6: 3.255
+door_top-M6: 0.72
+# 10. Marker 3
+O-M3: 4.3
+door_top-M3: 0.065
+door_bottom-M3: 1.05
+# 11. Marker 7
+O-M7: 5.04
+door_top-M7: 1.06
+door_bottom-M7: 0.09
+M3-M7:
+# 12. Marker 0
+M3-M0: 0.87
+M7-M0: 0.885
+door_bottom_in-M0:
+# 13. Marker 2
+M0-M2: 1.72
+M7-M2: 2.32
+glass_bottom_in-M2:
+
+# --- C. Desks D1, D3, D5, D7
+# 15. Tabletop size (all desks the same)
+desk_L: 1.4           # length, at a right angle to the room wall
+desk_W: 0.5          # width
+# 16. Desk D7
+M3-D7: 0.85
+M0-D7: 1
+door_top_in-D7:
+# 17. Desk D5
+D7-D5:
+door_top_in-D5:
+glass_bottom_in-D5:
+# 18. Desk D3
+D5-D3:
+glass_bottom_in-D3:
+glass_top_in-D3:
+# 19. Desk D1
+D3-D1:
+glass_top_in-D1:
+P0_in-D1:
+
+# --- D. Cameras
+# 20. Floor point under CAM 2
+glass_top_in-CAM2:
+M2-CAM2: 3.01
+M0-CAM2: 4.42
+
+# --- Optional (not used to compute x, y; may stay empty)
+desk_height: 0.75      # floor -> tabletop
+cam1_height:      # floor -> CAM 1 lens centre
+cam2_height:      # floor -> CAM 2 lens centre

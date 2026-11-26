@@ -27,15 +27,16 @@ VALID_X = {"cam_1": (-0.02, 0.36), "cam_2": (0.25, 1.02)}
 VALID_Y = (-0.02, 1.05)
 
 
-def to_map(cam_id, box):
+def to_map(cam_id, box, live=False):
     """Map position (x, y) of a normalised box [x, y, w, h], or None when the feet are not visible or the
-    point falls outside the part of the map this camera's homography is valid for."""
+    point falls outside the part of the map this camera's homography is valid for.
+    live=True uses the calibration of the current camera pose (the recorded takes were filmed at another one)."""
     if cam_id not in MAP_CAMS:
         return None
     x, y, w, h = (float(v) for v in box[:4])
     if y + h >= FEET_CUT:
         return None
-    p = homography(cam_id) @ np.array([(x + w / 2) * FRAME_W, (y + h) * FRAME_H, 1.0])
+    p = homography(cam_id, live) @ np.array([(x + w / 2) * FRAME_W, (y + h) * FRAME_H, 1.0])
     if abs(p[2]) < 1e-12:
         return None
     mx, my = float(p[0] / p[2]), float(p[1] / p[2])

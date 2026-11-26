@@ -1,5 +1,5 @@
 {
- "_note": "Simple top-down model of the corridor + Room 204 (not measured). Coordinates are fractions of the map: x 0 left -> 1 right, y 0 top -> 1 bottom, same convention as RoomMap.vue. scale_per_m is an assumption (corridor 0-0.3 ~ 3.4 m, map height ~ 7 m). cam_1/cam_2 positions are derived by ml/tracking/ground_model.py. Replace with measurements when available.",
+ "_note": "Top-down model of the corridor + Room 204. Coordinates are fractions of the map: x 0 left -> 1 right, y 0 top -> 1 bottom, same convention as RoomMap.vue. Wall, door, glass, desk D7 and both cameras come from the tape survey of 2026-11-25 (result.yaml -> survey.py -> apply_calibration.py); the map outline and the other desks' spacing are still not measured.",
  "corridor": {
   "x": [
    0.0,
@@ -24,38 +24,38 @@
  "door": {
   "x": 0.3,
   "y": [
-   0.727,
-   0.906
+   0.7371,
+   0.8959
   ],
   "centre": [
    0.3,
    0.8165
   ],
-  "_note": "door gap from the FigJam map (wall segments end at Figma y 498 and 591 of the 520 px drawing); matches the hand-fitted cam_1 homography (jamb feet at y 0.716 / 0.920)"
+  "_note": "measured (door_top / door_bottom of result.yaml)"
  },
  "glass_window": {
   "x": 0.3,
   "y": [
-   0.4,
-   0.634
+   0.352,
+   0.6635
   ],
-  "_note": "south edge from the cam_1 homography (window edge above the wall base at image x 632); north edge not visible, kept"
+  "_note": "measured (glass_top / glass_bottom of result.yaml)"
  },
  "cameras": {
   "cam_1": {
-   "x": 0.078,
-   "y": 0.347,
-   "_note": "from the hand-fitted cam_1 camera model (2026-11-24): corridor, ~0.73 m high, facing south-east"
+   "x": 0.0455,
+   "y": 0.3025,
+   "_note": "fitted on cam1_fixed.jpg (fit_floor.py, 2026-11-25): 0.88 m high, focal 928 px"
   },
   "cam_2": {
-   "x": 0.755,
-   "y": 0.795,
-   "_note": "from the hand-fitted cam_2 camera model (2026-11-24, with the take-1 table legs, Figma row 4 col 1): Room 204, ~0.83 m high, facing west (slightly north)"
+   "x": 0.754,
+   "y": 0.7372,
+   "_note": "fitted on cam2_fixed.jpg (fit_floor.py, 2026-11-25): 1.03 m high, focal 621 px"
   },
   "attendance_cam": {
-   "x": 0.41,
-   "y": 0.6026,
-   "_note": "on the front-left desk row near the door (moved with the desks by -0.0954 on 2026-11-24)"
+   "x": 0.3985,
+   "y": 0.7084,
+   "_note": "on desk D7 (moved with the desks to the measured D7 on 2026-11-25)"
   }
  },
  "scale_per_m": {
@@ -64,52 +64,52 @@
  },
  "desks": [
   [
-   0.3707,
-   0.1296,
-   0.2152,
-   0.0692
+   0.3592,
+   0.2354,
+   0.1225,
+   0.0715
   ],
   [
-   0.7022,
-   0.1296,
-   0.2152,
-   0.0692
+   0.6907,
+   0.2354,
+   0.1225,
+   0.0715
   ],
   [
-   0.3707,
-   0.2796,
-   0.2152,
-   0.0692
+   0.3592,
+   0.3854,
+   0.1225,
+   0.0715
   ],
   [
-   0.7022,
-   0.2796,
-   0.2152,
-   0.0692
+   0.6907,
+   0.3854,
+   0.1225,
+   0.0715
   ],
   [
-   0.3707,
-   0.4219,
-   0.2152,
-   0.0692
+   0.3592,
+   0.5277,
+   0.1225,
+   0.0715
   ],
   [
-   0.7022,
-   0.4219,
-   0.2152,
-   0.0692
+   0.6907,
+   0.5277,
+   0.1225,
+   0.0715
   ],
   [
-   0.3707,
-   0.565,
-   0.2152,
-   0.0692
+   0.3592,
+   0.6708,
+   0.1225,
+   0.0715
   ],
   [
-   0.7022,
-   0.5623,
-   0.2152,
-   0.0692
+   0.6907,
+   0.6681,
+   0.1225,
+   0.0715
   ],
   [
    0.8413,
@@ -118,5 +118,5 @@
    0.0692
   ]
  ],
- "_desks_note": "[x, y, w, h] fractions, top-left corner. Last one is the small desk by CAM 2. The 8 long desks were moved by -0.0954 in y on 2026-11-24 so the ATT desk (row 4 col 1, index 6) covers y 0.565-0.635, where cam_2 (homography v3, confirmed by GeoCalib) sees people seated at it in several takes (x 0.53-0.55, y 0.58-0.63). Still not measured."
+ "_desks_note": "[x, y, w, h] fractions, top-left corner. Size = measured desk_L x desk_W. D7 (index 6) is measured; the other long desks keep their old spacing, moved with D7. Last entry = small desk by CAM 2, not measured."
 }

@@ -10,3 +10,5 @@ One folder per model. Train on Colab/Kaggle GPUs; save weights to Drive (not git
 | `tracking/` | Mai Chi | YOLOv8n + ByteTrack, cross-camera matching | Our 9 recorded takes | ID switches, in/out time error vs ground truth |
 
 Rule from the brief: no fully pre-trained model without further training. Partial fine-tuning is allowed.
+
+`aruco/` (Đức Mạnh) is not a model: it is the floor calibration of `cam_1` / `cam_2` from ArUco markers (see its README).

@@ -137,7 +137,7 @@ def _to_map(cam_id, box, width, height):
     if to_map is None:
         return None
     x, y, w, h = box
-    xy = to_map(cam_id, [x / width, y / height, w / width, h / height])
+    xy = to_map(cam_id, [x / width, y / height, w / width, h / height], live=True)
     return [round(xy[0], 4), round(xy[1], 4)] if xy else None
 
 
