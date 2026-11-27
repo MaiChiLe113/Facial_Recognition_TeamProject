@@ -4,7 +4,7 @@
 // with the face box, head pose, quality and a hint. When a frame fits a missing pose slot and passes, the full-resolution
 // frame is sent again with final=true and kept. Upload video: the backend samples the video and does the same.
 // Emits 'update' with the scan summary (session_id, missing, done, slots) so the form can submit enrol_session.
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { discardScan, failScan, fetchScan, scanStillUrl, sendScanFrame, startScan, uploadScanVideo } from '../api.js'
 
 const emit = defineEmits(['update'])
@@ -16,6 +16,22 @@ const PREVIEW_W = 640, PREVIEW_MS = 250, ATTEMPT_S = 10, MAX_ATTEMPTS = 3
 const mode = ref('live')              // 'live' | 'video'
 const summary = ref(null)
 const last = ref(null)                // last frame analysis
+// The hint on the video changes only when a new hint comes twice in a row (or means a kept photo / done), so
+// landmark jitter between two frames does not make it flicker
+const shownHint = ref(null)
+const step = computed(() => {
+  const s = summary.value
+  if (!s || !s.missing.length) return null
+  const order = Object.keys(s.slots)
+  return { n: order.indexOf(s.missing[0]) + 1, total: order.length, label: SLOT_LABEL[s.missing[0]] }
+})
+let pendingHint = null
+watch(() => last.value?.hint, (h) => {
+  if (h == null) { shownHint.value = null; pendingHint = null; return }
+  if (h === shownHint.value) { pendingHint = null; return }
+  if (h === pendingHint || shownHint.value == null || h === 'done' || last.value?.kept) { shownHint.value = h; pendingHint = null }
+  else pendingHint = h
+})
 const error = ref('')
 const running = ref(false)
 const busy = ref(false)
@@ -163,18 +179,19 @@ const meterState = computed(() => {
   const r = last.value
   if (!r || r.quality == null) return 'low'
   if (r.accepted && !r.stillRejected && (r.kept || summary.value?.missing.includes(r.slot))) return 'good'
-  return r.quality >= (summary.value?.threshold ?? 1) ? 'warn' : 'low'
+  return r.quality >= (r.threshold ?? summary.value?.threshold ?? 1) ? 'warn' : 'low'
 })
 const meterReason = computed(() => {
   const r = last.value
   if (!r || r.quality == null) return ''
   if (meterState.value === 'good') return 'kept'
-  if (r.accepted && r.stillRejected) return 'still rejected (moved?)'
+  if (r.stillRejected) return r.accepted ? 'same view as a kept photo' : `still: ${REASON_TEXT[r.reason] ?? r.reason}`
   if (r.accepted) return r.kept === false && r.slot && summary.value?.missing.includes(r.slot) ? 'same view' : `${SLOT_LABEL[r.slot] ?? r.slot} slot full`
   return REASON_TEXT[r.reason] ?? r.reason
 })
 const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several faces', too_small: 'too far',
-  too_dark: 'too dark', too_bright: 'too bright', not_live: 'not live', between_poses: 'between poses', low_quality: 'low quality', no_progress: 'no new photo' }
+  too_dark: 'too dark', too_bright: 'too bright', not_live: 'not live', between_poses: 'between poses', low_quality: 'low quality', no_progress: 'no new photo', calibrating: 'calibrating: look straight', same_view: 'same view as a kept photo',
+  other_pose: 'not this pose yet' }
 </script>
 
 <template>
@@ -188,11 +205,15 @@ const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several fa
       <div v-if="running" class="scan-view">
         <video ref="videoEl" autoplay muted playsinline />
         <div v-if="boxStyle" class="scan-box" :class="last?.accepted ? 'good' : 'bad'" :style="boxStyle" />
-        <div class="scan-hint">{{ last?.hint ?? 'Look at the camera' }}</div>
-        <div class="scan-meter" :title="`quality ${last?.quality ?? '—'} / threshold ${summary?.threshold}`">
+        <!-- top: what to DO (instruction); bottom: what the scanner SEES (status, with the quality meter) -->
+        <div class="scan-instruction">
+          <small v-if="step">Step {{ step.n }} of {{ step.total }} · {{ step.label }}</small>
+          <span>{{ shownHint ?? 'Look at the camera' }}</span>
+        </div>
+        <div class="scan-meter" :title="`quality ${last?.quality ?? '—'} / threshold ${last?.threshold ?? summary?.threshold}`">
           <span :style="{ width: `${Math.round((last?.quality ?? 0) * 100)}%` }" :class="meterState" />
-          <i :style="{ left: `${(summary?.threshold ?? 0) * 100}%` }" />
-          <em v-if="meterReason" class="scan-reason" :class="meterState">{{ meterReason }}</em>
+          <i :style="{ left: `${(last?.threshold ?? summary?.threshold ?? 0) * 100}%` }" />
+          <em v-if="meterReason" class="scan-reason" :class="meterState">Status: {{ meterReason }}</em>
         </div>
       </div>
       <div class="drop-actions">
@@ -246,8 +267,11 @@ const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several fa
 .scan-box { position: absolute; border: 3px solid; border-radius: 8px; pointer-events: none; }
 .scan-box.good { border-color: #6ad16a; }
 .scan-box.bad { border-color: #f2b233; }
-.scan-hint { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); background: rgba(0, 0, 0, .65); color: #fff;
-  padding: 6px 14px; border-radius: 999px; font-weight: 600; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+.scan-instruction { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); max-width: 80%; display: grid;
+  justify-items: center; gap: 0; background: rgba(20, 90, 200, .8); color: #fff; padding: 3px 10px; border-radius: 8px;
+  text-align: center; }
+.scan-instruction small { font-size: 9px; font-weight: 600; opacity: .85; text-transform: uppercase; letter-spacing: .04em; }
+.scan-instruction span { font-size: 13px; font-weight: 600; }
 .scan-meter { position: absolute; left: 12px; right: 12px; bottom: 10px; height: 8px; background: rgba(255, 255, 255, .25); border-radius: 4px; }
 .scan-meter span { display: block; height: 100%; background: var(--danger); border-radius: 4px; transition: width .2s; }
 .scan-meter span.warn { background: var(--amber); }

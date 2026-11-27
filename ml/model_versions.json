@@ -2,7 +2,7 @@
   "_note": "Version label of each model file the app infers with. Edit by hand when you replace a model (see .agents/architecture.md, 'Model versions'). The System log page (/system) shows these next to the file's date and fingerprint, and logs every change it detects.",
   "face_recognition": { "version": "v1", "note": "Triplet + cosine (verification_fp32_v1/selected_model.pt), threshold 0.5254 in the checkpoint" },
   "anti_spoofing": { "version": "v1", "note": "MobileNetV2 (liveness_mobilenetv2.pt), threshold 0.0239 in the checkpoint" },
-  "face_quality": { "version": "v1", "note": "MobileNetV3-Small regression on Kaggle crops, labels from face_recognition v1 (pinned: retrain if it changes); threshold 0.78 in the checkpoint, app uses 0.65 for webcam frames" },
+  "face_quality": { "version": "v2", "note": "06_backbones.ipynb winner: MobileNetV3-Small, Kaggle (stage A) then team photos + recorded-video faces (stage B); labels from face_recognition v1 (pinned); threshold 0.58 in the checkpoint (webcam domain)" },
   "emotion": { "version": "v1", "note": "ResNet-18 on FER2013 + AffectNet, FER2013 test acc 0.707" },
   "presence_verification": { "version": "v1", "note": "Door audit + presence model from ml/presence_verification/train.py (git-ignored, rebuilt locally)" },
   "face_detector": { "version": "yunet-2023mar", "note": "OpenCV YuNet face detector" },

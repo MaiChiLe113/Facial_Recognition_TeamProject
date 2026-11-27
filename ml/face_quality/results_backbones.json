@@ -1,0 +1,734 @@
+{
+ "views": {
+  "video_app": {
+   "failure_rate_at_0": 0.3508771929824561,
+   "methods": {
+    "v1 file (mobilenet)": {
+     "spearman": 0.07655981045341327,
+     "pAUC": 0.3594981928143943
+    },
+    "v1 file (mobilenet) × size": {
+     "spearman": 0.10270751908628827,
+     "pAUC": 0.3452132255233311
+    },
+    "mobilenet_v3_small A": {
+     "spearman": -0.007464409388226242,
+     "pAUC": 0.36571188081331973
+    },
+    "mobilenet_v3_small A × size": {
+     "spearman": 0.06907515036147507,
+     "pAUC": 0.3542359142720244
+    },
+    "mobilenet_v3_small B": {
+     "spearman": 0.32462283064336483,
+     "pAUC": 0.3220932529022477
+    },
+    "mobilenet_v3_small B × size": {
+     "spearman": 0.3514104615135376,
+     "pAUC": 0.314228869389256
+    },
+    "resnet18 A": {
+     "spearman": 0.1292764423563719,
+     "pAUC": 0.37070687652446094
+    },
+    "resnet18 A × size": {
+     "spearman": 0.15656629067860112,
+     "pAUC": 0.35753025452916576
+    },
+    "resnet18 B": {
+     "spearman": 0.12480508697677244,
+     "pAUC": 0.3585259080596192
+    },
+    "resnet18 B × size": {
+     "spearman": 0.20407444158684515,
+     "pAUC": 0.34680161700614387
+    },
+    "efficientnet_b0 A": {
+     "spearman": -0.023251858002065574,
+     "pAUC": 0.35292676428263753
+    },
+    "efficientnet_b0 A × size": {
+     "spearman": 0.030752718656973335,
+     "pAUC": 0.34193005946912725
+    },
+    "efficientnet_b0 B": {
+     "spearman": 0.23047325894574838,
+     "pAUC": 0.33127689515295
+    },
+    "efficientnet_b0 B × size": {
+     "spearman": 0.31138697069723176,
+     "pAUC": 0.32175256354730725
+    },
+    "convnext_tiny A": {
+     "spearman": 0.08134707681091918,
+     "pAUC": 0.3623450863293241
+    },
+    "convnext_tiny A × size": {
+     "spearman": 0.12287721998339445,
+     "pAUC": 0.3512530589053004
+    },
+    "convnext_tiny B": {
+     "spearman": 0.3325692067799357,
+     "pAUC": 0.3365554226675387
+    },
+    "convnext_tiny B × size": {
+     "spearman": 0.362969563192321,
+     "pAUC": 0.32363427760418206
+    },
+    "heuristic": {
+     "spearman": 0.3269071100220733,
+     "pAUC": 0.3272133386534456
+    },
+    "size term only": {
+     "spearman": 0.06281363277373889,
+     "pAUC": 0.32947000063464965
+    }
+   }
+  },
+  "video_all": {
+   "failure_rate_at_0": 0.6666666666666666,
+   "methods": {
+    "v1 file (mobilenet)": {
+     "spearman": 0.33599202392821537,
+     "pAUC": 0.663682716433419
+    },
+    "v1 file (mobilenet) × size": {
+     "spearman": 0.5721317061473806,
+     "pAUC": 0.6151910896748313
+    },
+    "mobilenet_v3_small A": {
+     "spearman": 0.3024443847481065,
+     "pAUC": 0.6596869679358502
+    },
+    "mobilenet_v3_small A × size": {
+     "spearman": 0.5661703857685534,
+     "pAUC": 0.6149257249391106
+    },
+    "mobilenet_v3_small B": {
+     "spearman": 0.2752772424138074,
+     "pAUC": 0.6705883663355353
+    },
+    "mobilenet_v3_small B × size": {
+     "spearman": 0.6093626895083286,
+     "pAUC": 0.6150589900777103
+    },
+    "resnet18 A": {
+     "spearman": 0.334354080615297,
+     "pAUC": 0.658297616542893
+    },
+    "resnet18 A × size": {
+     "spearman": 0.5623319913676692,
+     "pAUC": 0.6184108238866001
+    },
+    "resnet18 B": {
+     "spearman": 0.14089107000878015,
+     "pAUC": 0.6564856960713119
+    },
+    "resnet18 B × size": {
+     "spearman": 0.5638365193749674,
+     "pAUC": 0.6168706461477886
+    },
+    "efficientnet_b0 A": {
+     "spearman": 0.3088293888677548,
+     "pAUC": 0.6485891629534585
+    },
+    "efficientnet_b0 A × size": {
+     "spearman": 0.5484631097665413,
+     "pAUC": 0.6146745326089623
+    },
+    "efficientnet_b0 B": {
+     "spearman": 0.19435454937177618,
+     "pAUC": 0.6613069739599206
+    },
+    "efficientnet_b0 B × size": {
+     "spearman": 0.6037195826625007,
+     "pAUC": 0.6137415946802957
+    },
+    "convnext_tiny A": {
+     "spearman": 0.30468810566492205,
+     "pAUC": 0.661305048648234
+    },
+    "convnext_tiny A × size": {
+     "spearman": 0.5641448169055221,
+     "pAUC": 0.614864326810227
+    },
+    "convnext_tiny B": {
+     "spearman": 0.04946462601346052,
+     "pAUC": 0.6741027535417453
+    },
+    "convnext_tiny B × size": {
+     "spearman": 0.6071378991416347,
+     "pAUC": 0.614520397184056
+    },
+    "heuristic": {
+     "spearman": 0.569827587761129,
+     "pAUC": 0.6305486158114931
+    },
+    "size term only": {
+     "spearman": 0.5817745677975117,
+     "pAUC": 0.6108308374431786
+    }
+   }
+  },
+  "photos": {
+   "failure_rate_at_0": 0.5207100591715976,
+   "methods": {
+    "v1 file (mobilenet)": {
+     "spearman": 0.5829148984669706,
+     "pAUC": 0.44177533625866666
+    },
+    "v1 file (mobilenet) × size": {
+     "spearman": 0.5829148984669706,
+     "pAUC": 0.44177533625866666
+    },
+    "mobilenet_v3_small A": {
+     "spearman": 0.6035429928326245,
+     "pAUC": 0.44035804327891154
+    },
+    "mobilenet_v3_small A × size": {
+     "spearman": 0.6035429928326245,
+     "pAUC": 0.44035804327891154
+    },
+    "mobilenet_v3_small B": {
+     "spearman": 0.6085609481750905,
+     "pAUC": 0.44171472828557456
+    },
+    "mobilenet_v3_small B × size": {
+     "spearman": 0.6085609481750905,
+     "pAUC": 0.44171472828557456
+    },
+    "resnet18 A": {
+     "spearman": 0.5261557853401555,
+     "pAUC": 0.4506857817924459
+    },
+    "resnet18 A × size": {
+     "spearman": 0.5261557853401555,
+     "pAUC": 0.4506857817924459
+    },
+    "resnet18 B": {
+     "spearman": 0.633036649222795,
+     "pAUC": 0.45191916712464264
+    },
+    "resnet18 B × size": {
+     "spearman": 0.633036649222795,
+     "pAUC": 0.45191916712464264
+    },
+    "efficientnet_b0 A": {
+     "spearman": 0.5752507618065448,
+     "pAUC": 0.4464420029671004
+    },
+    "efficientnet_b0 A × size": {
+     "spearman": 0.5752507618065448,
+     "pAUC": 0.4464420029671004
+    },
+    "efficientnet_b0 B": {
+     "spearman": 0.6340146330874598,
+     "pAUC": 0.4506194798697074
+    },
+    "efficientnet_b0 B × size": {
+     "spearman": 0.6340146330874598,
+     "pAUC": 0.4506194798697074
+    },
+    "convnext_tiny A": {
+     "spearman": 0.583942605057516,
+     "pAUC": 0.4428099976781424
+    },
+    "convnext_tiny A × size": {
+     "spearman": 0.583942605057516,
+     "pAUC": 0.4428099976781424
+    },
+    "convnext_tiny B": {
+     "spearman": 0.6824479865325997,
+     "pAUC": 0.4415989488121856
+    },
+    "convnext_tiny B × size": {
+     "spearman": 0.6824479865325997,
+     "pAUC": 0.4415989488121856
+    },
+    "heuristic": {
+     "spearman": 0.24092012525776188,
+     "pAUC": 0.4733239082557774
+    },
+    "size term only": {
+     "spearman": 0.260789948053736,
+     "pAUC": 0.4952160457618198
+    }
+   }
+  }
+ },
+ "test_people": [
+  "Hồng Minh",
+  "Mai Chi"
+ ],
+ "app_min_face": 80,
+ "n": {
+  "video_app": 114,
+  "video_all": 237,
+  "photos": 338
+ },
+ "best_stage_A_epoch": {
+  "mobilenet_v3_small": 3,
+  "resnet18": 7,
+  "efficientnet_b0": 2,
+  "convnext_tiny": 2
+ },
+ "kaggle_val_spearman": {
+  "v1 file (mobilenet)": 0.7225004181251046,
+  "mobilenet_v3_small A": 0.7297671699417925,
+  "mobilenet_v3_small B": 0.7276007614001904,
+  "resnet18 A": 0.7717221189305298,
+  "resnet18 B": 0.7668153597038398,
+  "efficientnet_b0 A": 0.7324138816034703,
+  "efficientnet_b0 B": 0.7222492970623242,
+  "convnext_tiny A": 0.7570326812581702,
+  "convnext_tiny B": 0.7318735154683789
+ },
+ "cpu_ms_per_crop": {
+  "mobilenet_v3_small": 8.406725066667303,
+  "resnet18": 20.601957233338908,
+  "efficientnet_b0": 19.744338633336156,
+  "convnext_tiny": 59.79612086666748
+ },
+ "selection": {
+  "best_on_video_app": "mobilenet_v3_small B",
+  "winner": "mobilenet_v3_small B",
+  "replaces_mobilenet": false,
+  "margin_vs_mobilenet": 0.0
+ },
+ "histories": {
+  "mobilenet_v3_small": [
+   {
+    "stage": "A",
+    "epoch": 1,
+    "kaggle_val": 0.6905075866268966
+   },
+   {
+    "stage": "A",
+    "epoch": 2,
+    "kaggle_val": 0.7211589932897483
+   },
+   {
+    "stage": "A",
+    "epoch": 3,
+    "kaggle_val": 0.7297671699417925
+   },
+   {
+    "stage": "A",
+    "epoch": 4,
+    "kaggle_val": 0.722101992525498
+   },
+   {
+    "stage": "A",
+    "epoch": 5,
+    "kaggle_val": 0.7228147132036783
+   },
+   {
+    "stage": "A",
+    "epoch": 6,
+    "kaggle_val": 0.7246350926587731
+   },
+   {
+    "stage": "A",
+    "epoch": 7,
+    "kaggle_val": 0.7284429861107465
+   },
+   {
+    "stage": "A",
+    "epoch": 8,
+    "kaggle_val": 0.7259062229765557
+   },
+   {
+    "stage": "A",
+    "epoch": 9,
+    "kaggle_val": 0.7246589366647341
+   },
+   {
+    "stage": "A",
+    "epoch": 10,
+    "kaggle_val": 0.72505024026256
+   },
+   {
+    "stage": "B",
+    "epoch": 1,
+    "kaggle_val": 0.7181407765351941,
+    "team_train": 0.7795859790066169,
+    "test_video_app": 0.29953625888499624
+   },
+   {
+    "stage": "B",
+    "epoch": 2,
+    "kaggle_val": 0.7189397697349424,
+    "team_train": 0.875888047279197,
+    "test_video_app": 0.3356554140256374
+   },
+   {
+    "stage": "B",
+    "epoch": 3,
+    "kaggle_val": 0.7271045312761328,
+    "team_train": 0.900665235557555,
+    "test_video_app": 0.34404730564387115
+   },
+   {
+    "stage": "B",
+    "epoch": 4,
+    "kaggle_val": 0.7291564312891078,
+    "team_train": 0.9261115956316128,
+    "test_video_app": 0.3343755695510419
+   },
+   {
+    "stage": "B",
+    "epoch": 5,
+    "kaggle_val": 0.7272430578107645,
+    "team_train": 0.933484797439545,
+    "test_video_app": 0.32178773212369133
+   },
+   {
+    "stage": "B",
+    "epoch": 6,
+    "kaggle_val": 0.7291976512994128,
+    "team_train": 0.9386499619355592,
+    "test_video_app": 0.33050363500131635
+   },
+   {
+    "stage": "B",
+    "epoch": 7,
+    "kaggle_val": 0.7283219255804814,
+    "team_train": 0.9403011063826612,
+    "test_video_app": 0.32656689819971246
+   },
+   {
+    "stage": "B",
+    "epoch": 8,
+    "kaggle_val": 0.7276007614001904,
+    "team_train": 0.940385605425946,
+    "test_video_app": 0.32462283064336483
+   }
+  ],
+  "resnet18": [
+   {
+    "stage": "A",
+    "epoch": 1,
+    "kaggle_val": 0.7591150507787627
+   },
+   {
+    "stage": "A",
+    "epoch": 2,
+    "kaggle_val": 0.762074808018702
+   },
+   {
+    "stage": "A",
+    "epoch": 3,
+    "kaggle_val": 0.7610618817654704
+   },
+   {
+    "stage": "A",
+    "epoch": 4,
+    "kaggle_val": 0.753134252283563
+   },
+   {
+    "stage": "A",
+    "epoch": 5,
+    "kaggle_val": 0.7531017262754315
+   },
+   {
+    "stage": "A",
+    "epoch": 6,
+    "kaggle_val": 0.7655061968765492
+   },
+   {
+    "stage": "A",
+    "epoch": 7,
+    "kaggle_val": 0.7717221189305298
+   },
+   {
+    "stage": "A",
+    "epoch": 8,
+    "kaggle_val": 0.7708349047087262
+   },
+   {
+    "stage": "A",
+    "epoch": 9,
+    "kaggle_val": 0.7714283438570859
+   },
+   {
+    "stage": "A",
+    "epoch": 10,
+    "kaggle_val": 0.7699814389953596
+   },
+   {
+    "stage": "B",
+    "epoch": 1,
+    "kaggle_val": 0.761809103952276,
+    "team_train": 0.8777919932278607,
+    "test_video_app": 0.10112796419675585
+   },
+   {
+    "stage": "B",
+    "epoch": 2,
+    "kaggle_val": 0.7638565399641349,
+    "team_train": 0.9387022132347298,
+    "test_video_app": 0.11162592900103281
+   },
+   {
+    "stage": "B",
+    "epoch": 3,
+    "kaggle_val": 0.7642791365697841,
+    "team_train": 0.965744208880323,
+    "test_video_app": 0.11286527206820438
+   },
+   {
+    "stage": "B",
+    "epoch": 4,
+    "kaggle_val": 0.7632402873100719,
+    "team_train": 0.9716696272342887,
+    "test_video_app": 0.18153945849618275
+   },
+   {
+    "stage": "B",
+    "epoch": 5,
+    "kaggle_val": 0.7683314775828695,
+    "team_train": 0.9744198813506976,
+    "test_video_app": 0.14122435754642476
+   },
+   {
+    "stage": "B",
+    "epoch": 6,
+    "kaggle_val": 0.7672313068078267,
+    "team_train": 0.9791577264763538,
+    "test_video_app": 0.15844555598307042
+   },
+   {
+    "stage": "B",
+    "epoch": 7,
+    "kaggle_val": 0.7666944026736006,
+    "team_train": 0.9819086762210553,
+    "test_video_app": 0.12482128753974203
+   },
+   {
+    "stage": "B",
+    "epoch": 8,
+    "kaggle_val": 0.7668153597038398,
+    "team_train": 0.9827194903793193,
+    "test_video_app": 0.12480508697677244
+   }
+  ],
+  "efficientnet_b0": [
+   {
+    "stage": "A",
+    "epoch": 1,
+    "kaggle_val": 0.708816492204123
+   },
+   {
+    "stage": "A",
+    "epoch": 2,
+    "kaggle_val": 0.7324138816034703
+   },
+   {
+    "stage": "A",
+    "epoch": 3,
+    "kaggle_val": 0.7213509903377475
+   },
+   {
+    "stage": "A",
+    "epoch": 4,
+    "kaggle_val": 0.7149726617431653
+   },
+   {
+    "stage": "A",
+    "epoch": 5,
+    "kaggle_val": 0.7250495097623774
+   },
+   {
+    "stage": "A",
+    "epoch": 6,
+    "kaggle_val": 0.7254806818701705
+   },
+   {
+    "stage": "A",
+    "epoch": 7,
+    "kaggle_val": 0.7194460153615038
+   },
+   {
+    "stage": "A",
+    "epoch": 8,
+    "kaggle_val": 0.7185709646427412
+   },
+   {
+    "stage": "A",
+    "epoch": 9,
+    "kaggle_val": 0.7215496788874197
+   },
+   {
+    "stage": "A",
+    "epoch": 10,
+    "kaggle_val": 0.7194901288725322
+   },
+   {
+    "stage": "B",
+    "epoch": 1,
+    "kaggle_val": 0.7145845651461413,
+    "team_train": 0.851310504320898,
+    "test_video_app": 0.2934205463639862
+   },
+   {
+    "stage": "B",
+    "epoch": 2,
+    "kaggle_val": 0.7202140125535031,
+    "team_train": 0.9170950030870626,
+    "test_video_app": 0.25108037504303277
+   },
+   {
+    "stage": "B",
+    "epoch": 3,
+    "kaggle_val": 0.7203379185844796,
+    "team_train": 0.9373355807594191,
+    "test_video_app": 0.3315971730017619
+   },
+   {
+    "stage": "B",
+    "epoch": 4,
+    "kaggle_val": 0.7248684102171025,
+    "team_train": 0.9600637987288326,
+    "test_video_app": 0.2435471132621859
+   },
+   {
+    "stage": "B",
+    "epoch": 5,
+    "kaggle_val": 0.7197214154303538,
+    "team_train": 0.9605954227545217,
+    "test_video_app": 0.19223993033757927
+   },
+   {
+    "stage": "B",
+    "epoch": 6,
+    "kaggle_val": 0.7223619035904759,
+    "team_train": 0.9655938683363405,
+    "test_video_app": 0.23986958546809506
+   },
+   {
+    "stage": "B",
+    "epoch": 7,
+    "kaggle_val": 0.7215889338972334,
+    "team_train": 0.9659643837182939,
+    "test_video_app": 0.2343370932139892
+   },
+   {
+    "stage": "B",
+    "epoch": 8,
+    "kaggle_val": 0.7222492970623242,
+    "team_train": 0.9674459814939121,
+    "test_video_app": 0.23047325894574838
+   }
+  ],
+  "convnext_tiny": [
+   {
+    "stage": "A",
+    "epoch": 1,
+    "kaggle_val": 0.7374654943663735
+   },
+   {
+    "stage": "A",
+    "epoch": 2,
+    "kaggle_val": 0.7570326812581702
+   },
+   {
+    "stage": "A",
+    "epoch": 3,
+    "kaggle_val": 0.7427139116784779
+   },
+   {
+    "stage": "A",
+    "epoch": 4,
+    "kaggle_val": 0.7348762627190657
+   },
+   {
+    "stage": "A",
+    "epoch": 5,
+    "kaggle_val": 0.7327785016946254
+   },
+   {
+    "stage": "A",
+    "epoch": 6,
+    "kaggle_val": 0.7441633050408263
+   },
+   {
+    "stage": "A",
+    "epoch": 7,
+    "kaggle_val": 0.7388367677091918
+   },
+   {
+    "stage": "A",
+    "epoch": 8,
+    "kaggle_val": 0.7388268392067098
+   },
+   {
+    "stage": "A",
+    "epoch": 9,
+    "kaggle_val": 0.7368232077058019
+   },
+   {
+    "stage": "A",
+    "epoch": 10,
+    "kaggle_val": 0.7369584927396232
+   },
+   {
+    "stage": "B",
+    "epoch": 1,
+    "kaggle_val": 0.7481291500322875,
+    "team_train": 0.9036561431302154,
+    "test_video_app": 0.29239991089690365
+   },
+   {
+    "stage": "B",
+    "epoch": 2,
+    "kaggle_val": 0.7421616865404216,
+    "team_train": 0.9572242440372637,
+    "test_video_app": 0.23427229096211094
+   },
+   {
+    "stage": "B",
+    "epoch": 3,
+    "kaggle_val": 0.7441590495397623,
+    "team_train": 0.9693561711306681,
+    "test_video_app": 0.3019744436119155
+   },
+   {
+    "stage": "B",
+    "epoch": 4,
+    "kaggle_val": 0.7346144916536229,
+    "team_train": 0.979099321977324,
+    "test_video_app": 0.24674672444867463
+   },
+   {
+    "stage": "B",
+    "epoch": 5,
+    "kaggle_val": 0.7361884750471187,
+    "team_train": 0.9831036638289745,
+    "test_video_app": 0.25915635568336
+   },
+   {
+    "stage": "B",
+    "epoch": 6,
+    "kaggle_val": 0.7331765957941488,
+    "team_train": 0.9836304410786718,
+    "test_video_app": 0.3414390150057715
+   },
+   {
+    "stage": "B",
+    "epoch": 7,
+    "kaggle_val": 0.7312757053189263,
+    "team_train": 0.9856613589850886,
+    "test_video_app": 0.32076709665660885
+   },
+   {
+    "stage": "B",
+    "epoch": 8,
+    "kaggle_val": 0.7318735154683789,
+    "team_train": 0.9858643354032329,
+    "test_video_app": 0.3325692067799357
+   }
+  ]
+ },
+ "saved": "face_quality_mobilenet_v3_small.pt",
+ "saved_threshold": 0.5799999833106995
+}

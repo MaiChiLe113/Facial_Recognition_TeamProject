@@ -1,0 +1,180 @@
+{
+ "test_people": [
+  "Hồng Minh",
+  "Mai Chi"
+ ],
+ "recogniser_threshold": 0.6922129522578123,
+ "data": {
+  "train_photo_crops": 897,
+  "train_video_faces": 388,
+  "test_photo_crops": 338,
+  "test_video_faces": 237,
+  "video_faces_detected": 1498,
+  "video_faces_named": 707,
+  "tracks_named": 25
+ },
+ "views": {
+  "video (real)": {
+   "n": 237,
+   "failure_rate_at_0": 0.6666666666666666,
+   "methods": {
+    "v3 (photos + video)": {
+     "spearman": 0.2828629842840376,
+     "pAUC_0_30": 0.6578599532526463
+    },
+    "v1": {
+     "spearman": 0.33599202392821537,
+     "pAUC_0_30": 0.663682716433419
+    },
+    "v2 (photos only)": {
+     "spearman": 0.43409464193315167,
+     "pAUC_0_30": 0.6548387925692777
+    },
+    "heuristic": {
+     "spearman": 0.569827587761129,
+     "pAUC_0_30": 0.6305486158114931
+    }
+   }
+  },
+  "photos (synthetic damage)": {
+   "n": 338,
+   "failure_rate_at_0": 0.5207100591715976,
+   "methods": {
+    "v3 (photos + video)": {
+     "spearman": 0.6250039428567788,
+     "pAUC_0_30": 0.4412288903937813
+    },
+    "v1": {
+     "spearman": 0.5829148984669706,
+     "pAUC_0_30": 0.44177533625866666
+    },
+    "v2 (photos only)": {
+     "spearman": 0.6211193548973546,
+     "pAUC_0_30": 0.43996780200391145
+    },
+    "heuristic": {
+     "spearman": 0.24092012525776188,
+     "pAUC_0_30": 0.4733239082557774
+    }
+   }
+  },
+  "all": {
+   "n": 575,
+   "failure_rate_at_0": 0.5808695652173913,
+   "methods": {
+    "v3 (photos + video)": {
+     "spearman": 0.5214975635004797,
+     "pAUC_0_30": 0.528564809310602
+    },
+    "v1": {
+     "spearman": 0.3516108039185982,
+     "pAUC_0_30": 0.5280544319878102
+    },
+    "v2 (photos only)": {
+     "spearman": 0.4480956168257335,
+     "pAUC_0_30": 0.5288859523245192
+    },
+    "heuristic": {
+     "spearman": 0.3900574407917992,
+     "pAUC_0_30": 0.5323537213741243
+    }
+   }
+  }
+ },
+ "kaggle_val_spearman": {
+  "v3 (photos + video)": 0.7250034987508748,
+  "v1": 0.7225004181251046,
+  "v2 (photos only)": 0.7253408323352081
+ },
+ "threshold": {
+  "value": 0.5899999737739563,
+  "rule": "10th percentile of v3 score on held-out clean enrolment photos (90 % of good photos pass)",
+  "check_on_video": {
+   "video_accepted": 0.5780590717299579,
+   "video_failure_all": 0.6666666666666666,
+   "video_failure_accepted": 0.5766423357664233,
+   "video_failure_refused": 0.79,
+   "clean_photos_accepted": 0.8846153846153846,
+   "by_camera": {
+    "attendance_cam": 0.7115384615384616,
+    "cam_1": 0.25,
+    "cam_2": 0.5132743362831859
+   }
+  },
+  "v1_rule_value": 0.79
+ },
+ "history": [
+  {
+   "epoch": 1,
+   "train_loss": 0.007756520910188556,
+   "team_train_spearman": 0.7719051850719073,
+   "kaggle_val_spearman": 0.715914991978748,
+   "team_test_spearman": 0.5632445210321669,
+   "team_test_video_spearman": 0.44237630688404944,
+   "seconds": 10.636185646057129
+  },
+  {
+   "epoch": 2,
+   "train_loss": 0.0057796358192960424,
+   "team_train_spearman": 0.8653542159061688,
+   "kaggle_val_spearman": 0.7193813458453364,
+   "team_test_spearman": 0.500308034136242,
+   "team_test_video_spearman": 0.20797643236655314,
+   "seconds": 9.509636878967285
+  },
+  {
+   "epoch": 3,
+   "train_loss": 0.005085964763226609,
+   "team_train_spearman": 0.9094568177991713,
+   "kaggle_val_spearman": 0.720436308109077,
+   "team_test_spearman": 0.5186176336918649,
+   "team_test_video_spearman": 0.28266646714467814,
+   "seconds": 9.344255924224854
+  },
+  {
+   "epoch": 4,
+   "train_loss": 0.00473890144067506,
+   "team_train_spearman": 0.9195111463688458,
+   "kaggle_val_spearman": 0.7217795794448948,
+   "team_test_spearman": 0.5070449553098015,
+   "team_test_video_spearman": 0.2161273863761338,
+   "seconds": 9.868697881698608
+  },
+  {
+   "epoch": 5,
+   "train_loss": 0.004667107613446812,
+   "team_train_spearman": 0.9331570886474199,
+   "kaggle_val_spearman": 0.7265511001377749,
+   "team_test_spearman": 0.5258756880270666,
+   "team_test_video_spearman": 0.26837209889319386,
+   "seconds": 9.777741193771362
+  },
+  {
+   "epoch": 6,
+   "train_loss": 0.004463010579347611,
+   "team_train_spearman": 0.9384478621221742,
+   "kaggle_val_spearman": 0.7237366614341654,
+   "team_test_spearman": 0.524630990254002,
+   "team_test_video_spearman": 0.2789677982327881,
+   "seconds": 9.29473876953125
+  },
+  {
+   "epoch": 7,
+   "train_loss": 0.004309514587124189,
+   "team_train_spearman": 0.9396267993797258,
+   "kaggle_val_spearman": 0.7246674911668728,
+   "team_test_spearman": 0.5178724183204565,
+   "team_test_video_spearman": 0.2774822007756117,
+   "seconds": 9.777514934539795
+  },
+  {
+   "epoch": 8,
+   "train_loss": 0.0043328502463797726,
+   "team_train_spearman": 0.9405319248990647,
+   "kaggle_val_spearman": 0.7250034987508748,
+   "team_test_spearman": 0.5214975635004797,
+   "team_test_video_spearman": 0.2828629842840376,
+   "seconds": 9.893127918243408
+  }
+ ]
+}

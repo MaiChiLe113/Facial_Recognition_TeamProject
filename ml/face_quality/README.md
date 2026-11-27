@@ -5,10 +5,19 @@ webcam camera or from an uploaded video. The scan keeps the best frames for five
 **face-quality model trained here**. The score estimates how useful a frame is **to the team's own face recogniser**
 (`ml/face_recognition`, v1), not how good it looks to a person.
 
+**The app runs v2** (`face_quality.pt`): MobileNetV3-Small trained on Kaggle, then fine-tuned on the team's enrolment
+photos and real faces from the recorded takes. Its threshold is 0.58, chosen on held-out team photos. v1 (Kaggle
+only, notebooks 01–03) is the first model and is in git history. Sections below describe v1 first, then the in-domain
+work (notebooks 04–06) that led to v2.
+
 - [x] `01_build_labels.ipynb`: labels from the recogniser (run locally)
 - [x] `02_train_quality.ipynb`: MobileNetV3-Small regression (run on Colab, T4 GPU)
 - [x] `03_evaluate.ipynb`: EDC curves against two baselines, damage response, threshold (run on Colab)
-- [x] `infer.py` (`score`, `score_batch`, `threshold`, `info`), loaded by `backend/app/services/enrol.py`
+- [x] `04_finetune_team.ipynb`: fine-tune on team photos (v2 candidate, not adopted: memorised its 3 people)
+- [x] `05_finetune_video.ipynb`: + real faces from the recorded takes (v3 candidate, not adopted)
+- [x] `06_backbones.ipynb`: 4 backbones, same protocol; the MobileNetV3 winner is **v2 in the app**
+- [x] `infer.py` (`score`, `score_batch`, `align_crop`, `threshold`, `info`, `build_model(arch=...)`), loaded by
+  `backend/app/services/enrol.py`
 - [x] Backend scan API (`/api/enrol/*`) and the scan UI (`frontend/src/components/FaceScan.vue`)
 - [ ] Try the live scan on a phone over the LAN (`docs/LAN_DEMO.md`)
 
@@ -67,10 +76,51 @@ Notebook 03 picks the lowest threshold at which camera-like pairs with both imag
 than 1.1 × the clean FNMR. This gives **0.78**, stored in the checkpoint. At 0.78 the model accepts 69 % of clean crops
 but only 4–9 % of blurred, motion-blurred, noisy or occluded ones (`figures/threshold.png`).
 
-**The app uses 0.65, not 0.78** (`QUALITY_THRESHOLD_WEBCAM` in `backend/app/services/enrol.py`). Real webcam frames
+**v1 in the app used 0.65, not 0.78** (`QUALITY_THRESHOLD_WEBCAM` in `backend/app/services/enrol.py`). Real webcam frames
 from the team's AppliedML enrolment photos score lower than the Kaggle crops: the median is 0.67 for one person and
 0.75 for the other. At 0.78 only 3 of 27 frames passed, so a scan would rarely finish. At 0.65, 15 of the 16 frontal
-frames pass. This is a calibration on only two people, chosen by hand, and it is the main limitation below.
+frames pass. This was a calibration on only two people, chosen by hand. v2 replaces it: its threshold, 0.58, was set on held-out
+team photos (90 % of clean photos pass) and is stored in the checkpoint with `threshold_domain: "webcam"`, which the
+backend uses instead of the hand value.
+
+## In-domain fine-tuning and the backbone comparison (notebooks 04–06) → v2
+
+**Data.** Team enrolment photos from `AppliedML/<person>/`: 95 photos with a face, 5 people. Each photo gets 12
+synthetic damages. Notebook 05 adds real faces cut from the 8 recorded takes × 3 cameras at 3 fps, 625 faces kept.
+The people in those faces are named with an independent recogniser, OpenCV SFace, plus a vote over each person track,
+so the labels do not depend on the model that computes them. Inside voted tracks, SFace's own name agreed with the
+track name on 99.5 % of 400 faces. Labels use the same rule as v1 (team-recogniser cosine to the person's enrolment
+mean). **Split by person:** training uses Minh Thành, Thuận Minh and Đức Mạnh; testing uses Hồng Minh and Mai Chi.
+
+**Protocol (notebook 06), the same for every backbone:**
+- Stage A: Kaggle only, the best epoch chosen on Kaggle validation.
+- Stage B: team photos + video faces, mixed half and half with Kaggle, with augmentation of framing, flip and colour.
+- Primary test: held-out video faces of **at least 80 px**, the range the scan scores (smaller faces are refused as
+  `too_small`).
+
+EDC pAUC on that test (lower is better):
+
+| Model | video faces ≥ 80 px (114) | photos, synthetic damage (338) | Kaggle val Spearman | CPU per crop |
+| --- | --- | --- | --- | --- |
+| **MobileNetV3-Small, stage B (v2)** | **32.21** | 44.17 | 0.728 | 8 ms |
+| EfficientNet-B0, stage B | 33.13 | 45.06 | 0.722 | 20 ms |
+| ConvNeXt-Tiny, stage B | 33.66 | 44.16 | 0.732 | 60 ms |
+| ResNet-18 initialised from the team recogniser, stage B | 35.85 | 45.19 | 0.767 | 21 ms |
+| Heuristic | 32.72 | 47.33 | — | — |
+| v1 | 35.95 | 44.18 | 0.723 | 8 ms |
+
+![Backbones](figures/backbones_edc.png)
+
+- **Bigger backbones fit Kaggle better but transfer worse.** They memorise the 3 training people more (team-train
+  Spearman 0.97–0.99), so capacity is not the bottleneck; the amount of in-domain data is.
+- **In-domain fine-tuning helped every backbone** on faces ≥ 80 px (by 1.2 to 4.4 pAUC). v2 is 3.7 pAUC better than
+  v1 there and equal on photos.
+- Multiplying the score by the heuristic's face-size term helps on small faces (all video faces: 61.5 vs 67.1). In
+  the app it changes little, because the scan only scores faces of 80/110 px and above, where the term is close to 1.
+- The 04 (photos only) and 05 (photos + video, judged on all video faces) runs did not beat v1. Their results are in
+  `results_v2.json`, `results_v3.json` and `figures/v2_*`, `figures/v3_*`.
+- **Caveats:** only 2 test people, and most video faces ≥ 80 px are of one of them. The backbones were also compared
+  on this test set (the rule, fixed in advance, favoured the baseline, which won).
 
 ## How the scan uses the score
 
@@ -87,6 +137,14 @@ against the gallery, and the page warns when the person already looks registered
 `data/photos/<student id>/` as before, with a `scan.json` that records the pose, quality, liveness and glasses of each
 photo plus the model versions and the threshold used.
 
+The quality model is given an **eye-aligned crop** (`infer.align_crop`) framed like the Kaggle training images:
+eyes level, eye distance 0.189 of the side, eye midpoint at (0.50, 0.43), measured with YuNet on 400 clean training
+crops. Those crops are loose (the YuNet box covers only about 42 % of the side), while the detector box with a 0.1
+margin covers about 83 %, and tighter crops score lower (on 27 webcam frames, median 0.66 at margin 0 vs 0.75 at 0.3).
+Switching to the aligned crop changed little in practice: median 0.712 → 0.719 on those frames, 11 % → 26 % above 0.78,
+and the same 78 % above 0.65. So the framing explains only part of the gap between the Kaggle images and the webcam;
+the rest needs retraining on in-domain crops.
+
 If `face_quality.pt` is missing, the scan falls back to the heuristic at 0.35.
 
 Smoke test (2026-11-26): a video made from Đức Mạnh's webcam photos, posted to `/api/enrol/video`, gave liveness
@@ -95,8 +153,8 @@ stayed empty because those photos have no such poses.
 
 ## Limits
 
-- **Domain gap.** The model is trained on 64 px aligned Kaggle crops. Webcam and phone crops are larger and differ in
-  look, hence the separate webcam threshold. The next step would be labels from the team's own recorded takes.
+- **Little in-domain data.** v2 saw only 3 team members and one room. The models memorise the people they see, so more
+  people and rooms would help more than a bigger backbone.
 - **Pinned to the recogniser.** The labels come from `face_recognition` v1. If that model is retrained, run notebook 01
   again, retrain, and bump `face_quality` in `ml/model_versions.json`.
 - **Clean crops are hard to rank.** The validation Spearman on clean crops alone is only 0.35; most of the signal comes
@@ -113,4 +171,7 @@ stayed empty because those photos have no such poses.
 2. On Colab, copy `labels/` and this repo's `ml/` folder (with `face_recognition/face_recognition.pt`) to
    `MyDrive/face_quality_colab/`, then run `02_train_quality.ipynb` and `03_evaluate.ipynb`. Notebook 03 fetches the
    Kaggle archive through `kagglehub`, or copies `face_quality_colab/archive.zip` if present.
-3. Copy `face_quality.pt`, `results.json` and `figures/` back here and restart the backend.
+3. For v2: add a shortcut to the shared `AppliedML` folder in My Drive, upload `video_tracks.json` (from
+   `python ml/face_quality/build_video_tracks.py`) next to the notebooks, and run `06_backbones.ipynb` (about 40 min
+   on a T4). Copy the saved `face_quality_mobilenet_v3_small.pt` here as `face_quality.pt`.
+4. Copy the weights, `results*.json` and `figures/` back here and restart the backend.
