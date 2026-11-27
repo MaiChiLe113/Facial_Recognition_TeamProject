@@ -109,6 +109,9 @@ button, input, select, textarea { font: inherit; }
 .source-switch .btn.active { border-color: transparent; color: var(--text); background: linear-gradient(90deg, var(--accent), var(--accent-strong)); font-weight: 600; }
 .cam-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; color: #ddd; gap: 4px; font-size: 14px; }
 .cam-empty .muted { color: #999; font-size: 12px; }
+.cam-empty.clickable { cursor: pointer; }
+.cam-empty.clickable:hover { background: rgba(255, 255, 255, .06); }
+.cam-empty.clickable:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
 .checks { list-style: none; margin: var(--space-1) 0 var(--space-3); padding: 0 var(--space-4); display: grid; gap: 6px; font-size: 13px; }
 .checks li::before { content: '✓'; display: inline-grid; place-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--green); color: #fff; font-size: 11px; margin-right: var(--space-2); }
 .checks li.bad::before { content: '!'; background: var(--danger); }
@@ -253,12 +256,13 @@ tr.selected, tr.selected:hover { background: var(--yellow-soft); }
   .demo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 700px) {
-  .field-row, .stats, .demo-grid, .grid-top { grid-template-columns: 1fr; }
+  .field-row, .field-row.ids, .stats, .demo-grid, .grid-top { grid-template-columns: 1fr; }
   .main { padding: var(--space-4); }
 }
 
 /* Roster photo (student card image) and hand-editable cells */
-.avatar.photo { width: 60px; height: 80px; object-fit: cover; object-position: center 40%; background: #eee; padding: 0; }
+.avatar.photo { width: 60px; height: 80px; min-width: 60px; max-width: 60px; object-fit: cover; object-position: center 40%;
+  background: #eee; padding: 0; display: grid; place-content: center; box-sizing: border-box; }
 select.pick { border: 1px solid transparent; cursor: pointer; font: inherit; font-size: 12px; background-color: transparent; }
 select.pick:hover { border-color: var(--line); }
 select.status.pick { padding: 2px 8px; border-radius: 999px; }
@@ -283,3 +287,26 @@ select.status.pick { padding: 2px 8px; border-radius: 999px; }
 /* Demo event log: room for a full page (8 rows + pager), so it does not shrink when a take is chosen */
 .event-log.demo-log { min-height: 0; }
 .notice a { color: var(--green); }
+
+/* Add person: remove a student added by live scan / upload */
+.remove-cell { width: 32px; text-align: right; }
+.row-remove { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted, #888);
+  cursor: pointer; line-height: 1; font-size: 15px; }
+.row-remove:hover { background: var(--accent); border-color: var(--accent-strong); color: #2b2b2b; }
+.row-remove:disabled { opacity: .5; cursor: default; }
+
+/* Add person: student details form */
+.student-form { gap: 0; }
+.student-form .card-head { margin-bottom: 0; }
+.form-section { display: grid; gap: var(--space-3); padding: var(--space-4) 0; border-bottom: 1px solid var(--line); }
+.form-section h3 { margin: 0; display: flex; align-items: center; gap: var(--space-2); font-size: 15px; }
+.form-section h3 em { font-style: normal; font-weight: 400; font-size: 13px; margin-left: auto; }
+.step { display: inline-grid; place-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 12px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong)); color: #2b2b2b; }
+.field-row.ids { grid-template-columns: 1fr 1fr 110px; align-items: start; }
+.student-form .check-chip.on { background: color-mix(in srgb, var(--accent) 30%, transparent); border-color: var(--accent-strong); }
+.student-form .check-chip input { accent-color: var(--accent-strong); }
+.face-mode { justify-content: flex-start; }
+.upload-zone { align-items: center; text-align: center; }
+.upload-thumbs { width: 100%; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
+.form-actions { justify-content: flex-end; padding-top: var(--space-4); }

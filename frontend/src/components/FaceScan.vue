@@ -1,14 +1,14 @@
 <script setup>
-// AI face scan (Đức Mạnh's innovative feature): replaces uploading face photos on Add person.
+// live_face_scan (Đức Mạnh's innovative feature): replaces uploading face photos on Add person.
 // Live scan: the camera preview is sent ~4 times a second (downscaled) to POST /api/enrol/frame; the backend answers
 // with the face box, head pose, quality and a hint. When a frame fits a missing pose slot and passes, the full-resolution
 // frame is sent again with final=true and kept. Upload video: the backend samples the video and does the same.
 // Emits 'update' with the scan summary (session_id, missing, done, slots) so the form can submit enrol_session.
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { discardScan, failScan, fetchScan, scanStillUrl, sendScanFrame, startScan, uploadScanVideo } from '../api.js'
+import { discardScan, failScan, fetchScan, removeScanStill, scanStillUrl, sendScanFrame, startScan, uploadScanVideo } from '../api.js'
 
 const emit = defineEmits(['update'])
-const SLOT_LABEL = { front: 'Straight', left: 'Turn left', right: 'Turn right', up: 'Chin up', down: 'Chin down' }
+const SLOT_LABEL = { front: 'Straight', left: 'Turn left', right: 'Turn right' }
 // No overall time limit: an attempt fails when no new photo is kept for ATTEMPT_S seconds (no face, too dark, not live…).
 // The scan retries automatically; after MAX_ATTEMPTS failed attempts it stops and the backend logs the failure.
 const PREVIEW_W = 640, PREVIEW_MS = 250, ATTEMPT_S = 10, MAX_ATTEMPTS = 3
@@ -25,8 +25,12 @@ const step = computed(() => {
   const order = Object.keys(s.slots)
   return { n: order.indexOf(s.missing[0]) + 1, total: order.length, label: SLOT_LABEL[s.missing[0]] }
 })
+// Problems the person must fix before the scan can go on: shown at once in the instruction box, in a warning colour
+const BLOCKING = new Set(['other_person', 'mask', 'glasses', 'not_live', 'too_dark', 'too_bright', 'several_faces', 'no_face', 'too_small'])
+const blocking = computed(() => BLOCKING.has(last.value?.reason))
 let pendingHint = null
 watch(() => last.value?.hint, (h) => {
+  if (blocking.value) { shownHint.value = h; pendingHint = null; return }
   if (h == null) { shownHint.value = null; pendingHint = null; return }
   if (h === shownHint.value) { pendingHint = null; return }
   if (h === pendingHint || shownHint.value == null || h === 'done' || last.value?.kept) { shownHint.value = h; pendingHint = null }
@@ -56,6 +60,10 @@ async function ensureSession(source) {
   return true
 }
 function setSummary(s) { summary.value = s; emit('update', s) }
+
+async function removeStill(slot, i) {
+  try { setSummary(await removeScanStill(summary.value.session_id, slot, i)) } catch (e) { error.value = e.message }
+}
 
 // ---- live --------------------------------------------------------------------------------------
 async function startLive() {
@@ -189,7 +197,7 @@ const meterReason = computed(() => {
   if (r.accepted) return r.kept === false && r.slot && summary.value?.missing.includes(r.slot) ? 'same view' : `${SLOT_LABEL[r.slot] ?? r.slot} slot full`
   return REASON_TEXT[r.reason] ?? r.reason
 })
-const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several faces', too_small: 'too far',
+const REASON_TEXT = { ok: 'kept', mask: 'face mask: take it off', other_person: 'a different person', glasses: 'glasses: take them off', no_face: 'no face', several_faces: 'several faces', too_small: 'too far',
   too_dark: 'too dark', too_bright: 'too bright', not_live: 'not live', between_poses: 'between poses', low_quality: 'low quality', no_progress: 'no new photo', calibrating: 'calibrating: look straight', same_view: 'same view as a kept photo',
   other_pose: 'not this pose yet' }
 </script>
@@ -206,7 +214,7 @@ const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several fa
         <video ref="videoEl" autoplay muted playsinline />
         <div v-if="boxStyle" class="scan-box" :class="last?.accepted ? 'good' : 'bad'" :style="boxStyle" />
         <!-- top: what to DO (instruction); bottom: what the scanner SEES (status, with the quality meter) -->
-        <div class="scan-instruction">
+        <div class="scan-instruction" :class="{ warn: blocking }">
           <small v-if="step">Step {{ step.n }} of {{ step.total }} · {{ step.label }}</small>
           <span>{{ shownHint ?? 'Look at the camera' }}</span>
         </div>
@@ -224,7 +232,7 @@ const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several fa
     </div>
 
     <div v-else class="scan-video">
-      <p class="muted small">Film the face slowly for about 15 s: straight, left, right, chin up, chin down. Good light,
+      <p class="muted small">Film the face slowly for about 15 s: straight, left, right. Good light,
         1080p or 4K, one person only. MP4, WebM or MOV, up to 60 s.</p>
       <div class="drop-actions">
         <button class="btn primary" type="button" :disabled="busy" @click="fileInput.click()">{{ busy ? 'Analysing video…' : 'Choose video' }}</button>
@@ -243,6 +251,7 @@ const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several fa
           <figure v-for="(e, i) in items" :key="i" class="thumb">
             <img :src="scanStillUrl(summary.session_id, slot, i) + `?q=${e.quality}`" :alt="`${slot} ${i + 1}`" />
             <figcaption>{{ e.quality.toFixed(2) }}</figcaption>
+            <button type="button" class="thumb-remove" :title="`Remove this ${SLOT_LABEL[slot]} photo`" aria-label="Remove photo" @click="removeStill(slot, i)">×</button>
           </figure>
         </div>
       </div>
@@ -250,8 +259,7 @@ const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several fa
 
     <div v-if="summary" class="scan-foot">
       <div class="progress"><span :style="{ width: `${Math.min(100, (kept / total) * 100)}%` }" /></div>
-      <span class="muted small">{{ kept }} / {{ total }} photos · quality model: {{ summary.model }} (threshold {{ summary.threshold }})
-        <template v-if="summary.liveness?.score != null"> · liveness {{ summary.liveness.score.toFixed(2) }}</template></span>
+      <span class="muted small">{{ kept }} / {{ total }} photos</span>
       <small v-if="summary.liveness?.live === false" class="error">Liveness check failed: use a real face, not a photo or a screen.</small>
       <small v-if="summary.duplicate" class="error">This face already matches {{ summary.duplicate.name }} ({{ summary.duplicate.student_id }}, score {{ summary.duplicate.score }}). Check before registering.</small>
       <button class="btn" type="button" @click="restart">Start again</button>
@@ -260,16 +268,21 @@ const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several fa
 </template>
 
 <style scoped>
-.scan { display: grid; gap: var(--space-3); }
-.scan-tabs { justify-content: flex-start; }
-.scan-view { position: relative; width: 100%; max-width: 640px; aspect-ratio: 16 / 9; background: #111; border-radius: 10px; overflow: hidden; }
+.scan { display: grid; gap: var(--space-3); justify-items: center; text-align: center; }
+.scan > * { width: 100%; max-width: 640px; }
+.scan-live, .scan-video { display: grid; gap: var(--space-2); justify-items: center; }
+.scan .drop-actions { justify-content: center; }
+.scan-tabs { justify-content: center; }
+.scan-view { position: relative; width: 100%; max-width: 640px; margin: 0 auto; aspect-ratio: 16 / 9; background: #111; border-radius: 10px; overflow: hidden; }
 .scan-view video { width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); }
 .scan-box { position: absolute; border: 3px solid; border-radius: 8px; pointer-events: none; }
 .scan-box.good { border-color: #6ad16a; }
 .scan-box.bad { border-color: #f2b233; }
 .scan-instruction { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); max-width: 80%; display: grid;
-  justify-items: center; gap: 0; background: rgba(20, 90, 200, .8); color: #fff; padding: 3px 10px; border-radius: 8px;
+  justify-items: center; gap: 0; background: linear-gradient(90deg, var(--accent), var(--accent-strong)); color: #2b2b2b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .25); padding: 3px 10px; border-radius: 8px;
   text-align: center; }
+.scan-instruction.warn { background: var(--danger); color: #fff; }
 .scan-instruction small { font-size: 9px; font-weight: 600; opacity: .85; text-transform: uppercase; letter-spacing: .04em; }
 .scan-instruction span { font-size: 13px; font-weight: 600; }
 .scan-meter { position: absolute; left: 12px; right: 12px; bottom: 10px; height: 8px; background: rgba(255, 255, 255, .25); border-radius: 4px; }
@@ -279,11 +292,11 @@ const REASON_TEXT = { ok: 'kept', no_face: 'no face', several_faces: 'several fa
 .scan-reason { position: absolute; right: 0; bottom: 12px; font-size: 12px; font-style: normal; font-weight: 600; color: #fff;
   background: rgba(0, 0, 0, .55); padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
 .scan-meter i { position: absolute; top: -3px; width: 2px; height: 14px; background: #fff; }
-.scan-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-2); }
+.scan-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-2); }
 .scan-slot { border: 1px solid var(--line); border-radius: 8px; padding: var(--space-2); }
 .scan-slot.full { border-color: var(--green); background: var(--green-soft); }
-.scan-slot .thumbs { margin-top: 6px; }
+.scan-slot .thumbs { margin-top: 6px; grid-template-columns: repeat(auto-fit, 76px); justify-content: center; }
 .scan-slot figcaption { font-size: 11px; text-align: center; color: var(--muted); }
-.scan-foot { display: grid; gap: 6px; justify-items: start; }
+.scan-foot { display: grid; gap: 6px; justify-items: center; }
 .scan-foot .progress { width: 100%; }
 </style>

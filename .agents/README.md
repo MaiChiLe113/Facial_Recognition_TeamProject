@@ -9,7 +9,7 @@ Start here. These files tell an agent (Claude, Copilot, Cursor…) what the proj
 | [`status.md`](status.md) | Branches, what is done, what comes next |
 | [`architecture.md`](architecture.md) | How the backend pipeline and the frontend are put together, and what to do when a model `.pt` is replaced |
 | [`decisions.md`](decisions.md) | Decisions already made and why. Do not reopen them without asking |
-| [`FACE_QUALITY.md`](FACE_QUALITY.md) | Đức Mạnh's innovative feature (AI enrolment scan + face-quality model): full history, results, bugs fixed, open problems, measure-first improvement plan |
+| [`LIVE_FACE_SCAN.md`](LIVE_FACE_SCAN.md) | Đức Mạnh's innovative feature, **live_face_scan** (the Add person enrolment scan, built on the `ml/face_quality` model): full history, results, bugs fixed, open problems, measure-first improvement plan |
 | [`presence_verification.md`](presence_verification.md) | Work in progress on Đức Mạnh's presence verification module: map calibration state, open problems, next steps |
 
 ## The project in one minute

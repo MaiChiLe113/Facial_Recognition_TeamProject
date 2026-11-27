@@ -27,7 +27,7 @@ def create_student(name: str = Form(...), student_id_vn: str = Form(...), studen
                    year: str = Form(""), courses: str = Form("[]"), photos: Optional[list[UploadFile]] = File(None),
                    enrol_session: str = Form("")):
     """Register a student from the Add person page: details + face photos (multipart form), or, instead of photos,
-    enrol_session = the id of a finished AI face scan (POST /api/enrol/..., app/services/enrol.py).
+    enrol_session = the id of a finished live_face_scan (POST /api/enrol/..., app/services/enrol.py).
     Photos go to data/photos/<student_id_vn>/ (a scan also writes scan.json there); the face gallery reloads so the
     student is recognised right away."""
     from ..services import enrol
@@ -90,6 +90,22 @@ def create_student(name: str = Form(...), student_id_vn: str = Form(...), studen
     from ..services import gallery
     gallery.roster_changed()                       # the new student is recognised once the photos are embedded
     return saved
+
+
+@router.delete("/api/students/{sid}")
+def delete_student(sid: str):
+    """Remove a student registered on the Add person page (live scan / upload) and their data/photos/<sid>/.
+    Students from the Drive enrolment photos are refused (403)."""
+    sid = sid.strip().upper()
+    try:
+        if not queries.delete_student(sid):
+            raise HTTPException(404, f"{sid} is not registered")
+    except PermissionError as e:
+        raise HTTPException(403, str(e)) from e
+    shutil.rmtree(PHOTOS_DIR / sid, ignore_errors=True)
+    from ..services import gallery
+    gallery.roster_changed()
+    return {"removed": sid}
 
 
 @router.get("/api/courses")

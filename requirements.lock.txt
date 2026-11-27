@@ -1,4 +1,4 @@
-# Exact versions from `uv pip freeze` of a working environment (2026-11-24), for reproducing it:
+# Exact versions from `uv pip freeze` of a working environments (2026-11-24), for reproducing it:
 #   pip install -r requirements.txt -c requirements.lock.txt
 # requirements.txt is the source of truth. Left out on purpose: opencv-python==5.1.0.95 and
 # opencv-python-headless (requirements.txt needs ONE OpenCV package, <5).

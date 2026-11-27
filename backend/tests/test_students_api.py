@@ -77,3 +77,37 @@ class RegisterStudent(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RemoveStudent(RegisterStudent):
+    def test_removes_an_added_student_and_their_photos(self):
+        self.client.post("/api/students", data=form(), files=photos())
+        self.assertTrue(queries.get_student("SWH09999", self.db)["removable"])
+        r = self.client.delete("/api/students/SWH09999")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIsNone(queries.get_student("SWH09999", self.db))
+        self.assertFalse((self.photos_dir / "SWH09999").exists())
+
+    def test_drive_student_cannot_be_removed(self):
+        self.assertFalse(queries.get_student("SWH02378", self.db)["removable"])
+        self.assertEqual(self.client.delete("/api/students/SWH02378").status_code, 403)
+        self.assertIsNotNone(queries.get_student("SWH02378", self.db))
+
+    def test_unknown_student_is_404(self):
+        self.assertEqual(self.client.delete("/api/students/SWH00000").status_code, 404)
+
+
+class FillMissingCards(unittest.TestCase):
+    def test_null_card_is_filled_from_the_roster_and_set_cards_are_kept(self):
+        from sqlalchemy import text
+        from app.db import connect
+        with tempfile.TemporaryDirectory() as d:
+            db = Path(d) / "t.sqlite3"
+            init_db(db)
+            with connect(db) as conn:
+                conn.execute(text("UPDATE students SET student_card = NULL WHERE student_id_vn = 'SWH02486'"))
+                conn.execute(text("UPDATE students SET student_card = 'keep.jpg' WHERE student_id_vn = 'SWH02378'"))
+            init_db(db)
+            self.assertEqual(queries.get_student("SWH02486", db)["student_card"], "AppliedML/student_card_image/HongMinh.jpg")
+            self.assertEqual(queries.get_student("SWH02378", db)["student_card"], "keep.jpg")
+            app.db._engines.pop(db).dispose()

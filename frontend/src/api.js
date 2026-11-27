@@ -120,6 +120,12 @@ export async function updateAttendance(sessionId, studentId, changes) {
   }
 }
 
+export async function deleteStudent(studentId) {
+  const res = await fetch(`/api/students/${encodeURIComponent(studentId)}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || `Could not remove ${studentId} (${res.status})`)
+  return res.json()
+}
+
 // form: FormData with name, student_id_vn, student_id_au, year, courses (JSON list of course keys), and either
 // photos (files) or enrol_session (id of a finished face scan, see the scan helpers below)
 export async function createStudent(form) {
@@ -137,7 +143,7 @@ export async function createStudent(form) {
   return { ok: false, message: body?.detail ? String(body.detail) : `The backend answered ${res.status}.` }
 }
 
-// ---- AI face scan for Add person (backend/app/api/enrol.py) ------------------------------------
+// ---- live_face_scan for Add person (backend/app/api/enrol.py) ------------------------------------
 //   POST /api/enrol/session            -> summary { session_id, model, threshold, per_slot, missing, done, slots, ... }
 //   POST /api/enrol/frame (multipart)  -> analysis { faces, box, yaw, pitch, slot, quality, reason, hint, kept, ... }
 //   POST /api/enrol/video (multipart)  -> summary + frame_reasons
@@ -188,6 +194,12 @@ export function failScan(sessionId, reason, attempts, reasons) {
 
 export function discardScan(sessionId) {
   return fetch(`/api/enrol/session/${sessionId}`, { method: 'DELETE' }).catch(() => null)
+}
+
+export async function removeScanStill(sessionId, slot, i) {
+  const res = await fetch(`/api/enrol/session/${sessionId}/still/${slot}/${i}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Could not remove the photo (${res.status})`)
+  return res.json()
 }
 
 export const scanStillUrl = (sessionId, slot, i) => `/api/enrol/session/${sessionId}/still/${slot}/${i}`

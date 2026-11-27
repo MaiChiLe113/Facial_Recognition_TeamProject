@@ -16,13 +16,14 @@ const FEATURES = [
   { key: 'anti_spoofing', label: 'Anti-spoofing', hint: 'Real face or a printed photo / phone screen?' },
   { key: 'emotion', label: 'Emotion', hint: 'Facial expression of each face.' },
   { key: 'glasses_detection', label: 'Glasses detection', hint: 'Check for glasses on each detected face.' },
+  { key: 'mask_detection', label: 'Face mask', hint: 'Is each face wearing a face mask? (colour rule, no trained model yet)' },
   { key: 'gesture', label: 'Gesture', hint: 'Hand gesture of each hand (👍 ✌️ ✋ ✊ ☝️ 👌 …).' },
 ]
 const ICONS = { angry: '😠', disgust: '🤢', fear: '😨', happy: '😄', sad: '😢', surprise: '😮', neutral: '😐' }
 const HAND_ICONS = { like: '👍', dislike: '👎', peace: '✌️', peace_inverted: '✌️', palm: '✋', stop: '✋', stop_inverted: '✋', fist: '✊',
   one: '☝️', ok: '👌', call: '🤙', rock: '🤘', mute: '🤫', four: '🖐️', three: '🤟', three2: '🤟', two_up: '✌️', two_up_inverted: '✌️', no_gesture: '🖐️' }
 
-const selected = ref({ face_recognition: true, anti_spoofing: true, emotion: true, glasses_detection: false, gesture: false })
+const selected = ref({ face_recognition: true, anti_spoofing: true, emotion: true, glasses_detection: false, mask_detection: false, gesture: false })
 const status = ref({})             // feature -> { found, code, error, expected_file }
 const backendUp = ref(true)
 const video = ref(null)
@@ -212,6 +213,7 @@ function nameTag(f) {
   if (f.loading) tag = { text: 'Loading…', cls: 'wait' }
   else if ('similarity' in f) tag = f.name ? { text: f.name, cls: 'known' } : { text: 'Unknown', cls: 'unknown' }
   else if ('glasses' in f && !emo) tag = { text: f.glasses ? 'Glasses' : 'No glasses', cls: 'wait' }
+  else if ('mask' in f && !emo) tag = { text: f.mask ? 'Mask' : 'No mask', cls: f.mask ? 'unknown' : 'wait' }
   if (!emo) return tag
   return tag ? { ...tag, text: `${tag.text} · ${emo}` } : { text: emo, cls: 'wait' }
 }
@@ -235,6 +237,7 @@ function lines(f) {
     else out.push({ cls: 'bad', text: f.registered ? `Unknown (${f.similarity.toFixed(2)})` : 'Unknown (nobody registered)' })
   }
   if (f.emotion) out.push({ cls: 'ok', text: `${ICONS[f.emotion] ?? ''} ${f.emotion}${pct(f.emotion_score)}` })
+  if ('mask' in f) out.push({ cls: f.mask ? 'bad' : 'ok', text: `${f.mask ? 'Face mask detected' : 'No face mask'} (${f.mask_score.toFixed(2)})` })
   if ('glasses' in f) {
     out.push({ cls: 'muted', text: f.glasses ? 'Glasses detected' : 'No glasses detected' })
     if (f.glasses && f.live !== false && f.registered && !f.name && !f.loading) {
@@ -263,9 +266,10 @@ function lines(f) {
           </header>
           <div class="fd-view">
             <video ref="video" autoplay playsinline muted></video>
-            <div v-if="!camOn" class="cam-empty">
+            <div v-if="!camOn" class="cam-empty clickable" role="button" tabindex="0" title="Turn the camera on"
+              @click="startCamera" @keydown.enter.prevent="startCamera" @keydown.space.prevent="startCamera">
               <div>{{ camError || 'Camera is off' }}</div>
-              <div class="small">Tick the features below, then turn the camera on.</div>
+              <div class="small">Click here to turn the camera on</div>
             </div>
             <div v-for="(f, i) in faces" :key="i" class="fd-box" :class="tone(f)" :style="boxStyle(f)">
               <span v-if="nameTag(f)" class="fd-name" :class="nameTag(f).cls">{{ nameTag(f).text }}</span>
