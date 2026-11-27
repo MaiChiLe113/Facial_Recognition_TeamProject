@@ -29,6 +29,7 @@ from ..db.queries import list_students
 MAX_SIDE = 1600      # phone photos are shrunk before the face search
 SEARCH_SIDES = (1600, 960, 640, 480)   # a face that fills a close-up is found at a smaller size
 MIN_FACE_PX = 24     # smallest face accepted in an enrolment photo (at the search size)
+RELAXED_FACE_CONF = 0.5   # enrolment retry when the strict detector (0.8) finds nothing: profiles, masks, hoods
 EMBEDDING_CACHE = DATA_DIR / "raw" / "face_embeddings.npz"
 GLASSES_RECOGNITION_FLOOR = 0.74  # calibrated on development identities with the checked-in centroid model
 
@@ -91,12 +92,13 @@ def _face_crop(image):
     import cv2
     from ..pipeline.detector import detect_faces
 
-    for side in SEARCH_SIDES:
-        scale = min(1.0, side / max(image.shape[:2]))
-        small = cv2.resize(image, None, fx=scale, fy=scale) if scale < 1 else image
-        boxes = detect_faces(small, min_size=MIN_FACE_PX)
-        if boxes:
-            return crop_face(small, boxes[0], "face_recognition")
+    for conf in (None, RELAXED_FACE_CONF):   # strict first, so normal photos are cropped exactly as before
+        for side in SEARCH_SIDES:
+            scale = min(1.0, side / max(image.shape[:2]))
+            small = cv2.resize(image, None, fx=scale, fy=scale) if scale < 1 else image
+            boxes = detect_faces(small, min_size=MIN_FACE_PX) if conf is None else                 detect_faces(small, conf=conf, min_size=MIN_FACE_PX)
+            if boxes:
+                return crop_face(small, boxes[0], "face_recognition")
     return None
 
 
@@ -112,7 +114,7 @@ def _signature():
     model = stamp("face_recognition")
     glasses = stamp("glasses_detection")
     suffix = f"|glasses={glasses}" if glasses != "none" else ""
-    return f"{model}|yunet{suffix}"
+    return f"{model}|yunet-relaxed{suffix}"
 
 
 def _eyewear(crop):
