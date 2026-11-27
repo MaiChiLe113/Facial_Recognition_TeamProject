@@ -19,7 +19,8 @@ from ..config import REPO_DIR
 
 ML_DIR = REPO_DIR / "ml"
 FEATURES = ("face_recognition", "anti_spoofing", "emotion")
-DEMO_FEATURES = (*FEATURES, "glasses_detection", "gesture")
+DEMO_FEATURES = (*FEATURES, "glasses_detection", "mask_detection", "gesture")
+NO_WEIGHTS = ("mask_detection",)   # rule-based, no .pt file (ml/mask_detection/infer.py)
 
 # Margin around a detected face box, per model, as a fraction of the box size on each side.
 # anti_spoofing was trained on crops with 25 % (ml/anti_spoofing/try_liveness.py); emotion scores the same on the raw box.
@@ -56,6 +57,8 @@ def weights_file(feature):
 
 
 def weights_status(feature):
+    if feature in NO_WEIGHTS:
+        return {"feature": feature, "weights": None, "found": True, "expected_file": None}
     path = weights_file(feature)
     return {"feature": feature, "weights": str(path), "found": path.is_file(),
             "expected_file": f"ml/{feature}/{feature}.pt"}

@@ -51,4 +51,7 @@ def init_db(path=None, seed=True):
         from .seed import seed_all
         seed_all(path)
         return True
+    if seed:
+        from .seed import fill_missing_cards
+        fill_missing_cards(path)
     return False

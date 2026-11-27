@@ -54,6 +54,20 @@ def _add_session(conn, s, students):
     return sid
 
 
+def fill_missing_cards(path=None):
+    """A database seeded before roster.json listed a member's student card keeps NULL there (no photo in the roster
+    tables). Fill only those NULLs from roster.json; a card already set is never overwritten. Returns rows updated."""
+    from . import connect
+    roster = json.loads((MOCK_DIR / "roster.json").read_text(encoding="utf-8"))
+    cards = {s["student_id_vn"]: s["student_card"] for s in roster["students"] if s.get("student_card")}
+    n = 0
+    with connect(path) as conn:
+        for sid, card in cards.items():
+            n += conn.execute(text("UPDATE students SET student_card = :c WHERE student_id_vn = :s AND student_card IS NULL"),
+                              {"c": card, "s": sid}).rowcount
+    return n
+
+
 def seed_all(path=None):
     from . import connect
     from .queries import insert_student

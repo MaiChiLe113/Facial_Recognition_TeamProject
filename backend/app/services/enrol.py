@@ -1,6 +1,6 @@
-"""AI face scan for the Add person page (Đức Mạnh's innovative feature). Replaces the manual photo upload.
+"""live_face_scan: the AI face scan for the Add person page (Đức Mạnh's innovative feature). Replaces the manual photo upload.
 
-A scan session collects the best face stills for 5 head poses (SLOTS), PER_SLOT each. Every frame, from the live
+A scan session collects the best face stills for 3 head poses (SLOTS), PER_SLOT each. Every frame, from the live
 camera (POST /api/enrol/frame) or sampled from an uploaded video (POST /api/enrol/video), goes through analyse():
 
     YuNet face + 5 landmarks -> head pose (yaw, pitch) from the landmarks -> which slot it fits
@@ -27,21 +27,20 @@ import numpy as np
 SLOTS = {   # name -> (yaw range, pitch range) in degrees, named from the PERSON's side (what the hints say):
     "front": ((-12, 12), (-10, 10)),      # yaw > 0 = nose towards the image right = head turned to the person's left
     "left": ((12, 55), (-20, 20)),        # pitch < 0 = chin up
-    "right": ((-55, -12), (-20, 20)),     # ranges touch: no dead zone between front and the sides / up / down
-    "up": ((-12, 12), (-45, -10)),        # the landmark pitch reads chin-up weakly: see TARGET_MARGIN
-    "down": ((-12, 12), (10, 45)),
+    "right": ((-55, -12), (-20, 20)),     # ranges touch: no dead zone between front and the sides
 }
+# Chin up / chin down slots were dropped (2026-11-27): the landmark pitch barely registered chin up and the quality
+# model scored those stills low, which made the scan slow and frustrating for little recognition gain.
 # The landmark pose is rough and its zero differs per face (pitch most), so each session first measures the person's
 # own "looking straight" pose and reports yaw / pitch relative to it.
 CALIB_FRAMES = 4            # frontal-looking frames averaged (median) for the baseline
 CALIB_MAX = (25, 30)        # |raw yaw|, |raw pitch| a frame may have to count as "looking straight"
 PER_SLOT = 3
-# Live scan: the slots are filled in SLOTS order (straight, left, right, chin up, chin down). Only the current target
+# Live scan: the slots are filled in SLOTS order (straight, left, right). Only the current target
 # slot accepts stills, so a passing "right" view no longer jumps ahead while the hint asks for "left".
-# The target's ranges are widened by TARGET_MARGIN degrees (more for chin up, which the landmarks read weakly), and
+# The target's ranges are widened by TARGET_MARGIN degrees, and
 # preview poses are smoothed over POSE_SMOOTH frames so slot and hint stop flickering from landmark jitter.
 TARGET_MARGIN = 3.0
-TARGET_MARGIN_UP = 5.0
 POSE_SMOOTH = 3
 MIN_FACE_PX = 110           # face box height in the full-resolution still (phone / 1080p)
 MIN_FACE_PX_LOW = 80        # for a 720p (or smaller) camera
@@ -50,6 +49,12 @@ DETECT_W = 640              # face detection width (the live preview size)
 SECOND_FACE_RATIO = 0.5    # another face this big (vs the largest) refuses the frame
 MIN_POSE_GAP = 4.0          # degrees: stills of one slot must differ this much in yaw or pitch (else the better one stays)
 LIVENESS_WINDOW = 10        # crops averaged for liveness
+MASK_WINDOW = 3             # mask scores (ml/mask_detection) averaged, so one odd frame does not flip the hint
+GLASSES_WINDOW = 3          # same for glasses (ml/glasses_detection): the scan asks to take them off
+# The checkpoint's threshold (EER on LCC-FASD dev) is 0.024: nearly every webcam frame, a printed photo or a phone
+# screen included, scores above it. Like QUALITY_THRESHOLD_WEBCAM, the scan uses its own bar on the mean P(live).
+# None = the checkpoint's value. Set from logs/enrol_frames.jsonl "live_score" (real scan vs photo attack).
+LIVENESS_THRESHOLD_WEBCAM = None
 SESSION_TTL = 30 * 60
 FRAME_LOG = None            # logs/enrol_frames.jsonl when None: quality / pose / reason of every scored frame
 FAIL_LOG = None             # logs/enrol_failures.jsonl in the repo when None (tests point it elsewhere)
@@ -59,9 +64,6 @@ VIDEO_MAX_BYTES = 300 * 2**20
 # The weights carry 0.78, chosen on Kaggle 64 px crops (03_evaluate.ipynb). Real webcam frames score lower
 # (median 0.67-0.75 on the team's AppliedML photos), so the scan uses a threshold calibrated on those photos.
 QUALITY_THRESHOLD_WEBCAM = 0.65
-# Measured on a live scan (logs/enrol_frames.jsonl, 2026-11-27): v2 scores chin-up stills lower (median 0.57 against
-# 0.70 straight, 0.70-0.74 left / right) because its labels are recognition similarity, which drops with pose.
-SLOT_QUALITY_OFFSET = {"up": -0.06}
 # The score level also moves between sessions (same light and face size: straight median 0.70 in one scan, 0.55 in
 # the next), so the bar is relative to this person's own straight frames in this session: QUALITY_REF_N straight
 # preview scores give a reference, and a frame passes at reference - QUALITY_REL_MARGIN (never above the model's
@@ -70,6 +72,10 @@ QUALITY_REF_N = 8
 QUALITY_REL_MARGIN = 0.06
 QUALITY_FLOOR = 0.45
 DUPLICATE_MIN_VOTES = 2     # kept stills that must match the same registered student to warn about a duplicate
+# Every new still must look like the person already kept in this session (someone else stepping in front of the
+# camera between two photos is refused): best cosine similarity to a kept still, face_recognition embeddings.
+# Below the recogniser's own threshold (0.53) on purpose: the same face turned left vs straight scores lower.
+SAME_PERSON_MIN = 0.35
 
 _lock = threading.Lock()
 _sessions = {}
@@ -131,9 +137,8 @@ def head_pose(marks):
 def slot_for(yaw, pitch, target=None):
     """The slot (yaw, pitch) fits. target: tried first with its ranges widened (live scan's current slot)."""
     if target is not None:
-        m = TARGET_MARGIN_UP if target == "up" else TARGET_MARGIN
         (y0, y1), (p0, p1) = SLOTS[target]
-        if y0 - m <= yaw <= y1 + m and p0 - m <= pitch <= p1 + m:
+        if y0 - TARGET_MARGIN <= yaw <= y1 + TARGET_MARGIN and p0 - TARGET_MARGIN <= pitch <= p1 + TARGET_MARGIN:
             return target
     for name, ((y0, y1), (p0, p1)) in SLOTS.items():
         if y0 <= yaw <= y1 and p0 <= pitch <= p1:
@@ -141,33 +146,34 @@ def slot_for(yaw, pitch, target=None):
     return None
 
 
-def _hint(missing, yaw, pitch):
+def _vary_hint(target, have):
+    """In the slot with `have` stills already kept: ask for a slightly different angle of the SAME pose, since a slot's
+    stills must differ by MIN_POSE_GAP degrees."""
+    n = f"photo {have + 1} of {PER_SLOT}"
+    if target == "front":
+        return f"straight, {n}: keep facing the camera, move your head slightly (a little up, down or sideways)"
+    return f"{target} side, {n}: stay turned, move slightly (turn a bit more or less, or tilt a little up / down)"
+
+
+def _hint(missing, yaw, pitch, have=0):
     """Tell the person how to reach the first missing slot (their own left / right). Each hint names that slot, and
-    overshooting it says "a little less", so "turn back" is never mistaken for "now do the other side"."""
+    overshooting it says "a little less", so "turn back" is never mistaken for "now do the other side".
+    have: stills already kept for that slot; once one is kept, "hold still" becomes "move slightly" (_vary_hint)."""
     if not missing:
         return "done"
     target = missing[0]
     (y0, y1), (p0, p1) = SLOTS[target]
+    still = _vary_hint(target, have) if have else "hold still"
     if target == "front":
-        return "look straight at the camera" if not (y0 <= yaw <= y1 and p0 <= pitch <= p1) else "hold still"
-    if target in ("left", "right"):
-        if not p0 <= pitch <= p1:
-            return f"{target} side: keep your chin level"
-        far = yaw > y1 if target == "left" else yaw < y0          # past the slot, away from the camera
-        if far:
-            return f"{target} side: a little less, turn back slightly"
-        if y0 <= yaw <= y1:
-            return "hold still"
-        return f"{target} side: turn your head to your {target}" + (" a bit more" if (yaw > 5 if target == "left" else yaw < -5) else "")
-    # up / down
-    if not y0 <= yaw <= y1:
-        return f"chin {target}: face the camera first"
-    far = pitch < p0 if target == "up" else pitch > p1
+        return "look straight at the camera" if not (y0 <= yaw <= y1 and p0 <= pitch <= p1) else still
+    if not p0 <= pitch <= p1:
+        return f"{target} side: keep your chin level"
+    far = yaw > y1 if target == "left" else yaw < y0          # past the slot, away from the camera
     if far:
-        return f"chin {target}: a little less"
-    if p0 <= pitch <= p1:
-        return "hold still"
-    return f"chin {target}: tilt your chin {target}" + (" a bit more" if (pitch < -3 if target == "up" else pitch > 3) else "")
+        return f"{target} side: a little less, turn back slightly"
+    if y0 <= yaw <= y1:
+        return still
+    return f"{target} side: turn your head to your {target}" + (" a bit more" if (yaw > 5 if target == "left" else yaw < -5) else "")
 
 
 # ---- sessions ---------------------------------------------------------------------------------------------
@@ -179,7 +185,7 @@ def new_session(source="live"):
     with _lock:
         _sessions[sid] = {"id": sid, "source": source, "created": time.time(), "slots": {k: [] for k in SLOTS},
                           "crops": [], "liveness": None, "duplicate": None, "frames": 0, "failed": None,
-                          "calib": [], "baseline": None, "poses": [], "dup_votes": {}, "q_front": []}
+                          "calib": [], "baseline": None, "poses": [], "dup_votes": {}, "q_front": [], "mask": [], "glasses": []}
     return sid
 
 
@@ -202,6 +208,15 @@ def _expire():
     with _lock:
         for k in [k for k, s in _sessions.items() if now - s["created"] > SESSION_TTL]:
             del _sessions[k]
+
+
+def remove_still(s, slot, index):
+    """Drop one kept still (the x on its thumbnail); the slot becomes missing again and the scan can refill it."""
+    with _lock:
+        entries = s["slots"].get(slot)
+        if entries is None or not 0 <= index < len(entries):
+            raise IndexError(index)
+        del entries[index]
 
 
 def missing_slots(s):
@@ -240,7 +255,7 @@ def _repo_dir():
 
 
 def _public(e):
-    return {k: v for k, v in e.items() if k not in ("jpeg", "crop")}
+    return {k: v for k, v in e.items() if k not in ("jpeg", "crop", "emb")}
 
 
 # ---- analysis ---------------------------------------------------------------------------------------------
@@ -305,19 +320,28 @@ def analyse(s, image, final=False, t=None):
         s["crops"] = (s["crops"] + [crop_face(image, (x, y, bw, bh), "anti_spoofing")])[-LIVENESS_WINDOW:]
     if not live_still and (final or len(s["crops"]) % 3 == 0):   # every 3rd preview frame, every video frame
         try:
-            s["liveness"] = {k: (round(v, 4) if isinstance(v, float) else v)
-                             for k, v in _infer("anti_spoofing").check(s["crops"]).items()}
+            res = _infer("anti_spoofing").check(s["crops"])
+            if LIVENESS_THRESHOLD_WEBCAM is not None:
+                res["live"] = res["score"] >= LIVENESS_THRESHOLD_WEBCAM
+            s["liveness"] = {k: (round(v, 4) if isinstance(v, float) else v) for k, v in res.items()}
         except Exception as e:  # noqa: BLE001 - missing weights must not stop the scan; reported instead
             s["liveness"] = {"live": None, "score": None, "error": str(e)}
+    masked, mask_score = _mask(s, image, marks)
+    wears_glasses, glasses_score = _glasses(s, crop_face(image, (x, y, bw, bh), "glasses_detection"))
     out.update(box=[round(x / w, 4), round(y / h, 4), round(bw / w, 4), round(bh / h, 4)],
                landmarks=[[round(px / w, 4), round(py / h, 4)] for px, py in marks],
                yaw=yaw, pitch=pitch, slot=slot, quality=round(q, 4), model=model, threshold=round(_quality_bar(s, thr, slot), 4),
-               brightness=round(bright, 1), face_px=round(bh), face_conf=round(float(conf), 4), liveness=s["liveness"])
+               brightness=round(bright, 1), face_px=round(bh), face_conf=round(float(conf), 4), liveness=s["liveness"],
+               mask_score=mask_score, glasses_score=glasses_score)
 
     # full-resolution stills from a 720p camera are smaller: same flow, lower size floor
     min_px = MIN_FACE_PX if max(w, h) >= 1280 and min(w, h) > 720 else MIN_FACE_PX_LOW
     if (s["liveness"] or {}).get("live") is False:
         reason, hint = "not_live", "use a real face (photos and screens are refused)"
+    elif masked:
+        reason, hint = "mask", "please take off your face mask to continue the scan"
+    elif wears_glasses:
+        reason, hint = "glasses", "please take off your glasses to continue the scan"
     elif bright < BRIGHTNESS[0]:
         reason, hint = "too_dark", "too dark: move to a brighter place"
     elif bright > BRIGHTNESS[1]:
@@ -331,18 +355,25 @@ def analyse(s, image, final=False, t=None):
     elif q < _quality_bar(s, thr, slot):
         reason, hint = "low_quality", "hold still (image not sharp enough)"
     elif slot in missing and not _would_keep(s, slot, q, yaw, pitch):
-        reason, hint = "same_view", "good, now tilt or turn your head a few degrees for another photo"
+        reason, hint = "same_view", _vary_hint(slot, len(s["slots"][slot]))
     else:
         reason = "ok"
         hint = "hold still" if slot in missing else _hint(missing, yaw, pitch)
     out.update(reason=reason, hint=hint, accepted=reason == "ok")
 
     if final and out["accepted"]:
-        out["kept"] = _keep(s, slot, image, crop, out, glasses_of(crop))
+        rec_crop = crop_face(image, (x, y, bw, bh), "face_recognition")
+        emb, same = _same_person(s, rec_crop)
+        out["same_person"] = same
+        if same is not None and same < SAME_PERSON_MIN:
+            out.update(reason="other_person", accepted=False,
+                       hint="a different person was detected: only the person being registered, or start again")
+    if final and out["accepted"]:
+        out["kept"] = _keep(s, slot, image, crop, out, glasses_of(crop), emb)
         if out["kept"]:
-            _vote_duplicate(s, crop_face(image, (x, y, bw, bh), "face_recognition"))
+            _vote_duplicate(s, rec_crop)
         missing = missing_slots(s)
-        out["hint"] = "done" if not missing else _hint(missing, yaw, pitch)
+        out["hint"] = "done" if not missing else _hint(missing, yaw, pitch, len(s["slots"][missing[0]]))
     out.update(missing=missing_slots(s), done=not missing_slots(s), duplicate=s["duplicate"])
     _log_frame(s, out, target, final)
     return out
@@ -352,7 +383,9 @@ def _log_frame(s, out, target, final):
     """Append one line per scored frame, to measure the quality score per pose (threshold tuning)."""
     entry = {"session_id": s["id"], "source": s["source"], "final": final, "target": target,
              **{k: out.get(k) for k in ("slot", "yaw", "pitch", "quality", "threshold", "reason", "face_px",
-                                        "face_conf", "brightness", "kept")}}
+                                        "face_conf", "brightness", "kept", "mask_score",
+                                        "glasses_score", "same_person")},
+             "live_score": (out.get("liveness") or {}).get("score")}
     log = FRAME_LOG or _repo_dir() / "logs" / "enrol_frames.jsonl"
     try:
         log.parent.mkdir(parents=True, exist_ok=True)
@@ -362,13 +395,40 @@ def _log_frame(s, out, target, final):
         pass  # logging must not break the scan
 
 
+def _mask(s, image, marks):
+    """(masked, score): the mean of the last MASK_WINDOW mask scores; (False, None) if the check cannot decide."""
+    try:
+        score = _infer("mask_detection").check(image, marks)["score"]
+    except Exception:  # noqa: BLE001 - the mask check must not stop the scan
+        score = None
+    if score is None:
+        return False, None
+    s["mask"] = (s.setdefault("mask", []) + [score])[-MASK_WINDOW:]
+    mean = float(np.mean(s["mask"]))
+    return mean >= _infer("mask_detection").THRESHOLD, round(mean, 4)
+
+
+def _glasses(s, crop):
+    """(wears_glasses, score): mean of the last GLASSES_WINDOW glasses scores against the model's threshold;
+    (False, None) when the model is missing or fails (the scan goes on)."""
+    try:
+        m = _infer("glasses_detection")
+        score = float(m.predict(crop)["glasses_score"])
+        thr = float(m._load()["threshold"])
+    except Exception:  # noqa: BLE001
+        return False, None
+    s["glasses"] = (s.setdefault("glasses", []) + [score])[-GLASSES_WINDOW:]
+    mean = float(np.mean(s["glasses"]))
+    return mean >= thr, round(mean, 4)
+
+
 def _quality_bar(s, thr, slot):
     """The quality a frame of this slot needs in this session (see QUALITY_REF_N)."""
     bar = thr
     ref = s.get("q_front") or []
     if len(ref) >= QUALITY_REF_N:
         bar = max(QUALITY_FLOOR, min(thr, float(np.median(ref)) - QUALITY_REL_MARGIN))
-    return bar + SLOT_QUALITY_OFFSET.get(slot, 0.0)
+    return bar
 
 
 def glasses_of(crop):
@@ -433,7 +493,20 @@ def _would_keep(s, slot, q, yaw, pitch):
     return len(entries) < PER_SLOT or q > min(e["quality"] for e in entries)
 
 
-def _keep(s, slot, image, crop, info, glasses):
+def _same_person(s, crop):
+    """(embedding, best cosine similarity to the session's kept stills). similarity is None for the first still or
+    when the recogniser is unavailable (the check is skipped, the scan goes on)."""
+    try:
+        emb = np.asarray(_infer("face_recognition").embed(crop), dtype=np.float32)
+    except Exception:  # noqa: BLE001
+        return None, None
+    kept = [e["emb"] for v in s["slots"].values() for e in v if e.get("emb") is not None]
+    if not kept:
+        return emb, None
+    return emb, round(float(max(np.dot(k, emb) for k in kept)), 4)
+
+
+def _keep(s, slot, image, crop, info, glasses, emb=None):
     import cv2
     entries = s["slots"][slot]
     near = _near(entries, info["yaw"], info["pitch"])
@@ -443,7 +516,7 @@ def _keep(s, slot, image, crop, info, glasses):
     entry = {"slot": slot, "quality": info["quality"], "yaw": info["yaw"], "pitch": info["pitch"],
              "face_px": info["face_px"], "brightness": info["brightness"], "frame_size": info["frame_size"],
              "liveness": (s["liveness"] or {}).get("score"), "glasses": glasses,
-             "t": info.get("t"), "jpeg": jpeg.tobytes()}
+             "t": info.get("t"), "jpeg": jpeg.tobytes(), "emb": emb}
     with _lock:
         for e in near:
             entries.remove(e)

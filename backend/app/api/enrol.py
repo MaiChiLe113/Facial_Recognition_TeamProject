@@ -1,4 +1,4 @@
-"""AI face scan for the Add person page (app/services/enrol.py). New routes only; nothing existing changes.
+"""live_face_scan (the AI face scan) for the Add person page (app/services/enrol.py). New routes only; nothing existing changes.
 
     POST /api/enrol/session                      start a scan -> summary (session_id, slots, threshold, model)
     POST /api/enrol/frame   (multipart)          session_id, image, final=false|true -> analysis + hint
@@ -65,6 +65,16 @@ def still(sid: str, slot: str, index: int):
     if slot not in enrol.SLOTS or not 0 <= index < len(s["slots"][slot]):
         raise HTTPException(404, "no such still")
     return Response(enrol.still_jpeg(s, slot, index), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@router.delete("/session/{sid}/still/{slot}/{index}")
+def remove_still(sid: str, slot: str, index: int):
+    s = _session(sid)
+    try:
+        enrol.remove_still(s, slot, index)
+    except IndexError:
+        raise HTTPException(404, "no such still") from None
+    return enrol.summary(s)
 
 
 @router.post("/frame")

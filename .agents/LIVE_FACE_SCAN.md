@@ -1,4 +1,7 @@
-# Face quality + AI enrolment scan: full record
+# live_face_scan (AI enrolment scan) + face quality model: full record
+
+Feature name: **live_face_scan** (renamed from "face quality" on 2026-11-27, user). The model it scores frames with
+keeps its name: `ml/face_quality/face_quality.pt`.
 
 Owner: Đức Mạnh. This is his graded **individual innovative feature** (assignment §7). Presence verification is now a
 team feature (decisions, 2026-11-26).
@@ -20,7 +23,7 @@ The **Add person** page no longer takes uploaded photos. It runs a guided face s
 
 - **Live scan** (default): the phone or webcam camera streams preview frames to the backend. The backend answers each
   frame with a face box, head pose, quality score and a hint ("left side: turn your head to your left", "too dark"…).
-  It keeps the best frames for five pose slots: front, left, right, up and down, 3 photos each.
+  It keeps the best frames for three pose slots: front, left, right, 3 photos each (chin up / down dropped 2026-11-27, see §8).
 - **Upload video**: a 15 s video is sampled at 5 fps and goes through the same per-frame pipeline.
 
 Each frame is scored by a **face-quality model trained in this repo**. The score estimates how useful the frame is to
@@ -196,6 +199,8 @@ v1 was trained on 64 px Kaggle crops. On 27 webcam frames of 2 people (`AppliedM
 | D9/D10 | HTTP frames ~4 fps; video at 5 fps, same pipeline | Simple, works over the LAN |
 | — | v2 adopted (06 MobileNetV3 B, 0.58) (2026-11-26, user) | §10 |
 | — | 3 attempts of 10 s, failures logged (user) | User request |
+| — | Chin up / down slots removed (2026-11-27, user) | Pose estimate barely sees chin up, v2 scores both low; scan is faster with front / left / right |
+| — | Face mask gate (`ml/mask_detection`, colour heuristic, no weights) (2026-11-27, user) | Masked stills hurt recognition; threshold 0.5 not yet measured on real scans (`mask_score` in the frame log) |
 
 ## 9. Open problems
 

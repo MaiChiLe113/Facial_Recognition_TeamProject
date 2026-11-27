@@ -4,6 +4,7 @@
     anti_spoofing     live or spoof (printed photo / phone screen)
     emotion           the facial expression
     glasses_detection whether each face is wearing glasses
+    mask_detection    whether each face is wearing a face mask (rule-based, needs YuNet landmarks)
     gesture           the hand gesture of every hand in the frame: result["hands"]
 
 The models come from ml/<feature>/infer.py + <feature>.pt (see app/core/ml_models.py). A feature
@@ -135,6 +136,20 @@ def analyze(image, features, client="default", threshold=None, liveness_threshol
                 if crop is not None:
                     face.update(infer.predict(crop))
         run("glasses_detection", detect_glasses)
+
+    if "mask_detection" in features and boxes:
+        def detect_mask(infer):
+            from ..pipeline.detector import detect_faces_landmarks
+            marked = detect_faces_landmarks(image, min_size=MIN_FACE_PX)   # same detector, now with the 5 landmarks
+            for face, (x, y, w, h) in zip(faces, boxes):
+                cx, cy = x + w / 2, y + h / 2
+                near = min(marked, key=lambda f: (f[0] + f[2] / 2 - cx) ** 2 + (f[1] + f[3] / 2 - cy) ** 2, default=None)
+                if near is None or abs(near[0] + near[2] / 2 - cx) > w / 2 or abs(near[1] + near[3] / 2 - cy) > h / 2:
+                    continue
+                r = infer.check(image, near[5])
+                if r["mask"] is not None:
+                    face.update(mask=bool(r["mask"]), mask_score=r["score"])
+        run("mask_detection", detect_mask)
 
     if "face_recognition" in features and boxes:
         def recognise(infer):

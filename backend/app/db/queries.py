@@ -32,7 +32,8 @@ def list_students(path=None, student_id=None):
     return [{"student_id_vn": r["student_id_vn"], "student_id_au": r["student_id_au"], "name": r["name"],
              "year": r["year"], "courses": courses.get(r["student_id_vn"], []), "photo_folder": r["photo_folder"],
              "student_card": r["student_card"],
-             "photo": _photo(r["student_id_vn"], r["student_card"], r["photo_folder"])} for r in rows]
+             "photo": _photo(r["student_id_vn"], r["student_card"], r["photo_folder"]),
+             "removable": is_upload(r["photo_folder"])} for r in rows]
 
 
 def get_student(student_id, path=None):
@@ -56,6 +57,26 @@ def create_student(student, path=None):
             raise ValueError(f"unknown course key(s): {unknown}")
         insert_student(conn, student)
     return get_student(sid, path)
+
+
+def delete_student(sid, path=None):
+    """Remove a student added on the Add person page (photos in data/). Drive (AppliedML) students are refused with
+    PermissionError; returns False when sid is unknown. Rows that point at the student go first (no FK cascade on
+    face_embeddings / presence_intervals; events keep their row with the student cleared)."""
+    with connect(path) as conn:
+        row = conn.execute(text("SELECT photo_folder FROM students WHERE student_id_vn = :s"), {"s": sid}).first()
+        if row is None:
+            return False
+        if not is_upload(row[0]):
+            raise PermissionError(f"{sid} comes from the Drive enrolment photos and cannot be removed here")
+        for sql in ("DELETE FROM face_embeddings WHERE student_id_vn = :s",
+                    "DELETE FROM presence_intervals WHERE student_id_vn = :s",
+                    "UPDATE events SET student_id_vn = NULL WHERE student_id_vn = :s",
+                    "DELETE FROM attendance WHERE student_id_vn = :s",
+                    "DELETE FROM enrollments WHERE student_id_vn = :s",
+                    "DELETE FROM students WHERE student_id_vn = :s"):
+            conn.execute(text(sql), {"s": sid})
+    return True
 
 
 def insert_student(conn, student):

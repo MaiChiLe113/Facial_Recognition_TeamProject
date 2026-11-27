@@ -63,7 +63,9 @@ Live mode calls `process_frame` for every frame a phone sends over `/ws/camera/{
 
 ## When someone replaces a model's `.pt` file
 
-Applies to `ml/face_recognition/face_recognition.pt`, `ml/anti_spoofing/anti_spoofing.pt`, `ml/emotion/emotion.pt`, `ml/gesture/gesture.pt`, `ml/face_quality/face_quality.pt` (or the `HAWKEYE_<FEATURE>_WEIGHTS` override). Weights are never committed (see `.gitignore`); teammates copy the file in by hand.
+Applies to `ml/face_recognition/face_recognition.pt`, `ml/anti_spoofing/anti_spoofing.pt`, `ml/emotion/emotion.pt`, `ml/gesture/gesture.pt`, `ml/face_quality/face_quality.pt`, `ml/glasses_detection/glasses_detection.pt` (or the `HAWKEYE_<FEATURE>_WEIGHTS` override). Weights are never committed (see `.gitignore`); teammates copy the file in by hand.
+
+**The app only loads `ml/<feature>/<feature>.pt`.** A teammate's file often has another name or sits elsewhere (e.g. `liveness_mobilenetv2.pt` at the repo root): copy it to that exact path (or set the override). Before replacing, compare SHA-256 with the current file; an identical file is not a new model (bump nothing).
 
 What the app does by itself:
 - **Threshold:** face recognition and anti-spoofing keep their decision threshold *inside* the `.pt` (chosen on validation data: ROC / EER). Nothing in the app hard-codes it. The Features demo page shows it as "Model default" (from `GET /api/features-demo/status`, field `threshold`) and logs the value actually used in the CSV (`threshold`, `liveness_threshold`).
@@ -76,14 +78,17 @@ What a person or agent must do:
 4. **Check on the Features demo page** (`/features-demo`): the feature shows no "weights missing" tag, "Model default" is the number you expect, and a known student is named while a stranger shows "Unknown". For anti-spoofing, also try a printed photo and a phone screen, not only a real face.
 5. **Update the numbers written in `.agents/status.md`** (selected model, threshold, AUC) so the next agent does not read stale values, and do not commit the `.pt`.
 6. The `recognize` stage option `threshold` in `backend/pipeline.json` is `null` (use the model's own). If someone set a number there for the old model, change it back or re-tune it.
+7. **Webcam overrides in the enrolment scan** (`backend/app/services/enrol.py`) beat the checkpoint's threshold and were tuned for the *old* model: `LIVENESS_THRESHOLD_WEBCAM` (anti-spoofing; `None` = the checkpoint's), `QUALITY_THRESHOLD_WEBCAM` (face quality without `threshold_domain: webcam`). Set them back to `None` / re-measure from `logs/enrol_frames.jsonl` (`live_score`, `quality`) after a model change.
+8. **Glasses detection** is used by the enrolment scan (asks the person to take glasses off, smoothed over `GLASSES_WINDOW` frames against `_load()["threshold"]`), the Features demo and the gallery's eyewear-aware matching (`services/gallery.py`; its cache signature includes the glasses model, so embeddings are rebuilt). Keep `predict(crop) -> {"glasses", "glasses_score"}` and the checkpoint keys `architecture`, `input_size`, `mean`, `std`, `threshold`.
+9. **Mask detection** (`ml/mask_detection/infer.py`) has no `.pt` today: a colour rule on the 5 YuNet landmarks, listed in `NO_WEIGHTS` in `core/ml_models.py`. To switch to a trained model: put it at `ml/mask_detection/mask_detection.pt`, load it inside `infer.py` keeping `check(image, marks) -> {"mask": bool|None, "score": float|None}` and `THRESHOLD`, remove `mask_detection` from `NO_WEIGHTS`, and add it to `models()` / `ml/model_versions.json`.
 
-**Face quality** depends on the recogniser: its labels come from `face_recognition` v1. When `face_recognition.pt` changes, re-run `ml/face_quality/01_build_labels.ipynb` → 02 → 03, then bump `face_quality` in `ml/model_versions.json`. The enrolment scan caps its per-session quality bar at the checkpoint's threshold when `threshold_domain` is "webcam" (v2: 0.58), else at `QUALITY_THRESHOLD_WEBCAM` 0.65 (`backend/app/services/enrol.py`, see `FACE_QUALITY.md` §6).
+**Face quality** depends on the recogniser: its labels come from `face_recognition` v1. When `face_recognition.pt` changes, re-run `ml/face_quality/01_build_labels.ipynb` → 02 → 03, then bump `face_quality` in `ml/model_versions.json`. The enrolment scan caps its per-session quality bar at the checkpoint's threshold when `threshold_domain` is "webcam" (v2: 0.58), else at `QUALITY_THRESHOLD_WEBCAM` 0.65 (`backend/app/services/enrol.py`, see `LIVE_FACE_SCAN.md` §6).
 
 ## Model versions (System log page)
 
 The user controls which version of each model the app runs. `ml/model_versions.json` (committed) holds a hand-set
 label per model: `{"<key>": {"version": "v2", "note": "what changed"}}`, keys `face_recognition`, `anti_spoofing`,
-`emotion`, `presence_verification`, `face_detector`, `person_detector`. The System log page (`/system`, gear icon,
+`emotion`, `face_quality`, `glasses_detection`, `presence_verification`, `face_detector`, `person_detector`. The System log page (`/system`, gear icon,
 `GET /api/system/models`, `services/model_log.py`) shows, per model, the file the app actually loads (same paths and
 `HAWKEYE_*` overrides as the loaders), its version label, last modified time, size and SHA-256 fingerprint. Every change
 it detects (new fingerprint or new label) is appended to `logs/model_changes.jsonl` (git-ignored, per machine), checked
