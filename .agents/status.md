@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-11-26. Update this file at the end of every step: change the current state, don't append a diary.
+Last updated: 2026-11-27. Update this file at the end of every step: change the current state, don't append a diary.
 
 ## Branch
 
@@ -29,7 +29,7 @@ All work goes on **`feature/backend-structure`**. Don't create other branches, m
 - `pipeline/detector.py` (YOLO11n people, YuNet faces) and `pipeline/tracker.py` (BYTETracker, 3 s buffer) are implemented; `matcher.py` (`GlobalMatcher`) is still a stub.
 - `services/gallery.py` owns the registered faces (Drive enrolment photos + uploads), cached in `data/raw/face_embeddings.npz`, kept in `engine.shared["gallery"]`.
 - `core/ml_models.py`: `MARGIN` per model (recognition 0.1, anti-spoofing 0.25, emotion 0.0) and `crop_face()`, shared by the Features demo and the attendance-camera stages.
-- AI enrolment scan: `api/enrol.py` (`/api/enrol/session|frame|video|session/{id}|session/{id}/still/{slot}/{i}`) + `services/enrol.py` (pose from YuNet landmarks, liveness, quality, duplicate check, `scan.json`). Quality threshold from the checkpoint when it is `threshold_domain: "webcam"` (v2: 0.58), else `QUALITY_THRESHOLD_WEBCAM` 0.65. HEVC videos need FFmpeg on PATH.
+- AI enrolment scan: `api/enrol.py` (`/api/enrol/session|frame|video|session/{id}|session/{id}/still/{slot}/{i}`) + `services/enrol.py` (pose from YuNet landmarks, ordered slots in a live scan, liveness, quality, duplicate vote over all stills, `scan.json`). Quality bar relative to the person in the session, capped at the checkpoint threshold (v2: 0.58); every scored frame logged to `logs/enrol_frames.jsonl`. Details: `FACE_QUALITY.md` §6. HEVC videos need FFmpeg on PATH.
 - Presence verification plug-in: `GET /api/features/presence_verification/take/{take}`, `/model`, `/live` (needs `presence_verification.joblib`, rebuild with `ml/presence_verification/train.py`).
 
 **Models** (`ml/<feature>/infer.py` + `<feature>.pt`, loaded through `core/ml_models.py`)

@@ -53,6 +53,7 @@ class Fakes:
                   patch("app.pipeline.detector.detect_faces_landmarks", lambda *a, **k: self.faces),
                   patch.object(gallery, "registered_faces", lambda: ({}, {})),
                   patch.object(enrol, "CALIB_FRAMES", 0),
+                  patch.object(enrol, "FRAME_LOG", Path(tempfile.gettempdir()) / "enrol_frames_test.jsonl"),
                   patch.object(enrol, "DETECT_W", 10**6)):   # the fake detector answers in full-frame pixels
             p.start()
             test.addCleanup(p.stop)
@@ -138,6 +139,17 @@ class Analyse(unittest.TestCase):
         self.assertEqual(enrol._hint(["right"], 20, 0), "right side: turn your head to your right")
         self.assertEqual(enrol._hint(["up"], 0, -50), "chin up: a little less")
         self.assertEqual(enrol._hint(["down"], 0, 0), "chin down: tilt your chin down")
+
+    def test_live_scan_follows_the_slot_order(self):
+        self.f.faces = [face(-25, 0)]                 # "right" before straight is done: refused, hint stays on front
+        r = enrol.analyse(self.s, frame(), final=True)
+        self.assertEqual(r["reason"], "other_pose")
+        self.assertFalse(r["kept"])
+        self.assertEqual(self.s["slots"]["right"], [])
+
+    def test_chin_up_target_is_widened(self):
+        self.assertEqual(enrol.slot_for(0, -7), "front")
+        self.assertEqual(enrol.slot_for(0, -7, target="up"), "up")
 
     def test_fills_all_slots(self):
         poses = {"front": (0, 0), "left": (25, 0), "right": (-25, 0), "up": (0, -20), "down": (0, 20)}

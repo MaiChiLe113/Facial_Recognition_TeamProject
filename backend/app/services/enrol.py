@@ -28,7 +28,7 @@ SLOTS = {   # name -> (yaw range, pitch range) in degrees, named from the PERSON
     "front": ((-12, 12), (-10, 10)),      # yaw > 0 = nose towards the image right = head turned to the person's left
     "left": ((12, 55), (-20, 20)),        # pitch < 0 = chin up
     "right": ((-55, -12), (-20, 20)),     # ranges touch: no dead zone between front and the sides / up / down
-    "up": ((-12, 12), (-45, -10)),
+    "up": ((-12, 12), (-45, -10)),        # the landmark pitch reads chin-up weakly: see TARGET_MARGIN
     "down": ((-12, 12), (10, 45)),
 }
 # The landmark pose is rough and its zero differs per face (pitch most), so each session first measures the person's
@@ -36,6 +36,13 @@ SLOTS = {   # name -> (yaw range, pitch range) in degrees, named from the PERSON
 CALIB_FRAMES = 4            # frontal-looking frames averaged (median) for the baseline
 CALIB_MAX = (25, 30)        # |raw yaw|, |raw pitch| a frame may have to count as "looking straight"
 PER_SLOT = 3
+# Live scan: the slots are filled in SLOTS order (straight, left, right, chin up, chin down). Only the current target
+# slot accepts stills, so a passing "right" view no longer jumps ahead while the hint asks for "left".
+# The target's ranges are widened by TARGET_MARGIN degrees (more for chin up, which the landmarks read weakly), and
+# preview poses are smoothed over POSE_SMOOTH frames so slot and hint stop flickering from landmark jitter.
+TARGET_MARGIN = 3.0
+TARGET_MARGIN_UP = 5.0
+POSE_SMOOTH = 3
 MIN_FACE_PX = 110           # face box height in the full-resolution still (phone / 1080p)
 MIN_FACE_PX_LOW = 80        # for a 720p (or smaller) camera
 BRIGHTNESS = (60, 200)      # mean grey level of the face crop
@@ -44,6 +51,7 @@ SECOND_FACE_RATIO = 0.5    # another face this big (vs the largest) refuses the 
 MIN_POSE_GAP = 4.0          # degrees: stills of one slot must differ this much in yaw or pitch (else the better one stays)
 LIVENESS_WINDOW = 10        # crops averaged for liveness
 SESSION_TTL = 30 * 60
+FRAME_LOG = None            # logs/enrol_frames.jsonl when None: quality / pose / reason of every scored frame
 FAIL_LOG = None             # logs/enrol_failures.jsonl in the repo when None (tests point it elsewhere)
 VIDEO_FPS = 5.0
 VIDEO_MAX_S = 60
@@ -51,6 +59,17 @@ VIDEO_MAX_BYTES = 300 * 2**20
 # The weights carry 0.78, chosen on Kaggle 64 px crops (03_evaluate.ipynb). Real webcam frames score lower
 # (median 0.67-0.75 on the team's AppliedML photos), so the scan uses a threshold calibrated on those photos.
 QUALITY_THRESHOLD_WEBCAM = 0.65
+# Measured on a live scan (logs/enrol_frames.jsonl, 2026-11-27): v2 scores chin-up stills lower (median 0.57 against
+# 0.70 straight, 0.70-0.74 left / right) because its labels are recognition similarity, which drops with pose.
+SLOT_QUALITY_OFFSET = {"up": -0.06}
+# The score level also moves between sessions (same light and face size: straight median 0.70 in one scan, 0.55 in
+# the next), so the bar is relative to this person's own straight frames in this session: QUALITY_REF_N straight
+# preview scores give a reference, and a frame passes at reference - QUALITY_REL_MARGIN (never above the model's
+# threshold, never below QUALITY_FLOOR). A blurred frame still falls below the person's own level.
+QUALITY_REF_N = 8
+QUALITY_REL_MARGIN = 0.06
+QUALITY_FLOOR = 0.45
+DUPLICATE_MIN_VOTES = 2     # kept stills that must match the same registered student to warn about a duplicate
 
 _lock = threading.Lock()
 _sessions = {}
@@ -109,7 +128,13 @@ def head_pose(marks):
     return round(yaw, 1), round(pitch, 1)
 
 
-def slot_for(yaw, pitch):
+def slot_for(yaw, pitch, target=None):
+    """The slot (yaw, pitch) fits. target: tried first with its ranges widened (live scan's current slot)."""
+    if target is not None:
+        m = TARGET_MARGIN_UP if target == "up" else TARGET_MARGIN
+        (y0, y1), (p0, p1) = SLOTS[target]
+        if y0 - m <= yaw <= y1 + m and p0 - m <= pitch <= p1 + m:
+            return target
     for name, ((y0, y1), (p0, p1)) in SLOTS.items():
         if y0 <= yaw <= y1 and p0 <= pitch <= p1:
             return name
@@ -149,11 +174,12 @@ def _hint(missing, yaw, pitch):
 
 def new_session(source="live"):
     _expire()
+    _warm_gallery()
     sid = uuid.uuid4().hex[:16]
     with _lock:
         _sessions[sid] = {"id": sid, "source": source, "created": time.time(), "slots": {k: [] for k in SLOTS},
                           "crops": [], "liveness": None, "duplicate": None, "frames": 0, "failed": None,
-                          "calib": [], "baseline": None}
+                          "calib": [], "baseline": None, "poses": [], "dup_votes": {}, "q_front": []}
     return sid
 
 
@@ -257,13 +283,20 @@ def analyse(s, image, final=False, t=None):
                 "hint": f"look straight at the camera ({len(s['calib'])}/{CALIB_FRAMES})", "missing": missing,
                 "done": not missing, "duplicate": s["duplicate"]}
     yaw, pitch = round(raw_yaw - s["baseline"][0], 1), round(raw_pitch - s["baseline"][1], 1)
+    ordered = s["source"] == "live"
+    if ordered and not final and POSE_SMOOTH > 1:      # median of the last preview poses: steadier slot and hint
+        s["poses"] = (s.get("poses", []) + [(yaw, pitch)])[-POSE_SMOOTH:]
+        yaw, pitch = (round(float(np.median([p[i] for p in s["poses"]])), 1) for i in (0, 1))
     crop = crop_face(image, (x, y, bw, bh), "face_quality")
     grey = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     bright = float(grey.mean())
     scorer, thr, model = quality_model()
     # the trained model sees an eye-aligned crop framed like its Kaggle training images (much looser than the box)
     q = float(scorer(_infer("face_quality").align_crop(image, marks))) if scorer else heuristic(crop, bh, yaw, pitch)
-    slot = slot_for(yaw, pitch)
+    target = missing[0] if ordered and missing else None
+    slot = slot_for(yaw, pitch, target)
+    if slot == "front" and not final and len(s.setdefault("q_front", [])) < QUALITY_REF_N:
+        s["q_front"].append(q)
 
     # Live scan: liveness comes from the preview frames only. Re-checking it on the full-resolution still mixed crop
     # sizes in the window and often flipped it to "not live". A video has no preview, so every sampled frame counts.
@@ -278,8 +311,8 @@ def analyse(s, image, final=False, t=None):
             s["liveness"] = {"live": None, "score": None, "error": str(e)}
     out.update(box=[round(x / w, 4), round(y / h, 4), round(bw / w, 4), round(bh / h, 4)],
                landmarks=[[round(px / w, 4), round(py / h, 4)] for px, py in marks],
-               yaw=yaw, pitch=pitch, slot=slot, quality=round(q, 4), model=model, threshold=round(thr, 4),
-               brightness=round(bright, 1), face_px=round(bh), liveness=s["liveness"])
+               yaw=yaw, pitch=pitch, slot=slot, quality=round(q, 4), model=model, threshold=round(_quality_bar(s, thr, slot), 4),
+               brightness=round(bright, 1), face_px=round(bh), face_conf=round(float(conf), 4), liveness=s["liveness"])
 
     # full-resolution stills from a 720p camera are smaller: same flow, lower size floor
     min_px = MIN_FACE_PX if max(w, h) >= 1280 and min(w, h) > 720 else MIN_FACE_PX_LOW
@@ -293,10 +326,12 @@ def analyse(s, image, final=False, t=None):
         reason, hint = "too_small", "move closer"
     elif slot is None:
         reason, hint = "between_poses", _hint(missing, yaw, pitch)
-    elif q < thr:
+    elif target is not None and slot != target and slot in missing:   # a later pose, not reached yet
+        reason, hint = "other_pose", _hint(missing, yaw, pitch)
+    elif q < _quality_bar(s, thr, slot):
         reason, hint = "low_quality", "hold still (image not sharp enough)"
     elif slot in missing and not _would_keep(s, slot, q, yaw, pitch):
-        reason, hint = "same_view", "got this angle: move your head slightly for another view"
+        reason, hint = "same_view", "good, now tilt or turn your head a few degrees for another photo"
     else:
         reason = "ok"
         hint = "hold still" if slot in missing else _hint(missing, yaw, pitch)
@@ -304,12 +339,36 @@ def analyse(s, image, final=False, t=None):
 
     if final and out["accepted"]:
         out["kept"] = _keep(s, slot, image, crop, out, glasses_of(crop))
-        if out["kept"] and s["duplicate"] is None:
-            s["duplicate"] = duplicate_of(crop)
+        if out["kept"]:
+            _vote_duplicate(s, crop_face(image, (x, y, bw, bh), "face_recognition"))
         missing = missing_slots(s)
         out["hint"] = "done" if not missing else _hint(missing, yaw, pitch)
     out.update(missing=missing_slots(s), done=not missing_slots(s), duplicate=s["duplicate"])
+    _log_frame(s, out, target, final)
     return out
+
+
+def _log_frame(s, out, target, final):
+    """Append one line per scored frame, to measure the quality score per pose (threshold tuning)."""
+    entry = {"session_id": s["id"], "source": s["source"], "final": final, "target": target,
+             **{k: out.get(k) for k in ("slot", "yaw", "pitch", "quality", "threshold", "reason", "face_px",
+                                        "face_conf", "brightness", "kept")}}
+    log = FRAME_LOG or _repo_dir() / "logs" / "enrol_frames.jsonl"
+    try:
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError:
+        pass  # logging must not break the scan
+
+
+def _quality_bar(s, thr, slot):
+    """The quality a frame of this slot needs in this session (see QUALITY_REF_N)."""
+    bar = thr
+    ref = s.get("q_front") or []
+    if len(ref) >= QUALITY_REF_N:
+        bar = max(QUALITY_FLOOR, min(thr, float(np.median(ref)) - QUALITY_REL_MARGIN))
+    return bar + SLOT_QUALITY_OFFSET.get(slot, 0.0)
 
 
 def glasses_of(crop):
@@ -318,6 +377,32 @@ def glasses_of(crop):
         return {"glasses": bool(r["glasses"]), "score": round(float(r["glasses_score"]), 4)}
     except Exception:  # noqa: BLE001
         return None
+
+
+def _warm_gallery():
+    """Start loading the registered faces in the background (they are empty until a page first loads them)."""
+    try:
+        from . import gallery
+        if not gallery.registered_faces()[0]:
+            threading.Thread(target=gallery.load_registered, daemon=True, name="enrol-gallery").start()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _vote_duplicate(s, crop):
+    """Check every kept still, not only the first: one view can match the wrong person (a straight still matched
+    another student while the side views matched the right one). Warn once DUPLICATE_MIN_VOTES stills agree."""
+    d = duplicate_of(crop)
+    if not d:
+        if s["duplicate"] is None and d is False and not s["dup_votes"]:
+            s["duplicate"] = False
+        return
+    v = s["dup_votes"].setdefault(d["student_id"], {**d, "votes": 0})
+    v["votes"] += 1
+    v["score"] = max(v["score"], d["score"])
+    best = max(s["dup_votes"].values(), key=lambda e: (e["votes"], e["score"]))
+    if best["votes"] >= DUPLICATE_MIN_VOTES:
+        s["duplicate"] = dict(best)
 
 
 def duplicate_of(crop):

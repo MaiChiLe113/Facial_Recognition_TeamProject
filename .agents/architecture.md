@@ -77,7 +77,7 @@ What a person or agent must do:
 5. **Update the numbers written in `.agents/status.md`** (selected model, threshold, AUC) so the next agent does not read stale values, and do not commit the `.pt`.
 6. The `recognize` stage option `threshold` in `backend/pipeline.json` is `null` (use the model's own). If someone set a number there for the old model, change it back or re-tune it.
 
-**Face quality** depends on the recogniser: its labels come from `face_recognition` v1. When `face_recognition.pt` changes, re-run `ml/face_quality/01_build_labels.ipynb` → 02 → 03, then bump `face_quality` in `ml/model_versions.json`. The enrolment scan's threshold is `QUALITY_THRESHOLD_WEBCAM` in `backend/app/services/enrol.py` (not the checkpoint's value).
+**Face quality** depends on the recogniser: its labels come from `face_recognition` v1. When `face_recognition.pt` changes, re-run `ml/face_quality/01_build_labels.ipynb` → 02 → 03, then bump `face_quality` in `ml/model_versions.json`. The enrolment scan caps its per-session quality bar at the checkpoint's threshold when `threshold_domain` is "webcam" (v2: 0.58), else at `QUALITY_THRESHOLD_WEBCAM` 0.65 (`backend/app/services/enrol.py`, see `FACE_QUALITY.md` §6).
 
 ## Model versions (System log page)
 
