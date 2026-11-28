@@ -4,8 +4,16 @@ Newest first. Add a line when the user decides something; do not reopen a decisi
 
 | Date | Decision | Why |
 | --- | --- | --- |
-| 2026-11-26 | `face_quality` v2 = the 06_backbones MobileNetV3 winner (Kaggle + team photos + recorded-video faces), threshold 0.58 from the checkpoint; bigger backbones not used | Best on held-out real faces ≥ 80 px (pAUC 32.21 vs v1 35.95), equal on photos, fastest; user approved |
-| 2026-11-26 | Đức Mạnh's innovative feature is now the AI enrolment scan + face-quality model (`ml/face_quality/`); presence verification becomes a team feature. No face restoration for gallery photos. Quality labels come from `face_recognition` v1, and the quality model is pinned to that version | User request; restoration invents detail and shifts embeddings |
+| 2026-11-28 | Anti-spoofing v1 is kept, moved from the repo root to `ml/anti_spoofing/anti_spoofing_v1.pt` | User request: keep v1 |
+| 2026-11-28 | The app runs anti-spoofing v2 (threshold 0.4), copied over `anti_spoofing.pt` | User request |
+| 2026-11-28 | In-app Wi-Fi guide page (`/guide/lan`) removed; `docs/LAN_DEMO.md` stays. Replaces that part of the 2026-11-24 decision | User request |
+| 2026-11-28 | `own_data/` and `test_out/` (liveness notebook outputs) removed from the repo | User request |
+| 2026-11-28 | Home (Recorded) plays only the take set in `data/video_config.json` (commit `a86b692`). Replaces "plays every take" (2026-11-17) | Noted while merging that commit |
+| 2026-11-28 | One root requirements file: `requirements.txt` (version ranges). `requirements.lock.txt` removed (exact pins are in Git history). The `ml/*/requirements.txt` files stay | User request |
+| 2026-11-28 | Presence verification + door audit removed completely; only the 2D live tracking map stays (projection moved to `backend/app/services/floor_map.py`). Replaces the earlier presence verification decisions below | User request |
+| 2026-11-28 | Module `ml/face_quality` renamed to `ml/live_face_scan` (folder, feature key, weights file; model unchanged). Drive folder `face_quality_colab/`, `data/raw/face_quality/` and experiment output names keep the old name | User request |
+| 2026-11-26 | `live_face_scan` v2 = the 06_backbones MobileNetV3 winner (Kaggle + team photos + recorded-video faces), threshold 0.58 from the checkpoint; bigger backbones not used | Best on held-out real faces ≥ 80 px (pAUC 32.21 vs v1 35.95), equal on photos, fastest; user approved |
+| 2026-11-26 | Đức Mạnh's innovative feature is now the AI enrolment scan + face-quality model (`ml/live_face_scan/`); presence verification becomes a team feature. No face restoration for gallery photos. Quality labels come from `face_recognition` v1, and the quality model is pinned to that version | User request; restoration invents detail and shifts embeddings |
 | 2026-11-26 | (v1 only, superseded by v2) The scan used 0.65 for webcam frames, not the checkpoint's 0.78 | At 0.78 only 3 of 27 real webcam frames passed |
 | 2026-11-24 | Attend Course page dropped; the Wi-Fi guide is shown in the app (`/guide/lan`) from `docs/LAN_DEMO.md`; anyone may edit any file (ownership rule removed) | User request |
 | 2026-11-23 | `scikit-learn`, `scipy`, `joblib` added to `requirements.txt` for presence verification; `*.joblib` and `ml/presence_verification/outputs/` git-ignored. Recorded takes are scored as the start of a 90-min class (`sessions.CLASS_S`) | User asked to implement the plan without waiting for review; team still to be told about the new deps |

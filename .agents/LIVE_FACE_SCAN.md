@@ -1,17 +1,17 @@
 # live_face_scan (AI enrolment scan) + face quality model: full record
 
-Feature name: **live_face_scan** (renamed from "face quality" on 2026-11-27, user). The model it scores frames with
-keeps its name: `ml/face_quality/face_quality.pt`.
+Feature name: **live_face_scan** (renamed from "face quality" on 2026-11-27, user). The module folder and weights were renamed to
+match on 2026-11-28: `ml/live_face_scan/live_face_scan.pt` (formerly "face_quality"; same model).
 
-Owner: Đức Mạnh. This is his graded **individual innovative feature** (assignment §7). Presence verification is now a
-team feature (decisions, 2026-11-26).
+Owner: Đức Mạnh. This is his graded **individual innovative feature** (assignment §7). Presence verification was removed
+from the project on 2026-11-28.
 
 This file records the full history of the module, so the report can be written without re-deriving anything. Every
 number here was measured in a session and states where it came from.
 
-- Short public description: [`ml/face_quality/README.md`](../ml/face_quality/README.md).
-- Hand test checklist: `ml/face_quality/TEST.md` (git-ignored by the user).
-- Original plan, in Vietnamese: `ml/face_quality/KE_HOACH.md` (git-ignored).
+- Short public description: [`ml/live_face_scan/README.md`](../ml/live_face_scan/README.md).
+- Hand test checklist: `ml/live_face_scan/TEST.md` (git-ignored by the user).
+- Original plan, in Vietnamese: `ml/live_face_scan/KE_HOACH.md` (git-ignored).
 
 Last updated: 2026-11-27 (scan fixes from live-scan logs).
 
@@ -57,17 +57,17 @@ download with `curl` saved an HTML error page as `archive.zip`; notebook 03 now 
 
 | File | Role |
 | --- | --- |
-| `ml/face_quality/01_build_labels.ipynb` | Kaggle crops → damage → recogniser embeddings → labels (`data/raw/face_quality/labels/`, git-ignored) |
-| `ml/face_quality/02_train_quality.ipynb` | Training (Colab) → `face_quality.pt` |
-| `ml/face_quality/03_evaluate.ipynb` | EDC, Spearman, damage response, threshold → `results.json`, `figures/` |
-| `ml/face_quality/infer.py` | `build_model`, `score`, `score_batch`, `align_crop`, `threshold`, `info` |
-| `ml/face_quality/damage.py` | The 9 synthetic damage types |
-| `ml/face_quality/heuristic.py` | Baseline score; also the backend fallback when the weights are missing |
+| `ml/live_face_scan/01_build_labels.ipynb` | Kaggle crops → damage → recogniser embeddings → labels (`data/raw/face_quality/labels/`, git-ignored) |
+| `ml/live_face_scan/02_train_quality.ipynb` | Training (Colab) → `live_face_scan.pt` |
+| `ml/live_face_scan/03_evaluate.ipynb` | EDC, Spearman, damage response, threshold → `results.json`, `figures/` |
+| `ml/live_face_scan/infer.py` | `build_model`, `score`, `score_batch`, `align_crop`, `threshold`, `info` |
+| `ml/live_face_scan/damage.py` | The 9 synthetic damage types |
+| `ml/live_face_scan/heuristic.py` | Baseline score; also the backend fallback when the weights are missing |
 | `backend/app/services/enrol.py` | Sessions, per-frame `analyse()`, slots, hints, calibration, liveness, duplicate check, video, `save()` → `scan.json`, `fail()` |
 | `backend/app/api/enrol.py` | `POST /api/enrol/session`, `POST /frame`, `POST /video`, `GET` / `DELETE /session/{id}`, `GET /session/{id}/still/{slot}/{i}`, `POST /session/{id}/fail` |
 | `backend/app/api/records.py` | `POST /api/students` accepts an optional `enrol_session` in place of `photos` (additive) |
 | `backend/app/pipeline/detector.py` | `detect_faces_landmarks()` (YuNet box + 5 landmarks); `detect_faces()` unchanged |
-| `backend/app/services/model_log.py` | `face_quality` appears on the System log page |
+| `backend/app/services/model_log.py` | `live_face_scan` appears on the System log page |
 | `backend/tests/test_enrol.py` | 15 tests with fake models (session logic only) |
 | `frontend/src/components/FaceScan.vue` | Live scan / Upload video tabs, overlay, quality meter with reason, retry counter, review grid |
 | `frontend/src/pages/AddPerson.vue`, `frontend/src/api.js` | Form wiring, scan API helpers |
@@ -129,7 +129,7 @@ download with `curl` saved an HTML error page as `archive.zip`; notebook 03 now 
 - **Threshold from data: 0.78.** Rule: the lowest t at which camera-like pairs with both images ≥ t reach an FNMR of at
   most 1.1 × the clean FNMR. At 0.78 the model accepts 69 % of clean crops but only 4–9 % of blurred, motion-blurred,
   noisy or occluded ones (jpeg 31 %, downscale 29 %, dark 30 %, bright 26 %, pose 19 %). The value is stored in
-  `face_quality.pt`.
+  `live_face_scan.pt`.
 
 ## 5. The domain gap (Kaggle → webcam)
 
@@ -245,6 +245,6 @@ attendance-camera takes with each gallery, compare correct / wrong / Unknown, an
 
 ## 11. Pointers for the report
 
-- Method: §4, §6. Results: `ml/face_quality/results*.json`, `figures/`, the executed notebooks.
+- Method: §4, §6. Results: `ml/live_face_scan/results*.json`, `figures/`, the executed notebooks.
 - Honest limits: §5, §9, D8; a video upload cannot prove presence (the live scan is the default for that reason).
 - Engineering story: §7 (each fix backed by a measurement or a replay).

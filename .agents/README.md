@@ -9,8 +9,7 @@ Start here. These files tell an agent (Claude, Copilot, Cursor…) what the proj
 | [`status.md`](status.md) | Branches, what is done, what comes next |
 | [`architecture.md`](architecture.md) | How the backend pipeline and the frontend are put together, and what to do when a model `.pt` is replaced |
 | [`decisions.md`](decisions.md) | Decisions already made and why. Do not reopen them without asking |
-| [`LIVE_FACE_SCAN.md`](LIVE_FACE_SCAN.md) | Đức Mạnh's innovative feature, **live_face_scan** (the Add person enrolment scan, built on the `ml/face_quality` model): full history, results, bugs fixed, open problems, measure-first improvement plan |
-| [`presence_verification.md`](presence_verification.md) | Work in progress on Đức Mạnh's presence verification module: map calibration state, open problems, next steps |
+| [`LIVE_FACE_SCAN.md`](LIVE_FACE_SCAN.md) | Đức Mạnh's innovative feature, **live_face_scan** (the Add person enrolment scan, built on the `ml/live_face_scan` model): full history, results, bugs fixed, open problems, measure-first improvement plan |
 
 ## The project in one minute
 
@@ -31,7 +30,7 @@ The team design doc is the source of truth for scope and marking. It is a Claude
 ## Hard rules
 
 1. **Who built what (for context only; anyone may edit any file).**
-   - Đức Mạnh: `frontend/`, `backend/app/main.py`, `backend/app/api/`, `backend/app/services/`, `backend/app/core/`, `backend/app/db/`, `backend/app/pipeline/attendance.py` (with Mai Chi), `ml/presence_verification/` and `backend/app/features/presence_verification/`, `ml/face_quality/`, `frontend/src/components/FaceScan.vue`
+   - Đức Mạnh: `frontend/`, `backend/app/main.py`, `backend/app/api/`, `backend/app/services/`, `backend/app/core/`, `backend/app/db/`, `backend/app/pipeline/attendance.py` (with Mai Chi), `ml/live_face_scan/`, `frontend/src/components/FaceScan.vue`
    - Mai Chi: `backend/app/pipeline/{detector,tracker,matcher}.py`
    - Thuận Minh `ml/face_recognition/`, Hồng Minh `ml/anti_spoofing/`, Minh Thành `ml/emotion/`: each holds `infer.py` and the weights `<feature>.pt`; the app finds them through `backend/app/core/ml_models.py`
 

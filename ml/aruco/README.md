@@ -54,7 +54,7 @@ python ml/aruco/survey.py             # data/result.yaml -> data/result_solved.j
 python ml/aruco/pin_points.py cam1    # data/cam1_fixed.jpg -> data/pins_cam1.json (saved clicks are reused)
 python ml/aruco/pin_points.py cam2
 python ml/aruco/fit_floor.py          # -> data/floor_cam*.json, figures/floor_*.png
-python ml/aruco/apply_calibration.py  # -> data/calibration/ (the files the app and ml/presence_verification read)
+python ml/aruco/apply_calibration.py  # -> data/calibration/ (the files the app reads (live map: services/floor_map.py))
 ```
 
 `python ml/aruco/fit_floor.py click cam1` prints the floor position of a clicked pixel, to check against a tape.

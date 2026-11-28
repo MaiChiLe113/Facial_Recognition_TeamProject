@@ -7,33 +7,32 @@ import {
   CAMERA, MAP_H, MAP_W, cameras, corridor, corridorLabel, desks, doorLabels, doorLeaves, glassWindow, room, roomLabel, walls,
 } from '../roomLayout.js'
 
-// map: dashboard map (only its layout is used; live mode draws no people yet); trails (optional): [{ track_id, name, flagged, points: [[t, x, y], ...] }]
-// from presence verification, drawn as paths, red when the track is part of an alert.
+// map: dashboard map (only its layout is used); trails (optional): [{ track_id, name, points: [[t, x, y], ...] }], the
+// live tracking positions of the session (pages/Home.vue), drawn as paths.
 const props = defineProps({ map: { type: Object, required: true }, room: String, trails: { type: Array, default: null },
-  time: Number })   // playback position (s); dots of people not seen for a while are hidden
+  time: Number })   // seconds since the session started; dots of people not seen for a while are hidden
 
 const W = MAP_W, H = MAP_H
 const X = (f) => f * W
 const Y = (f) => f * H
 
-// One colour per person. Red is left out: it is reserved for alerts. The colour follows the person's index in the
-// full list (trails keep every track while the video plays, only their points grow), so it never changes mid-take.
+// One colour per person. Red is left out (the app's colour for problems). The colour follows the person's index in the
+// full list (trails keep every track of the session, only their points grow), so it does not change as people move.
 const PALETTE = ['#2f6fb5', '#e07b1a', '#7a4fb3', '#1f9a8a', '#c2478f', '#8a6a1f', '#4a9a2f', '#5b6b80', '#b5872f', '#3b8fd0']
 const colorAt = (i) => PALETTE[i % PALETTE.length]
 
-// One map object per person, not per camera. Presence verification gives one trail per camera track
+// One map object per person, not per camera. Live tracking gives one trail per camera track
 // ("cam_1:3", "cam_2:5"); tracks that carry the same name (door handoff) are the same person, so their points are
 // merged into one time-ordered trail. Unnamed tracks stay on their own. Grouping uses the full list, so the person
-// numbers (P1, P2...) and colours never change while the video plays.
+// numbers (P1, P2...) and colours stay stable during the session.
 const people = computed(() => {
   const groups = new Map()
   for (const tr of props.trails ?? []) {
     const key = tr.name ? `name:${tr.name}` : `track:${tr.track_id}`
-    if (!groups.has(key)) groups.set(key, { name: tr.name, tracks: [], points: [], flagged: false })
+    if (!groups.has(key)) groups.set(key, { name: tr.name, tracks: [], points: [] })
     const g = groups.get(key)
     g.tracks.push(tr.track_id)
     g.points.push(...tr.points)
-    g.flagged ||= tr.flagged
   }
   return [...groups.values()].map((g, i) => ({ ...g, id: `P${i + 1}`, color: colorAt(i),
     points: smooth(g.points.sort((a, b) => a[0] - b[0])) }))
@@ -61,14 +60,14 @@ const trailPaths = computed(() => people.value
   .filter((g) => g.points.length > 0)
   .map((g) => {
     const last = g.points[g.points.length - 1]
-    return { id: g.id, name: g.name, tracks: g.tracks, flagged: g.flagged, color: g.color,
+    return { id: g.id, name: g.name, tracks: g.tracks, color: g.color,
       gone: now.value - last[0] > GONE_S, x: X(last[1]), y: Y(last[2]),
       d: g.points.map(([, x, y], i) => `${i ? 'L' : 'M'}${X(x).toFixed(1)} ${Y(y).toFixed(1)}`).join(' ') }
   }))
 
 // Legend: who is who (colour, person number, name, the camera tracks merged into it).
 const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t.color, id: t.id, name: t.name,
-  flagged: t.flagged, gone: t.gone, tracks: t.tracks.map((s) => s.replace(':', ' #')).join(', ') })))
+  gone: t.gone, tracks: t.tracks.map((s) => s.replace(':', ' #')).join(', ') })))
 </script>
 
 <template>
@@ -93,21 +92,20 @@ const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t
         <title>{{ c.id }}</title>
       </g>
 
-      <g v-for="tr in trailPaths" :key="tr.id" class="map-trail" :class="{ flagged: tr.flagged, gone: tr.gone }" :style="{ '--c': tr.color }">
+      <g v-for="tr in trailPaths" :key="tr.id" class="map-trail" :class="{ gone: tr.gone }" :style="{ '--c': tr.color }">
         <path v-if="tr.d.includes('L')" :d="tr.d" />
         <template v-if="!tr.gone">
           <circle :cx="tr.x" :cy="tr.y" r="10" />
           <text :x="tr.x" :y="tr.y - 16" class="rm-id">{{ tr.name || tr.id }}</text>
         </template>
-        <title>{{ tr.id }}{{ tr.name ? ` · ${tr.name}` : '' }} ({{ tr.tracks.join(', ') }}){{ tr.flagged ? ' · alert' : '' }}</title>
+        <title>{{ tr.id }}{{ tr.name ? ` · ${tr.name}` : '' }} ({{ tr.tracks.join(', ') }})</title>
       </g>
     </svg>
     <ul v-if="legend.length" class="rm-legend" aria-label="People on the map">
-      <li v-for="l in legend" :key="l.key" :class="{ flagged: l.flagged, gone: l.gone }" :title="`Camera tracks: ${l.tracks}`">
+      <li v-for="l in legend" :key="l.key" :class="{ gone: l.gone }" :title="`Camera tracks: ${l.tracks}`">
         <span class="rm-swatch" :style="{ background: l.color }" />
         <strong>{{ l.id }}</strong>
         <span class="muted">{{ l.name || 'Unknown' }}</span>
-        <span v-if="l.flagged" class="rm-alert">Alert</span>
       </li>
     </ul>
     <p v-else class="muted small rm-none">Nobody on the map yet.</p>
@@ -129,19 +127,13 @@ const legend = computed(() => trailPaths.value.map((t) => ({ key: t.id, color: t
 .rm-id { font-size: 18px; font-weight: 600; text-anchor: middle; fill: var(--c); paint-order: stroke; stroke: #fff; stroke-width: 5px; }
 .map-trail path { fill: none; stroke: var(--c); stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: round; opacity: 0.8; }
 .map-trail circle { fill: var(--c); stroke: #fff; stroke-width: 3; }
-/* Alert: the person keeps their colour, a dashed red halo marks the alert. */
 .map-trail.gone path { opacity: 0.3; }
 .rm-glass { fill: #7cc4fa; }
 .rm-legend li.gone { opacity: 0.5; }
-.map-trail.flagged path { stroke-width: 5; opacity: 1; }
-.map-trail.flagged circle { stroke: var(--danger); stroke-width: 4; animation: map-blink 1s ease-in-out infinite; }
-@keyframes map-blink { 50% { opacity: 0.35; } }
-@media (prefers-reduced-motion: reduce) { .map-trail.flagged circle { animation: none; } }
 .rm-legend { list-style: none; margin: 12px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line);
   display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px 16px; font-size: 13px; }
 .rm-legend li { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .rm-legend .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; }
-.rm-alert { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--danger); background: var(--danger-soft); border-radius: 999px; padding: 1px 8px; }
 .rm-none { margin: 12px 0 0; }
 </style>

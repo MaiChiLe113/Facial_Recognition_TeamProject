@@ -4,8 +4,8 @@
 // with the face box, head pose, quality and a hint. When a frame fits a missing pose slot and passes, the full-resolution
 // frame is sent again with final=true and kept. Upload video: the backend samples the video and does the same.
 // Emits 'update' with the scan summary (session_id, missing, done, slots) so the form can submit enrol_session.
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { discardScan, failScan, fetchScan, removeScanStill, scanStillUrl, sendScanFrame, startScan, uploadScanVideo } from '../api.js'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { discardScan, failScan, fetchScan, removeScanStill, saveScanLog, scanLogUrl, scanStillUrl, sendScanFrame, startScan, uploadScanVideo } from '../api.js'
 
 const emit = defineEmits(['update'])
 const SLOT_LABEL = { front: 'Straight', left: 'Turn left', right: 'Turn right' }
@@ -45,6 +45,11 @@ const fileInput = ref(null)
 const camInfo = ref('')
 const failedAttempts = ref(0)
 const failed = ref(null)              // { reason, attempts } once the scan gave up
+// Save log (CSV): off by default. When ticked, the scan's frames are written to logs/ each time the camera stops or a
+// video has been analysed (one file per scan, rewritten).
+const saveLog = ref(false)
+const logStatus = ref(null)           // { ok, text } result of the last save
+let saving = Promise.resolve()        // the last save: restart() discards the session only after it
 let stream = null, timer = null, inFlight = false, attemptStart = 0, keptAtStart = 0, reasonCounts = {}
 
 const sid = computed(() => summary.value?.session_id)
@@ -57,6 +62,7 @@ async function ensureSession(source) {
   const s = await startScan(source)
   if (s.error) { error.value = s.error; return false }
   setSummary(s)
+  logStatus.value = null
   return true
 }
 function setSummary(s) { summary.value = s; emit('update', s) }
@@ -92,9 +98,29 @@ async function startLive() {
 }
 
 function stopLive() {
+  const wasRunning = running.value
   clearInterval(timer); timer = null
   stream?.getTracks().forEach((t) => t.stop()); stream = null
   running.value = false
+  if (wasRunning) writeLog()
+  return saving
+}
+
+function writeLog() {
+  const id = sid.value
+  if (!saveLog.value || !id) return saving
+  saving = saveScanLog(id).then((r) => {
+    if (r.error) logStatus.value = { ok: false, text: `Scan log was not saved: ${r.error}` }
+    else if (r.log_file) logStatus.value = { ok: true, text: `Scan log saved: ${r.log_file} (${r.rows} frames)` }
+  })
+  return saving
+}
+// Ticked after the camera already stopped (or after a video): save the current scan now
+watch(saveLog, (on) => { logStatus.value = null; if (on && !running.value && !busy.value) writeLog() })
+
+// The tab is closed or reloaded while the camera is on: it cannot wait for a response
+function saveOnLeave() {
+  if (running.value && saveLog.value && sid.value) navigator.sendBeacon(scanLogUrl(sid.value))
 }
 
 function grab(maxW) {
@@ -121,8 +147,9 @@ async function attemptFailed() {
   stopLive()
   failed.value = { reason, attempts: failedAttempts.value }
   error.value = `Scan failed after ${MAX_ATTEMPTS} attempts: ${REASON_TEXT[reason] ?? reason}. Fix it and press Start again, or upload a video.`
-  const r = await failScan(sid.value, reason, failedAttempts.value, reasonCounts)
-  if (!r.error) setSummary(r)
+  const id = sid.value
+  const r = await failScan(id, reason, failedAttempts.value, reasonCounts)
+  if (!r.error && sid.value === id) setSummary(r)
 }
 
 async function tick() {
@@ -132,20 +159,24 @@ async function tick() {
   if (elapsed.value >= ATTEMPT_S) { await attemptFailed(); return }
   if (inFlight) return
   inFlight = true
+  const id = sid.value                 // a reply that arrives after restart() belongs to a discarded scan
   try {
     const blob = await grab(PREVIEW_W)
-    if (!blob) return
-    const r = await sendScanFrame(sid.value, blob)
-    if (r.error) { error.value = r.error; if (r.status === 404) stopLive(); return }
+    if (!blob || sid.value !== id) return
+    const r = await sendScanFrame(id, blob)
+    if (sid.value !== id) return
+    if (r.error){ error.value = r.error; if (r.status === 404) stopLive(); return }
     last.value = r
     if (r.reason) reasonCounts[r.reason] = (reasonCounts[r.reason] || 0) + 1
     if (r.accepted && summary.value.missing.includes(r.slot)) {
       const full = await grab(0)                       // the full-resolution still for the gallery
-      const k = full && (await sendScanFrame(sid.value, full, true))
+      if (sid.value !== id) return
+      const k = full && (await sendScanFrame(id, full, true))
+      if (sid.value !== id) return
       if (k && !k.error) last.value = { ...k, stillRejected: !k.kept }
     }
-    const s = await fetchScan(sid.value)
-    if (!s.error) setSummary(s)
+    const s = await fetchScan(id)
+    if (!s.error && sid.value === id) setSummary(s)
   } finally {
     inFlight = false
   }
@@ -159,23 +190,28 @@ async function onVideo(e) {
   error.value = ''
   if (!(await ensureSession('video'))) return
   busy.value = true
-  const r = await uploadScanVideo(sid.value, file)
+  const id = sid.value
+  const r = await uploadScanVideo(id, file)
   busy.value = false
-  if (r.error) { error.value = r.error; return }
+  if (sid.value !== id) return
+  if (r.error){ error.value = r.error; return }
   setSummary(r)
+  writeLog()
   last.value = { hint: r.done ? 'done' : `missing: ${r.missing.map((m) => SLOT_LABEL[m]).join(', ')}`, reasons: r.frame_reasons }
 }
 
 async function restart() {
-  stopLive()
-  if (sid.value) discardScan(sid.value)
+  const logged = stopLive()
+  const old = sid.value
+  if (old) logged.then(() => discardScan(old))
   summary.value = null; last.value = null; error.value = ''; failed.value = null; failedAttempts.value = 0
   emit('update', null)
 }
 function switchMode(m) { if (m !== mode.value) { restart(); mode.value = m } }
 
-defineExpose({ restart })
-onBeforeUnmount(() => { stopLive() })
+defineExpose({ restart, stop: stopLive })    // stop: turns the camera off, resolves once the log is saved
+onMounted(() => window.addEventListener('pagehide', saveOnLeave))
+onBeforeUnmount(() => { window.removeEventListener('pagehide', saveOnLeave); stopLive() })
 
 const boxStyle = computed(() => {
   const b = last.value?.box
@@ -242,6 +278,14 @@ const REASON_TEXT = { ok: 'kept', mask: 'face mask: take it off', other_person: 
       <p v-if="last?.hint" class="small">{{ last.hint }}</p>
     </div>
 
+    <label class="scan-log">
+      <input type="checkbox" v-model="saveLog" />
+      <span><strong>Save log (CSV)</strong>
+        <small class="muted">Saves each frame's scores to <span class="mono">logs/</span> in the repo folder when the camera
+          stops or a video has been analysed. No photos or names.</small></span>
+    </label>
+    <small v-if="logStatus" :class="logStatus.ok ? 'muted' : 'error'">{{ logStatus.text }}</small>
+
     <small v-if="error" class="error">{{ error }}</small>
 
     <div v-if="summary" class="scan-slots">
@@ -299,4 +343,6 @@ const REASON_TEXT = { ok: 'kept', mask: 'face mask: take it off', other_person: 
 .scan-slot figcaption { font-size: 11px; text-align: center; color: var(--muted); }
 .scan-foot { display: grid; gap: 6px; justify-items: center; }
 .scan-foot .progress { width: 100%; }
+.scan-log { display: flex; gap: var(--space-2); align-items: flex-start; text-align: left; cursor: pointer; }
+.scan-log span { display: grid; }
 </style>

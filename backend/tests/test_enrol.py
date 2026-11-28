@@ -44,12 +44,12 @@ class Fakes:
     def __init__(self, test, quality=0.9, live=True):
         self.quality, self.live, self.faces = quality, live, [face()]
         infers = {"anti_spoofing": type("A", (), {"check": staticmethod(lambda crops: {"live": self.live, "score": 0.9 if self.live else 0.1})}),
-                  "face_quality": type("Q", (), {"align_crop": staticmethod(lambda img, marks: img[:128, :128])}),
+                  "live_face_scan": type("Q", (), {"align_crop": staticmethod(lambda img, marks: img[:128, :128])}),
                   "glasses_detection": type("G", (), {"predict": staticmethod(lambda c: {"glasses": False, "glasses_score": 0.1})}),
                   "face_recognition": type("R", (), {"identify": staticmethod(lambda c, g, t: (None, 0.2)),
                                                      "threshold": staticmethod(lambda: 0.69)})}
         for p in (patch.object(enrol, "_infer", lambda f: infers[f]),
-                  patch.object(enrol, "quality_model", lambda: (lambda c: self.quality, 0.5, "face_quality")),
+                  patch.object(enrol, "quality_model", lambda: (lambda c: self.quality, 0.5, "live_face_scan")),
                   patch("app.pipeline.detector.detect_faces_landmarks", lambda *a, **k: self.faces),
                   patch.object(gallery, "registered_faces", lambda: ({}, {})),
                   patch.object(enrol, "CALIB_FRAMES", 0),
@@ -229,6 +229,25 @@ class Api(unittest.TestCase):
         self.assertEqual(r.json()["failed"]["attempts"], 3)
         line = json.loads((Path(self.tmp.name) / "logs" / "enrol_failures.jsonl").read_text(encoding="utf-8"))
         self.assertEqual((line["session_id"], line["reasons"]), (sid, {"no_face": 40}))
+
+    def test_scan_log_is_saved_only_on_request(self):
+        logs = Path(self.tmp.name) / "logs"
+        with patch.object(enrol, "SCAN_LOG_DIR", logs):
+            sid = self.client.post("/api/enrol/session").json()["session_id"]
+            url = f"/api/enrol/session/{sid}/log"
+            self.assertEqual(self.client.post(url).json(), {"log_file": None, "rows": 0})
+            for _ in range(2):
+                self.client.post("/api/enrol/frame", data={"session_id": sid},
+                                 files={"image": ("f.jpg", self.jpeg(), "image/jpeg")})
+            self.assertFalse(logs.exists())          # scanning alone writes no CSV
+            for _ in range(2):                       # saving twice rewrites the same file
+                r = self.client.post(url)
+                self.assertEqual(r.json()["rows"], 2, r.text)
+        files = list(logs.glob("live_face_scan_*.csv"))
+        self.assertEqual([f"logs/{f.name}" for f in files], [r.json()["log_file"]])
+        lines = files[0].read_text(encoding="utf-8-sig").splitlines()
+        self.assertEqual(lines[0], ",".join(enrol.LOG_COLUMNS))
+        self.assertEqual(len(lines), 3)
 
     def test_scan_then_register(self):
         sid = self.client.post("/api/enrol/session").json()["session_id"]

@@ -31,8 +31,7 @@ const svg = computed(() => {
     <template v-if="url">
       <div class="qr" v-html="svg" />
       <p class="mono qr-url">{{ url }}</p>
-      <p class="muted small">The phone must be on the same Wi-Fi, and the app started with <code>npm run dev:lan</code>.
-        <RouterLink to="/guide/lan" @click="dialog.close()">Wi-Fi demo guide</RouterLink></p>
+      <p class="muted small">The phone must be on the same Wi-Fi, and the app started with <code>npm run dev:lan</code>.</p>
     </template>
     <p v-else class="empty">No Wi-Fi address yet. Start the backend and run <code>npm run dev:lan</code>, then try again.</p>
   </dialog>
@@ -45,5 +44,4 @@ const svg = computed(() => {
 .qr { width: 100%; max-width: 280px; margin: 0 auto; }
 .qr :deep(svg) { width: 100%; height: auto; display: block; }
 .qr-url { text-align: center; word-break: break-all; margin: var(--space-3) 0; }
-.small a { color: var(--green); }
 </style>

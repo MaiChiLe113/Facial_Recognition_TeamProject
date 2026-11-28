@@ -4,7 +4,7 @@ A scan session collects the best face stills for 3 head poses (SLOTS), PER_SLOT 
 camera (POST /api/enrol/frame) or sampled from an uploaded video (POST /api/enrol/video), goes through analyse():
 
     YuNet face + 5 landmarks -> head pose (yaw, pitch) from the landmarks -> which slot it fits
-    face quality: ml/face_quality (trained model; heuristic fallback when face_quality.pt is missing)
+    face quality: ml/live_face_scan (trained model; heuristic fallback when live_face_scan.pt is missing)
     liveness: ml/anti_spoofing, averaged over the session's recent crops (one crop is too noisy)
     glasses: ml/glasses_detection (recorded in scan.json)
 
@@ -15,6 +15,7 @@ PER_SLOT best. Kept stills are checked against the registered faces (duplicate w
 POST /api/students with enrol_session=<id> saves the kept stills into data/photos/<id>/ with scan.json.
 Sessions live in memory and expire after SESSION_TTL seconds. Heavy imports (cv2, models) happen inside functions.
 """
+import csv
 import json
 import math
 import threading
@@ -58,6 +59,11 @@ LIVENESS_THRESHOLD_WEBCAM = None
 SESSION_TTL = 30 * 60
 FRAME_LOG = None            # logs/enrol_frames.jsonl when None: quality / pose / reason of every scored frame
 FAIL_LOG = None             # logs/enrol_failures.jsonl in the repo when None (tests point it elsewhere)
+SCAN_LOG_DIR = None         # logs/ in the repo when None: the CSV a person asks for ("Save log" on the scan)
+MAX_LOG_ROWS = 20_000       # rows a session keeps for that CSV
+LOG_COLUMNS = ("time", "session_id", "source", "t", "final", "faces", "target", "slot", "yaw", "pitch", "quality",
+               "threshold", "reason", "hint", "kept", "face_px", "face_conf", "brightness", "live", "live_score",
+               "mask_score", "glasses_score", "same_person")
 VIDEO_FPS = 5.0
 VIDEO_MAX_S = 60
 VIDEO_MAX_BYTES = 300 * 2**20
@@ -91,18 +97,18 @@ def _infer(feature):
 def quality_model():
     """(scorer, threshold, name): the trained model when its weights exist, else the heuristic baseline."""
     from ..core.ml_models import weights_file
-    if weights_file("face_quality").is_file():
-        q = _infer("face_quality")
+    if weights_file("live_face_scan").is_file():
+        q = _infer("live_face_scan")
         # v2+ (04_finetune_team.ipynb) chose its threshold on webcam / phone crops: use it; v1's 0.78 was Kaggle-only
         thr = q.threshold() if q.info().get("threshold_domain") == "webcam" else QUALITY_THRESHOLD_WEBCAM
-        return q.score, thr, "face_quality"
+        return q.score, thr, "live_face_scan"
     return None, 0.35, "heuristic"
 
 
 def _heuristic():
     import importlib.util
     from ..core.ml_models import ML_DIR
-    spec = importlib.util.spec_from_file_location("hawkeye_ml_face_quality_heuristic", ML_DIR / "face_quality" / "heuristic.py")
+    spec = importlib.util.spec_from_file_location("hawkeye_ml_live_face_scan_heuristic", ML_DIR / "live_face_scan" / "heuristic.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -185,7 +191,7 @@ def new_session(source="live"):
     with _lock:
         _sessions[sid] = {"id": sid, "source": source, "created": time.time(), "slots": {k: [] for k in SLOTS},
                           "crops": [], "liveness": None, "duplicate": None, "frames": 0, "failed": None,
-                          "calib": [], "baseline": None, "poses": [], "dup_votes": {}, "q_front": [], "mask": [], "glasses": []}
+                          "calib": [], "baseline": None, "poses": [], "dup_votes": {}, "q_front": [], "mask": [], "glasses": [], "log": []}
     return sid
 
 
@@ -262,6 +268,43 @@ def _public(e):
 
 def analyse(s, image, final=False, t=None):
     """Analyse one BGR frame for session s. final=True: keep it in its slot if it passes. t = video time (s)."""
+    wanted = missing_slots(s)
+    target = wanted[0] if s["source"] == "live" and wanted else None   # the pose asked for when the frame arrived
+    out = _analyse(s, image, final, t)
+    _remember(s, out, target, final, t)
+    return out
+
+
+def _remember(s, out, target, final, t):
+    """Keep one CSV row per frame (refused ones too) in the session, for save_scan_log()."""
+    live = s["liveness"] or {}
+    row = {**out, "time": datetime.now().isoformat(timespec="milliseconds"), "session_id": s["id"],
+           "source": s["source"], "t": t, "final": final, "target": target,
+           "live": live.get("live"), "live_score": live.get("score")}
+    with _lock:
+        rows = s.setdefault("log", [])
+        if len(rows) < MAX_LOG_ROWS:
+            rows.append({k: row.get(k) for k in LOG_COLUMNS})
+
+
+def save_scan_log(s):
+    """Write every frame of this scan so far to logs/live_face_scan_<start>_<id>.csv (one file per scan: saving
+    again rewrites it). {"log_file": path relative to the repo, or None when no frame was analysed, "rows": n}."""
+    with _lock:
+        rows = list(s.get("log") or [])
+    if not rows:
+        return {"log_file": None, "rows": 0}
+    folder = SCAN_LOG_DIR or _repo_dir() / "logs"
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"live_face_scan_{datetime.fromtimestamp(s['created']):%Y-%m-%d_%H%M%S}_{s['id'][:6]}.csv"
+    with path.open("w", newline="", encoding="utf-8-sig") as fh:   # BOM: Excel reads it as UTF-8
+        writer = csv.DictWriter(fh, fieldnames=LOG_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+    return {"log_file": f"logs/{path.name}", "rows": len(rows)}
+
+
+def _analyse(s, image, final, t):
     import cv2
     from ..core.ml_models import crop_face
     from ..pipeline.detector import detect_faces_landmarks
@@ -302,12 +345,12 @@ def analyse(s, image, final=False, t=None):
     if ordered and not final and POSE_SMOOTH > 1:      # median of the last preview poses: steadier slot and hint
         s["poses"] = (s.get("poses", []) + [(yaw, pitch)])[-POSE_SMOOTH:]
         yaw, pitch = (round(float(np.median([p[i] for p in s["poses"]])), 1) for i in (0, 1))
-    crop = crop_face(image, (x, y, bw, bh), "face_quality")
+    crop = crop_face(image, (x, y, bw, bh), "live_face_scan")
     grey = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     bright = float(grey.mean())
     scorer, thr, model = quality_model()
     # the trained model sees an eye-aligned crop framed like its Kaggle training images (much looser than the box)
-    q = float(scorer(_infer("face_quality").align_crop(image, marks))) if scorer else heuristic(crop, bh, yaw, pitch)
+    q = float(scorer(_infer("live_face_scan").align_crop(image, marks))) if scorer else heuristic(crop, bh, yaw, pitch)
     target = missing[0] if ordered and missing else None
     slot = slot_for(yaw, pitch, target)
     if slot == "front" and not final and len(s.setdefault("q_front", [])) < QUALITY_REF_N:
@@ -607,8 +650,8 @@ def save(s, folder):
             "missing": missing_slots(s), "liveness": s["liveness"], "duplicate": s["duplicate"],
             "frames_analysed": s["frames"],
             "model_versions": {k: versions.get(k, {}).get("version") for k in
-                               ("face_quality", "face_recognition", "anti_spoofing", "glasses_detection")},
-            "quality_weights_found": weights_file("face_quality").is_file(), "images": images}
+                               ("live_face_scan", "face_recognition", "anti_spoofing", "glasses_detection")},
+            "quality_weights_found": weights_file("live_face_scan").is_file(), "images": images}
     (folder / "scan.json").write_text(json.dumps(scan, indent=1, ensure_ascii=False), encoding="utf-8")
     return n
 

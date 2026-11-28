@@ -63,9 +63,9 @@ Live mode calls `process_frame` for every frame a phone sends over `/ws/camera/{
 
 ## When someone replaces a model's `.pt` file
 
-Applies to `ml/face_recognition/face_recognition.pt`, `ml/anti_spoofing/anti_spoofing.pt`, `ml/emotion/emotion.pt`, `ml/gesture/gesture.pt`, `ml/face_quality/face_quality.pt`, `ml/glasses_detection/glasses_detection.pt` (or the `HAWKEYE_<FEATURE>_WEIGHTS` override). Weights are never committed (see `.gitignore`); teammates copy the file in by hand.
+Applies to `ml/face_recognition/face_recognition.pt`, `ml/anti_spoofing/anti_spoofing.pt`, `ml/emotion/emotion.pt`, `ml/gesture/gesture.pt`, `ml/live_face_scan/live_face_scan.pt`, `ml/glasses_detection/glasses_detection.pt` (or the `HAWKEYE_<FEATURE>_WEIGHTS` override). Weights are never committed (see `.gitignore`); teammates copy the file in by hand.
 
-**The app only loads `ml/<feature>/<feature>.pt`.** A teammate's file often has another name or sits elsewhere (e.g. `liveness_mobilenetv2.pt` at the repo root): copy it to that exact path (or set the override). Before replacing, compare SHA-256 with the current file; an identical file is not a new model (bump nothing).
+**The app only loads `ml/<feature>/<feature>.pt`.** A teammate's file often has another name or sits elsewhere (e.g. `liveness_mobilenetv2.pt`): copy it to that exact path (or set the override). Before replacing, compare SHA-256 with the current file; an identical file is not a new model (bump nothing).
 
 What the app does by itself:
 - **Threshold:** face recognition and anti-spoofing keep their decision threshold *inside* the `.pt` (chosen on validation data: ROC / EER). Nothing in the app hard-codes it. The Features demo page shows it as "Model default" (from `GET /api/features-demo/status`, field `threshold`) and logs the value actually used in the CSV (`threshold`, `liveness_threshold`).
@@ -82,13 +82,13 @@ What a person or agent must do:
 8. **Glasses detection** is used by the enrolment scan (asks the person to take glasses off, smoothed over `GLASSES_WINDOW` frames against `_load()["threshold"]`), the Features demo and the gallery's eyewear-aware matching (`services/gallery.py`; its cache signature includes the glasses model, so embeddings are rebuilt). Keep `predict(crop) -> {"glasses", "glasses_score"}` and the checkpoint keys `architecture`, `input_size`, `mean`, `std`, `threshold`.
 9. **Mask detection** (`ml/mask_detection/infer.py`) has no `.pt` today: a colour rule on the 5 YuNet landmarks, listed in `NO_WEIGHTS` in `core/ml_models.py`. To switch to a trained model: put it at `ml/mask_detection/mask_detection.pt`, load it inside `infer.py` keeping `check(image, marks) -> {"mask": bool|None, "score": float|None}` and `THRESHOLD`, remove `mask_detection` from `NO_WEIGHTS`, and add it to `models()` / `ml/model_versions.json`.
 
-**Face quality** depends on the recogniser: its labels come from `face_recognition` v1. When `face_recognition.pt` changes, re-run `ml/face_quality/01_build_labels.ipynb` → 02 → 03, then bump `face_quality` in `ml/model_versions.json`. The enrolment scan caps its per-session quality bar at the checkpoint's threshold when `threshold_domain` is "webcam" (v2: 0.58), else at `QUALITY_THRESHOLD_WEBCAM` 0.65 (`backend/app/services/enrol.py`, see `LIVE_FACE_SCAN.md` §6).
+**Face quality** depends on the recogniser: its labels come from `face_recognition` v1. When `face_recognition.pt` changes, re-run `ml/live_face_scan/01_build_labels.ipynb` → 02 → 03, then bump `live_face_scan` in `ml/model_versions.json`. The enrolment scan caps its per-session quality bar at the checkpoint's threshold when `threshold_domain` is "webcam" (v2: 0.58), else at `QUALITY_THRESHOLD_WEBCAM` 0.65 (`backend/app/services/enrol.py`, see `LIVE_FACE_SCAN.md` §6).
 
 ## Model versions (System log page)
 
 The user controls which version of each model the app runs. `ml/model_versions.json` (committed) holds a hand-set
 label per model: `{"<key>": {"version": "v2", "note": "what changed"}}`, keys `face_recognition`, `anti_spoofing`,
-`emotion`, `face_quality`, `glasses_detection`, `presence_verification`, `face_detector`, `person_detector`. The System log page (`/system`, gear icon,
+`emotion`, `live_face_scan`, `glasses_detection`, `face_detector`, `person_detector`. The System log page (`/system`, gear icon,
 `GET /api/system/models`, `services/model_log.py`) shows, per model, the file the app actually loads (same paths and
 `HAWKEYE_*` overrides as the loaders), its version label, last modified time, size and SHA-256 fingerprint. Every change
 it detects (new fingerprint or new label) is appended to `logs/model_changes.jsonl` (git-ignored, per machine), checked
@@ -104,24 +104,21 @@ Rules for agents:
 
 "Last modified" is the file date on that machine (a clone or copy resets it); the fingerprint is the reliable identity.
 
-## Presence verification + door audit (`ml/presence_verification/`)
+## 2D live tracking map
 
-Đức Mạnh's innovative feature. Reads `data/tracks/`, `data/calibration/`, `data/ground_truth/` (never writes them).
-Flow: tracks → map points (`trajectories.py`) → door crossings → match check-ins ↔ entries (`door_audit.py`, Hungarian +
-pair classifier) → alerts D1/D2/D3 → per-student features + rules R1–R5 + model score (`presence.py`).
-Models train on simulated sessions (`simulate.py`) whose parameters come from the recorded takes; `train.py` writes
-`presence_verification.joblib`, `evaluate.py` writes `outputs/eval/report.md`. The backend loads `infer.py` from
-`backend/app/features/presence_verification/` and serves it under `/api/features/presence_verification/`.
-If `data/tracks/` or the homographies change, retrain and re-run `evaluate.py`: the dt model is fitted on the takes.
+`services/live.py` projects each tracked person's feet on cam_1 / cam_2 onto the Room 204 floor with
+`services/floor_map.py` (homographies in `data/calibration/`, made by `ml/aruco/`) and also derives the door zone
+(door events, door-handoff naming) from it. `GET /api/live` returns each person's `map` position; Home (Live) collects
+them into trails between Start and Stop and `components/RoomMap.vue` draws them. Recorded mode shows no map.
 
 ## Frontend (`frontend/src/`)
 
 ```
-pages.js           page registry (router + sidebar built from it): Home, History, Features demo, Camera, Add person, Wi-Fi guide
+pages.js           page registry (router + sidebar built from it): Home, History, Features demo, Camera, Add person
 router.js          routes from pages.js + redirects (/class, /demo, /live, unknown -> /)
 api.js             fetch helpers with offline fallback to data/mock (keep it working)
-pages/             Home, History, FeaturesDemo, AddPerson, Camera, LanGuide, Placeholder
-components/        Sidebar, CameraCard, EventLog, ClassRoster, RoomMap, PresencePanel, QrButton
+pages/             Home, History, FeaturesDemo, AddPerson, Camera, Placeholder
+components/        Sidebar, CameraCard, EventLog, ClassRoster, RoomMap, QrButton
 composables/       useSyncedPlayback (Recorded mode: play/seek the three videos together)
 roomLayout.js      2D map drawing (from FigJam); takeEvents.js, format.js helpers
 styles.css         all global styles; tokens on :root (colours, --space-1..5); no UI library

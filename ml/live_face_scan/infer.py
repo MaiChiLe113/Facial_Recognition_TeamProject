@@ -4,7 +4,7 @@ Predicts how useful a face crop is to the team's recogniser (ml/face_recognition
 0 = useless, 1 = as good as a clean enrolment photo. Trained in 02_train_quality.ipynb on labels from
 01_build_labels.ipynb; the accept threshold comes from 03_evaluate.ipynb and is stored in the weights.
 
-Weights: ml/face_quality/face_quality.pt (override with HAWKEYE_FACE_QUALITY_WEIGHTS).
+Weights: ml/live_face_scan/live_face_scan.pt (override with HAWKEYE_LIVE_FACE_SCAN_WEIGHTS).
 A face crop is an HxWx3 uint8 OpenCV array (BGR), cut like the recogniser's crops.
 
     align_crop(image, marks) -> crop framed like the training images (use this for camera frames)
@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-_DEFAULT_WEIGHTS = Path(__file__).resolve().parent / "face_quality.pt"
+_DEFAULT_WEIGHTS = Path(__file__).resolve().parent / "live_face_scan.pt"
 INPUT_SIZE = 112
 MEAN, STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
 
@@ -109,7 +109,7 @@ def arch_of(payload):
 
 
 def _weights_path() -> Path:
-    return Path(os.environ.get("HAWKEYE_FACE_QUALITY_WEIGHTS", _DEFAULT_WEIGHTS))
+    return Path(os.environ.get("HAWKEYE_LIVE_FACE_SCAN_WEIGHTS", _DEFAULT_WEIGHTS))
 
 
 def _load():

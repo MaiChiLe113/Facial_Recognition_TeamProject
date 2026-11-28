@@ -23,9 +23,7 @@ data/raw/
 # ML environment, outputs and checkpoints
 ml/.venv/
 runs/**
-# presence verification: trained model and generated outputs (ml/presence_verification/train.py, evaluate.py)
 *.joblib
-ml/presence_verification/outputs/
 
 # Notebook caches and training/recovery checkpoints
 .ipynb_checkpoints/
@@ -46,7 +44,7 @@ ml/presence_verification/outputs/
 
 AppliedML/
 
-# Features demo CSV logs (root/logs/)
+# Local logs (root/logs/): Features demo CSV, face scan CSV and jsonl, model changes
 logs/
 
 # Face photos uploaded on the Add person page (personal data)
@@ -58,6 +56,6 @@ frontend/certs/
 # backups written by ml/aruco/apply_calibration.py and calibrate_homography.py
 data/calibration/*.bak
 
-ml/face_quality/KE_HOACH.md
-ml/face_quality/RESUME.md
-ml/face_quality/TEST.md
+ml/live_face_scan/KE_HOACH.md
+ml/live_face_scan/RESUME.md
+ml/live_face_scan/TEST.md

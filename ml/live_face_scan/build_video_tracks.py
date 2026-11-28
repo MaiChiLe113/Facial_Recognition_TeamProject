@@ -1,7 +1,7 @@
 """Pack the recorded takes' track boxes into one small file for 05_finetune_video.ipynb (Colab).
 
 Reads data/video_config.json (which video file is which take and camera) and data/tracks/take<N>/<cam>.json (YOLO11n +
-ByteTrack person boxes, see ml/tracking). Writes ml/face_quality/video_tracks.json:
+ByteTrack person boxes, see ml/tracking). Writes ml/live_face_scan/video_tracks.json:
 
     {"takes": [{"take": 1, "files": {"cam_1": "...webm", ...},
                 "tracks": {"cam_1": [{"id": 3, "kf": [[t, x, y, w, h], ...]}, ...], ...}}, ...]}
@@ -10,7 +10,7 @@ Boxes are normalised to the frame (0..1), t in seconds from the start of that ca
 purpose: the notebook names faces itself, with an independent recogniser (SFace), so its labels do not depend on the
 team recogniser it is computing them with.
 
-    python ml/face_quality/build_video_tracks.py
+    python ml/live_face_scan/build_video_tracks.py
 """
 import json
 from pathlib import Path
@@ -33,7 +33,7 @@ def main():
                             "kf": [[round(k["t"], 2), *[round(v, 4) for v in k["box"]]] for k in tr["keyframes"]]}
                            for tr in data["tracks"]]
         takes.append({"take": n, "files": take["files"], "tracks": tracks})
-    out = REPO / "ml" / "face_quality" / "video_tracks.json"
+    out = REPO / "ml" / "live_face_scan" / "video_tracks.json"
     out.write_text(json.dumps({"takes": takes}, separators=(",", ":")), encoding="utf-8")
     n_tracks = sum(len(v) for t in takes for v in t["tracks"].values())
     print(f"{out.relative_to(REPO)}: {len(takes)} takes, {n_tracks} tracks, {out.stat().st_size / 1e3:.0f} kB")

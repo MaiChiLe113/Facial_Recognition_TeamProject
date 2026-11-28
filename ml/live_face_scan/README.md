@@ -5,7 +5,7 @@ webcam camera or from an uploaded video. The scan keeps the best frames for five
 **face-quality model trained here**. The score estimates how useful a frame is **to the team's own face recogniser**
 (`ml/face_recognition`, v1), not how good it looks to a person.
 
-**The app runs v2** (`face_quality.pt`): MobileNetV3-Small trained on Kaggle, then fine-tuned on the team's enrolment
+**The app runs v2** (`live_face_scan.pt`): MobileNetV3-Small trained on Kaggle, then fine-tuned on the team's enrolment
 photos and real faces from the recorded takes. Its threshold is 0.58, chosen on held-out team photos. v1 (Kaggle
 only, notebooks 01–03) is the first model and is in git history. Sections below describe v1 first, then the in-domain
 work (notebooks 04–06) that led to v2.
@@ -145,7 +145,7 @@ Switching to the aligned crop changed little in practice: median 0.712 → 0.719
 and the same 78 % above 0.65. So the framing explains only part of the gap between the Kaggle images and the webcam;
 the rest needs retraining on in-domain crops.
 
-If `face_quality.pt` is missing, the scan falls back to the heuristic at 0.35.
+If `live_face_scan.pt` is missing, the scan falls back to the heuristic at 0.35.
 
 Smoke test (2026-11-26): a video made from Đức Mạnh's webcam photos, posted to `/api/enrol/video`, gave liveness
 0.9986. It filled the front slot with quality 0.81–0.83 and the side slots with 0.72–0.78. The up and down slots
@@ -156,7 +156,7 @@ stayed empty because those photos have no such poses.
 - **Little in-domain data.** v2 saw only 3 team members and one room. The models memorise the people they see, so more
   people and rooms would help more than a bigger backbone.
 - **Pinned to the recogniser.** The labels come from `face_recognition` v1. If that model is retrained, run notebook 01
-  again, retrain, and bump `face_quality` in `ml/model_versions.json`.
+  again, retrain, and bump `live_face_scan` in `ml/model_versions.json`.
 - **Clean crops are hard to rank.** The validation Spearman on clean crops alone is only 0.35; most of the signal comes
   from separating damaged frames from good ones.
 - **No restoration.** Super-resolution or face restoration (GFPGAN, CodeFormer) was ruled out on purpose: it invents
@@ -172,6 +172,6 @@ stayed empty because those photos have no such poses.
    `MyDrive/face_quality_colab/`, then run `02_train_quality.ipynb` and `03_evaluate.ipynb`. Notebook 03 fetches the
    Kaggle archive through `kagglehub`, or copies `face_quality_colab/archive.zip` if present.
 3. For v2: add a shortcut to the shared `AppliedML` folder in My Drive, upload `video_tracks.json` (from
-   `python ml/face_quality/build_video_tracks.py`) next to the notebooks, and run `06_backbones.ipynb` (about 40 min
-   on a T4). Copy the saved `face_quality_mobilenet_v3_small.pt` here as `face_quality.pt`.
+   `python ml/live_face_scan/build_video_tracks.py`) next to the notebooks, and run `06_backbones.ipynb` (about 40 min
+   on a T4). Copy the saved `face_quality_mobilenet_v3_small.pt` here as `live_face_scan.pt`.
 4. Copy the weights, `results*.json` and `figures/` back here and restart the backend.

@@ -1,5 +1,5 @@
 """Hand-made face-quality baseline (no learning), the comparison for the trained model in 03_evaluate.ipynb.
-Also the fallback score in the backend when face_quality.pt is missing.
+Also the fallback score in the backend when live_face_scan.pt is missing.
 
     heuristic_score(face_crop, face_px=None, yaw=0, pitch=0) -> float in [0, 1]
 

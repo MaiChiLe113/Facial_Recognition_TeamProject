@@ -24,8 +24,8 @@ NO_WEIGHTS = ("mask_detection",)   # rule-based, no .pt file (ml/mask_detection/
 
 # Margin around a detected face box, per model, as a fraction of the box size on each side.
 # anti_spoofing was trained on crops with 25 % (ml/anti_spoofing/try_liveness.py); emotion scores the same on the raw box.
-MARGIN = {"face_recognition": 0.1, "anti_spoofing": 0.25, "emotion": 0.0, "glasses_detection": 0.1, "face_quality": 0.1}
-ENROL_FEATURES = ("face_quality",)   # used by the Add person face scan (app/services/enrol.py), not the Features demo
+MARGIN = {"face_recognition": 0.1, "anti_spoofing": 0.25, "emotion": 0.0, "glasses_detection": 0.1, "live_face_scan": 0.1}
+ENROL_FEATURES = ("live_face_scan",)   # used by the Add person face scan (app/services/enrol.py), not the Features demo
 
 _modules = {}
 

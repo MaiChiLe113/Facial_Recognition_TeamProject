@@ -35,7 +35,7 @@ from app.core.ml_models import crop_face  # noqa: E402
 from app.pipeline.detector import detect_faces  # noqa: E402
 from app.services import gallery as G  # noqa: E402
 
-SRC = Path(__file__).parent / "anti_spoofing.pt"
+SRC = Path(__file__).parent / "anti_spoofing_v1.pt"   # start from v1: anti_spoofing.pt (loaded by the app) is v2
 OUT = Path(__file__).parent / "anti_spoofing_v2.pt"
 FOLDS, EPOCHS, LR, BATCH, FREEZE_UNTIL = 4, 6, 1e-4, 16, 14
 THRESHOLD = 0.4   # held-out: ~19 % of spoofs accepted (mostly tiny avatars), ~12 % of live frames rejected; see the table

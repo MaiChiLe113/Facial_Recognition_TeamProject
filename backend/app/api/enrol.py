@@ -5,6 +5,7 @@
     POST /api/enrol/video   (multipart)          session_id, video -> summary + counts of why frames were refused
     GET  /api/enrol/session/{id}                 summary (kept stills per slot, missing slots, liveness, duplicate)
     GET  /api/enrol/session/{id}/still/{slot}/{i}  a kept still (JPEG) for the review screen
+    POST /api/enrol/session/{id}/log             save the scan's frames to logs/live_face_scan_*.csv (only on request)
     DELETE /api/enrol/session/{id}               discard a scan
 
 Finish with POST /api/students and enrol_session=<id> instead of photos.
@@ -57,6 +58,14 @@ def fail(sid: str, reason: str = Form(...), attempts: int = Form(3), reasons: st
         counts = {}
     enrol.fail(_session(sid), reason, attempts, counts if isinstance(counts, dict) else {})
     return enrol.summary(_session(sid))
+
+
+@router.post("/session/{sid}/log")
+def save_log(sid: str):
+    try:
+        return enrol.save_scan_log(_session(sid))
+    except OSError as e:   # e.g. the folder is read-only, or the CSV is open in Excel
+        raise HTTPException(500, f"Could not write the log: {type(e).__name__}: {e}") from e
 
 
 @router.get("/session/{sid}/still/{slot}/{index}")

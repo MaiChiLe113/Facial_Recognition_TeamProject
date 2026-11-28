@@ -4,17 +4,16 @@
 //                 (GET /api/live/<cam_id>/stream, boxes drawn by the backend) and the doorway tile lists the real
 //                 per-face results from GET /api/live, polled every second. "+" on an idle tile opens /camera?cam=<id>.
 //   Recorded      the demo recording (one take, "take" in data/video_config.json) played in sync, with its precomputed
-//                 track boxes (/api/tracks), event log, presence verification + door audit and the map trails. (This was
-//                 the MultiCam page, /demo, which now redirects here: /?source=recorded.)
-// Class roster and room map are shown in both modes. In Live, the event log, the map trails and the roster only run
-// after Start (a session); before it they stay empty, and Stop freezes them.
+//                 track boxes (/api/tracks) and event log. (This was the MultiCam page, /demo, which now redirects
+//                 here: /?source=recorded.)
+// The class roster is shown in both modes; the 2D room map (live tracking) only in Live. In Live, the event log, the
+// map trails and the roster only run after Start (a session); before it they stay empty, and Stop freezes them.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { demoTakes, fetchDashboard, fetchDemoConfig, fetchLive, fetchPresence, fetchTracks, liveStreamUrl, removeLiveCamera } from '../api.js'
+import { demoTakes, fetchDashboard, fetchDemoConfig, fetchLive, fetchTracks, liveStreamUrl, removeLiveCamera } from '../api.js'
 import CameraCard from '../components/CameraCard.vue'
 import ClassRoster from '../components/ClassRoster.vue'
 import EventLog from '../components/EventLog.vue'
-import PresencePanel from '../components/PresencePanel.vue'
 import RoomMap from '../components/RoomMap.vue'
 import { useSyncedPlayback } from '../composables/useSyncedPlayback.js'
 import { clockOf, eventsFromTracks } from '../takeEvents.js'
@@ -68,7 +67,7 @@ async function poll() {
 const started = ref(false)
 const startedAt = ref(0)
 const sessionEvents = ref([])     // newest first, EventLog shape { t, time, event, source }
-const sessionTrails = ref({})     // "<cam>:<id>" -> { track_id, name, flagged, points: [[t, x, y]] }
+const sessionTrails = ref({})     // "<cam>:<id>" -> { track_id, name, points: [[t, x, y]] }
 const clock = ref(0)              // seconds since Start (map time)
 const SPOOF_EVERY_MS = 5000, UNKNOWN_EVERY_MS = 10000, MAX_POINTS = 900
 let seen = {}                     // what the previous poll showed, to report changes once
@@ -135,7 +134,7 @@ function record(r) {
     for (const p of c.people ?? []) {
       if (!p.map) continue
       const key = `${c.cam_id}:${p.id}`
-      const tr = (sessionTrails.value[key] ??= { track_id: key, name: null, flagged: false, points: [] })
+      const tr = (sessionTrails.value[key] ??= { track_id: key, name: null, points: [] })
       if (p.name) tr.name = p.name                     // named by the door handoff: the map merges both cameras' trails
       tr.points.push([clock.value, p.map[0], p.map[1]])
       if (tr.points.length > MAX_POINTS) tr.points.shift()
@@ -156,7 +155,6 @@ const peopleOf = (camId) => liveOf(camId)?.people ?? []
 
 // ---------------- recorded (was MultiCam) ----------------
 const tracks = ref({})
-const presence = ref(null)   // presence verification + door audit of the take (null while loading)
 const message = ref('')
 const cards = {}
 const videoOf = (camId) => cards[camId]?.video
@@ -167,8 +165,6 @@ const { srcs, playing, position, duration, seek, play, togglePause, restart, sto
 function loadTake(n) {
   fetchDemoConfig(n).then((d) => { if (selected.value === n) demo.value = d })
   tracks.value = {}
-  presence.value = null
-  fetchPresence(n).then((p) => { if (selected.value === n) presence.value = p })
   Promise.all(ORDER.map((c) => fetchTracks(c, n))).then((list) => {
     if (selected.value === n) tracks.value = Object.fromEntries(ORDER.map((c, i) => [c, list[i]]))
   })
@@ -211,14 +207,8 @@ const roster = computed(() => {
     Object.fromEntries(cameras.value.map((c) => [c.cam_id, c.offset_s || 0])), position.value, hasVideo.value)
 })
 
-// Map trails from presence verification, drawn up to the playback position while a video plays.
-const trails = computed(() => {
-  if (!recorded.value) return started.value || sessionEvents.value.length ? Object.values(sessionTrails.value) : null
-  const all = presence.value?.trails ?? []
-  // Nothing is drawn until the take plays; Restart and a new take start from an empty map (position 0).
-  if (!hasVideo.value) return all.map((tr) => ({ ...tr, points: [] }))
-  return all.map((tr) => ({ ...tr, points: tr.points.filter((p) => p[0] <= position.value + 0.05) }))
-})
+// Live map trails of the session (kept after Stop; empty before the first Start).
+const trails = computed(() => (started.value || sessionEvents.value.length ? Object.values(sessionTrails.value) : null))
 
 // Playback line: drag to scrub. While dragging, the videos pause and resume on release.
 let wasPlaying = false
@@ -293,7 +283,7 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
       </CameraCard>
     </div>
 
-    <!-- Recorded: always shown (disabled before Play) so choosing a take does not change the page height. -->
+    <!-- Recorded: always shown (disabled before Play) so pressing Play does not change the page height. -->
     <div v-if="recorded" class="card timeline" :class="{ off: !hasVideo }">
       <button class="btn" :disabled="!hasVideo" :aria-label="playing ? 'Pause' : 'Play'" @click="togglePause">{{ playing ? '❚❚' : '▶' }}</button>
       <span class="mono">{{ fmtTime(position) }}</span>
@@ -302,25 +292,20 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
       <span class="mono muted">{{ fmtTime(duration) }}</span>
     </div>
 
-    <!-- Event log and room map side by side under the playback line. -->
-    <div class="grid-log-map">
-      <EventLog v-if="recorded" class="demo-log" :events="takeEvents" :title="`Event log · take ${selected}`" />
-      <!-- Live: the session's events, recorded from the cameras between Start and Stop (empty before Start). -->
-      <EventLog v-else :events="sessionEvents" :title="started ? 'Event log · live' : 'Event log'" />
-      <RoomMap :map="dash.map" :room="dash.course.room" :trails="trails"
-        :time="recorded ? (hasVideo ? position : undefined) : clock" />
+    <!-- Recorded: the take's event log under the playback line. Live: event log and 2D tracking map side by side. -->
+    <EventLog v-if="recorded" class="demo-log recorded-log" :events="takeEvents" :title="`Event log · take ${selected}`" />
+    <div v-else class="grid-log-map">
+      <!-- The session's events, recorded from the cameras between Start and Stop (empty before Start). -->
+      <EventLog :events="sessionEvents" :title="started ? 'Event log · live' : 'Event log'" />
+      <RoomMap :map="dash.map" :room="dash.course.room" :trails="trails" :time="clock" />
     </div>
 
     <ClassRoster :roster="roster" />
-
-    <template v-if="recorded">
-      <PresencePanel :result="presence" :position="position" :live="hasVideo" />
-
-    </template>
   </div>
 </template>
 
 <style scoped>
+.recorded-log { margin-bottom: var(--space-5); }
 .home-bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
 .home-bar h1 { justify-self: start; white-space: nowrap; }
 .bar-right { justify-self: end; justify-content: flex-end; }

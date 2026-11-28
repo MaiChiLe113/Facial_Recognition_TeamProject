@@ -49,23 +49,6 @@ export async function fetchTracks(camId, take) {
   }
 }
 
-// ---- Presence verification + door audit (backend/app/features/presence_verification/) --------------------
-// The model runs on the backend only. Without it this answers { offline: true } (backend down) or
-// { unavailable: true, message } (feature switched off or model not trained), and the page hides the panel.
-export async function fetchPresence(take) {
-  try {
-    const res = await fetch(`/api/features/presence_verification/take/${take}`)
-    if (res.ok) return { ...(await res.json()), offline: false }
-    const body = await res.json().catch(() => null)
-    return { unavailable: true, offline: false,
-      message: res.status === 404 && !body?.detail?.startsWith?.('No data')
-        ? 'Presence verification is not running. Train the model (ml/presence_verification/train.py), then restart the backend.'
-        : (body?.detail ?? `The backend answered ${res.status}.`) }
-  } catch {
-    return { offline: true }
-  }
-}
-
 // ---- pages beyond Home --------------------------------------------------------------
 // Served from SQLite by backend/app/api/records.py. Without the backend, each call falls back to data/mock.
 // Shapes:
@@ -190,6 +173,12 @@ export function failScan(sessionId, reason, attempts, reasons) {
   form.append('attempts', String(attempts))
   form.append('reasons', JSON.stringify(reasons || {}))
   return scanCall(`/api/enrol/session/${sessionId}/fail`, form)
+}
+
+// Save the scan's frame log as logs/live_face_scan_*.csv -> { log_file, rows } or { error }.
+export const scanLogUrl = (sessionId) => `/api/enrol/session/${sessionId}/log`
+export function saveScanLog(sessionId) {
+  return scanCall(scanLogUrl(sessionId), new FormData())
 }
 
 export function discardScan(sessionId) {

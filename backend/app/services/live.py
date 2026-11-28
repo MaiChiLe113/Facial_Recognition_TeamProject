@@ -13,6 +13,8 @@ import threading
 import time
 from collections import Counter, deque
 
+from . import floor_map
+
 BOUNDARY = "frame"
 JPEG_QUALITY = 80
 STALE_SECONDS = 3.0          # a camera with no frame for this long shows as disconnected
@@ -148,46 +150,21 @@ def _vote_names(cam, faces, now):
         f["student_id"] = top
 
 
-_projection = {}
-
-
 def _to_map(cam_id, box, width, height):
     """Map position (fractions of the Room 204 map) of a person box in pixels, from the calibrated floor homographies
-    (ml/presence_verification/trajectories.to_map, the same projection as the recorded trails), or None when the
-    camera has no homography, the feet are not visible, or the module cannot load."""
-    if "to_map" not in _projection:
-        try:
-            import sys
-            from ..config import REPO_DIR
-            folder = str(REPO_DIR / "ml" / "presence_verification")
-            if folder not in sys.path:
-                sys.path.insert(0, folder)
-            from trajectories import to_map            # noqa: E402 (ml/ module, imported by path)
-            _projection["to_map"] = to_map
-        except Exception:  # noqa: BLE001 - no map positions, the rest of live mode still works
-            _projection["to_map"] = None
-    to_map = _projection["to_map"]
-    if to_map is None:
-        return None
+    (services/floor_map.py), or None when the camera has no homography, the feet are not visible, or the
+    calibration cannot be read."""
     x, y, w, h = box
-    xy = to_map(cam_id, [x / width, y / height, w / width, h / height], live=True)
+    try:
+        xy = floor_map.to_map(cam_id, [x / width, y / height, w / width, h / height], live=True)
+    except (OSError, ValueError, KeyError):    # no map positions, the rest of live mode still works
+        return None
     return [round(xy[0], 4), round(xy[1], 4)] if xy else None
 
 
-_ZONE_OF = {}
-
-
 def _zone(xy):
-    """corridor / door / room for a map position (presence verification's zone_of), or None."""
-    if xy is None:
-        return None
-    if "zone_of" not in _ZONE_OF:
-        try:
-            from trajectories import zone_of          # on sys.path once _to_map has loaded the module
-            _ZONE_OF["zone_of"] = zone_of
-        except Exception:  # noqa: BLE001
-            _ZONE_OF["zone_of"] = None
-    return _ZONE_OF["zone_of"](*xy) if _ZONE_OF["zone_of"] else None
+    """corridor / door / room for a map position, or None."""
+    return floor_map.zone_of(*xy) if xy else None
 
 
 # ---- door handoff: the doorway's check-in names the corridor / classroom track at the door (live link_names.py) ----

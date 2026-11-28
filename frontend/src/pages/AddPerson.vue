@@ -34,7 +34,13 @@ function removeUpload(i) {
   uploads.value = uploads.value.filter((_, j) => j !== i)
 }
 function clearUploads() { uploads.value.forEach((u) => URL.revokeObjectURL(u.url)); uploads.value = [] }
-function resetForm() { form.value = empty(); touched.value = false }
+function resetForm() {
+  form.value = empty()
+  touched.value = false
+  scan.value = null
+  scanner.value?.restart()      // stops the camera and discards the scan's photos on the backend
+  clearUploads()
+}
 const scanCount = computed(() => (scan.value ? Object.values(scan.value.slots).reduce((n, v) => n + v.length, 0) : 0))
 
 onMounted(loadLists)
@@ -96,15 +102,12 @@ async function submit() {
   if (upload) uploads.value.forEach((u) => data.append('photos', u.file))
   else data.append('enrol_session', scan.value.session_id)
   saving.value = true
+  await scanner.value?.stop()      // registering drops the scan session, so its log (if wanted) is saved first
   const r = await createStudent(data)
   saving.value = false
   result.value = r.ok ? { ok: true, message: `${f.name.trim()} registered with ${n} ${upload ? 'uploaded' : 'scanned'} photos.` } : r
   if (r.ok) {
-    scan.value = null
-    scanner.value?.restart()
-    clearUploads()
-    form.value = empty()
-    touched.value = false
+    resetForm()
     loadLists()
   }
 }
