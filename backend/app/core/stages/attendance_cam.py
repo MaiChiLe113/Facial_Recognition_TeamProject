@@ -31,23 +31,51 @@ class DetectFaces(Stage):
 
 @register_stage("liveness")
 class Liveness(Stage):
-    """liveness.check() wants ~10 recent crops of one face. Options: {"frames": 10}.
-    TODO: keep one buffer per global ID once the matcher links faces to tracks; for now one
-    buffer for the main (largest) face, which is enough for one person at the door."""
+    """liveness.check() wants ~10 recent crops of one face. Options: {"frames": 10, "max_missed": 5}.
+    EVERY face in the frame is checked, not only the largest: a face shown on a phone screen is usually smaller
+    than the person holding it, and a face that is never checked used to be recognised as if it were live.
+    Each face keeps its own buffer of recent crops; a face is followed from frame to frame by box overlap
+    (IoU), and a buffer is dropped after `max_missed` frames without a match.
+    TODO: key the buffers by global ID once the matcher links faces to tracks."""
+    MIN_IOU = 0.3
 
     def setup(self):
         self.liveness = load_infer("anti_spoofing")
-        self.recent = deque(maxlen=int(self.options.get("frames", 10)))
+        self.frames = int(self.options.get("frames", 10))
+        self.max_missed = int(self.options.get("max_missed", 5))
+        self.tracks = []        # [{"box", "recent": deque of crops, "missed": frames since last seen}]
+
+    @staticmethod
+    def _iou(a, b):
+        ax, ay, aw, ah = a[:4]
+        bx, by, bw, bh = b[:4]
+        w = min(ax + aw, bx + bw) - max(ax, bx)
+        h = min(ay + ah, by + bh) - max(ay, by)
+        inter = max(0.0, w) * max(0.0, h)
+        union = aw * ah + bw * bh - inter
+        return inter / union if union > 0 else 0.0
 
     def process(self, ctx):
-        faces = [f for f in ctx.faces if f["crops"]["anti_spoofing"] is not None]
-        if not faces:
-            self.recent.clear()
-            return
-        main = max(faces, key=lambda f: f["box"][2] * f["box"][3])
-        self.recent.append(main["crops"]["anti_spoofing"])
-        result = self.liveness.check(list(self.recent))
-        main["live"], main["liveness_score"] = bool(result["live"]), result.get("score")
+        for t in self.tracks:
+            t["missed"] += 1
+        free = list(self.tracks)
+        for face in sorted(ctx.faces, key=lambda f: -f["box"][2] * f["box"][3]):
+            crop = face["crops"]["anti_spoofing"]
+            if crop is None:
+                face["live"], face["liveness_score"] = False, 0.0    # no usable crop: never accept without evidence
+                continue
+            best = max(free, key=lambda t: self._iou(t["box"], face["box"]), default=None)
+            if best is not None and self._iou(best["box"], face["box"]) >= self.MIN_IOU:
+                free.remove(best)
+                track = best
+            else:
+                track = {"recent": deque(maxlen=self.frames)}
+                self.tracks.append(track)
+            track.update(box=face["box"], missed=0)
+            track["recent"].append(crop)
+            result = self.liveness.check(list(track["recent"]))
+            face["live"], face["liveness_score"] = bool(result["live"]), result.get("score")
+        self.tracks = [t for t in self.tracks if t["missed"] <= self.max_missed]
 
 
 @register_stage("recognize")
