@@ -116,17 +116,20 @@ def analyze(image, features, client="default", threshold=None, liveness_threshol
                     return
                 buffer.append(crop_face(image, boxes[0], "anti_spoofing"))
                 crops = list(buffer)
-            result = infer.check(crops)           # the largest face; smoothed over the last frames
-            score = result.get("score")
-            if liveness_threshold is None or score is None:
-                is_live = bool(result["live"])
-            else:                                 # custom threshold; a 0.0 score means "no usable crop": never live
-                is_live = score > 0.0 and score >= liveness_threshold
-            confidence = None
-            if score is not None:
-                limit = liveness_threshold if liveness_threshold is not None else _default_threshold("anti_spoofing")
-                confidence = _live_confidence(is_live, score, limit)
-            faces[0].update(live=is_live, liveness_score=score, liveness_confidence=confidence)
+            # the largest face is smoothed over the last frames; every other face (e.g. a face shown on a phone
+            # screen, usually smaller than the person holding it) is checked on this frame alone
+            for i, face in enumerate(faces):
+                result = infer.check(crops if i == 0 else [crop_face(image, boxes[i], "anti_spoofing")])
+                score = result.get("score")
+                if liveness_threshold is None or score is None:
+                    is_live = bool(result["live"])
+                else:                             # custom threshold; a 0.0 score means "no usable crop": never live
+                    is_live = score > 0.0 and score >= liveness_threshold
+                confidence = None
+                if score is not None:
+                    limit = liveness_threshold if liveness_threshold is not None else _default_threshold("anti_spoofing")
+                    confidence = _live_confidence(is_live, score, limit)
+                face.update(live=is_live, liveness_score=score, liveness_confidence=confidence)
         run("anti_spoofing", live)
 
     if "glasses_detection" in features and boxes:
