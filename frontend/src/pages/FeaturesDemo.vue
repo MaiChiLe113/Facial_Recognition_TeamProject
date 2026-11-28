@@ -232,6 +232,7 @@ function lines(f) {
     out.push({ cls: f.live ? 'ok' : 'bad', text: `${f.live ? 'Live' : 'Spoof'}${pct(sure)}` })
   }
   if (f.loading) out.push({ cls: 'bad', text: 'Loading registered faces…' })
+  else if (f.recognition_skipped) out.push({ cls: 'bad', text: 'Not identified (spoof)' })
   else if ('similarity' in f) {
     if (f.name) out.push({ cls: 'ok', text: `${f.name} (${f.similarity.toFixed(2)})` })
     else out.push({ cls: 'bad', text: f.registered ? `Unknown (${f.similarity.toFixed(2)})` : 'Unknown (nobody registered)' })

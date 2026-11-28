@@ -163,6 +163,10 @@ def analyze(image, features, client="default", threshold=None, liveness_threshol
                 return
             profiles, names = gallery.registered_profiles()
             for face, box in zip(faces, boxes):
+                if face.get("live") is False:    # never identify a spoof (same rule as the live pipeline)
+                    face.update(student_id=None, name=None, similarity=0.0, registered=bool(profiles[0]),
+                                recognition_skipped="spoof")
+                    continue
                 crop = crop_face(image, box, "face_recognition")
                 student_id, similarity, cutoff = gallery.identify_face(infer, crop, profiles, threshold, face.get("glasses"))
                 face.update(student_id=student_id, name=names.get(student_id) if student_id else None,
@@ -175,6 +179,8 @@ def analyze(image, features, client="default", threshold=None, liveness_threshol
                 infer.reset()
                 return
             for face, box in zip(faces, boxes):
+                if face.get("live") is False:    # a spoof has no emotion
+                    continue
                 result = infer.predict(crop_face(image, box, "emotion"))
                 face.update(emotion=result["label"], emotion_score=result.get("score"))
         run("emotion", feel)

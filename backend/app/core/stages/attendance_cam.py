@@ -107,7 +107,7 @@ class Emotion(Stage):
         self.recent = deque()           # (t, {label: prob}) of this camera's main face
 
     def process(self, ctx):
-        faces = [f for f in ctx.faces if f["crops"]["emotion"] is not None]
+        faces = [f for f in ctx.faces if f["crops"]["emotion"] is not None and f.get("live") is not False]   # a spoof has no emotion
         if not faces:
             self.recent.clear()
             return

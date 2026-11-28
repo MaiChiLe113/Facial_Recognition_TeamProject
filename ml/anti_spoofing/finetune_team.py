@@ -8,6 +8,8 @@ HAWKEYE_ANTI_SPOOFING_WEIGHTS=ml/anti_spoofing/anti_spoofing_v2.pt, or copy it o
 
 Data (cut with the pipeline's YuNet detector and the same 25 % margin as the app):
   spoof  data/AppliedML/Hồng Minh/1795836404*.jpg   a phone screen showing a face (whole photo = one phone face)
+         data/AppliedML/Hồng Minh/1795842868*.jpg   phone screens (Instagram: other people, dark UI); every face found
+                                                    in the photo is on the screen, avatars and icons included
          data/AppliedML/Hồng Minh/fake_image*.jpg   the smaller face (the phone) in each photo
   real   every other photo in the five people's folders (masks, hoods, glasses and profiles included, they are live),
          plus the big face in fake_image*.jpg
@@ -36,7 +38,9 @@ from app.services import gallery as G  # noqa: E402
 SRC = Path(__file__).parent / "anti_spoofing.pt"
 OUT = Path(__file__).parent / "anti_spoofing_v2.pt"
 FOLDS, EPOCHS, LR, BATCH, FREEZE_UNTIL = 4, 6, 1e-4, 16, 14
+THRESHOLD = 0.4   # held-out: ~19 % of spoofs accepted (mostly tiny avatars), ~12 % of live frames rejected; see the table
 SKIP = {"student_card_image", "video data"}
+PHONE_PREFIXES = ("fake", "1795836404", "1795842868")   # photos of a phone screen: never real data
 
 
 def largest_face(img, relaxed=True):
@@ -58,7 +62,7 @@ def load_samples(root):
 
     for person in sorted(d for d in (root / "AppliedML").iterdir() if d.is_dir() and d.name not in SKIP):
         files = sorted(p for p in person.iterdir() if p.suffix.lower() in G.IMAGE_EXT and p.name != "desktop.ini")
-        real_files = [f for f in files if not f.name.startswith(("fake", "1795836404"))]
+        real_files = [f for f in files if not f.name.startswith(PHONE_PREFIXES)]
         for i, f in enumerate(real_files):
             img = G._read_photo(f)
             box = largest_face(img)
@@ -66,7 +70,7 @@ def load_samples(root):
                 add(img, box, 1, f"{person.name}-real-{i * FOLDS // len(real_files)}")
         if person.name == "Hồng Minh":
             for f in files:
-                if not f.name.startswith(("fake", "1795836404")):
+                if not f.name.startswith(PHONE_PREFIXES):
                     continue
                 img = G._read_photo(f)
                 if f.name.startswith("fake"):
@@ -77,6 +81,9 @@ def load_samples(root):
                     add(img, big, 1, f"{person.name}-real-fake")
                     if phone is not None or len(faces) == 1:
                         add(img, phone if phone is not None else faces[0], 0, f"{f.stem}")
+                elif f.name.startswith("1795842868"):
+                    for box in detect_faces(img, conf=0.5, min_size=24):     # all of them are on the screen
+                        add(img, box, 0, f.stem)
                 else:
                     box = largest_face(img, relaxed=False)
                     if box is not None:
@@ -180,9 +187,12 @@ def main():
         print(f"fold {k}: held-out live {sum(ys[te] == 1)} spoof {sum(ys[te] == 0)}")
     v1_thr = float(ckpt["threshold"])
     report("v1 (current)", held_v1[ys == 1], held_v1[ys == 0], v1_thr)
-    thr = max(0.3, best_threshold(held[ys == 1], held[ys == 0]))   # floor: the EER cut-off sat 0.02 under a spoof's score
+    thr = THRESHOLD
+    print(f"EER-style cut-off would be {best_threshold(held[ys == 1], held[ys == 0]):.3f}; using {THRESHOLD}")
     report("v2 held-out", held[ys == 1], held[ys == 0], thr)
     print("v2 held-out spoof scores:", np.round(np.sort(held[ys == 0]), 3))
+    for t in (0.2, 0.3, 0.4, 0.5, 0.6, 0.7):
+        print(f"  held-out at {t}: spoof accepted {(held[ys == 0] >= t).mean():.2f}  live rejected {(held[ys == 1] < t).mean():.2f}")
     if args.cv_only:
         return
 
