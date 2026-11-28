@@ -20,6 +20,9 @@ const FEATURES = [
   { key: 'gesture', label: 'Gesture', hint: 'Hand gesture of each hand (👍 ✌️ ✋ ✊ ☝️ 👌 …).' },
 ]
 const ICONS = { angry: '😠', disgust: '🤢', fear: '😨', happy: '😄', sad: '😢', surprise: '😮', neutral: '😐' }
+// Hand skeleton: pairs of MediaPipe hand points joined by a line (0 = wrist; thumb 1-4, index 5-8, middle 9-12, ring 13-16, little 17-20).
+const HAND_BONES = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12],
+  [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]]
 const HAND_ICONS = { like: '👍', dislike: '👎', peace: '✌️', peace_inverted: '✌️', palm: '✋', stop: '✋', stop_inverted: '✋', fist: '✊',
   one: '☝️', ok: '👌', call: '🤙', rock: '🤘', mute: '🤫', four: '🖐️', three: '🤟', three2: '🤟', two_up: '✌️', two_up_inverted: '✌️', no_gesture: '🖐️' }
 
@@ -275,6 +278,13 @@ function lines(f) {
             <div v-for="(f, i) in faces" :key="i" class="fd-box" :class="tone(f)" :style="boxStyle(f)">
               <span v-if="nameTag(f)" class="fd-name" :class="nameTag(f).cls">{{ nameTag(f).text }}</span>
             </div>
+            <svg v-if="hands.length" class="fd-skeleton" viewBox="0 0 4 3" preserveAspectRatio="none">
+              <g v-for="(h, i) in hands.filter((h) => h.points)" :key="'s' + i">
+                <line v-for="([a, b], j) in HAND_BONES" :key="j" class="bone"
+                  :x1="h.points[a][0] * 4" :y1="h.points[a][1] * 3" :x2="h.points[b][0] * 4" :y2="h.points[b][1] * 3" />
+                <circle v-for="(p, j) in h.points" :key="'p' + j" class="joint" :cx="p[0] * 4" :cy="p[1] * 3" r="0.022" />
+              </g>
+            </svg>
             <div v-for="(h, i) in hands" :key="'h' + i" class="fd-box hand" :style="boxStyle(h)">
               <span class="fd-name hand">{{ HAND_ICONS[h.label] ?? '' }} {{ h.label }}</span>
             </div>
@@ -416,8 +426,11 @@ function lines(f) {
 .fd-name.known { background: var(--green); }
 .fd-name.unknown { background: var(--danger); }
 .fd-name.wait { background: var(--muted); }
-.fd-box.hand { border-color: #f0a020; }
-.fd-name.hand { background: #f0a020; }
+.fd-box.hand { border-color: transparent; }
+.fd-name.hand { background: #f0a020; top: -32px; bottom: auto; border-radius: 4px; }
+.fd-skeleton { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.fd-skeleton .bone { stroke: #f0a020; stroke-width: 3; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.fd-skeleton .joint { fill: #fff; stroke: #f0a020; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .fd-lines { padding: 0; margin: 10px 0 0; }
 .fd-log { max-height: 340px; overflow: auto; }
 .fd-log table { width: 100%; border-collapse: collapse; font-size: 13px; }

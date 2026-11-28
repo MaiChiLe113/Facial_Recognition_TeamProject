@@ -190,7 +190,8 @@ def analyze(image, features, client="default", threshold=None, liveness_threshol
         def gesture(infer):                  # whole frame, not face crops; boxes as fractions like the faces
             for hand in infer.predict(image):
                 x, y, w, h = hand["box"]
-                hands.append({"label": hand["label"], "score": hand["score"], "box": [x / width, y / height, w / width, h / height]})
+                hands.append({"label": hand["label"], "score": hand["score"], "box": [x / width, y / height, w / width, h / height],
+                              "points": [[px / width, py / height] for px, py in hand["points"]]})   # 21 points, for the skeleton
         run("gesture", gesture)
 
     result = {"faces": faces, "errors": errors, "ms": round((time.perf_counter() - start) * 1000, 1)}
