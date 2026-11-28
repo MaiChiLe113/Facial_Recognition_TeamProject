@@ -924,7 +924,8 @@
       0.5266
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 3,
@@ -1794,7 +1795,8 @@
       0.1739
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 6,
@@ -2396,7 +2398,8 @@
     }
    ],
    "name_from": 5.4,
-   "name_source": "attendance_cam ID 1 (door handoff)"
+   "name_source": "attendance_cam ID 1 (door handoff)",
+   "ends_at_door": false
   },
   {
    "global_id": 9,
@@ -2582,7 +2585,8 @@
       0.5279
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   }
  ]
 }

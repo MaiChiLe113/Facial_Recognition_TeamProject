@@ -276,8 +276,8 @@ def _draw(img, ctx, names, role=None, cam=None, now=None):
         color = _COLORS[tid % len(_COLORS)] if tid is not None else _UNKNOWN
         cv2.rectangle(img, (x, y), (x + w, y + h), color, 2)
         person = cam.people.get(tid, {}) if cam is not None else {}
-        labels.append((x, y, w, h, f"ID {tid} | {person['name']}" if person.get("name") else f"ID {tid}", color,
-                       1 if person.get("name") else 0))
+        # Label = name only; the per-camera track ID stays internal (summary "id", box colour), see CameraCard.vue.
+        labels.append((x, y, w, h, person.get("name") or "Unknown", color, 1 if person.get("name") else 0))
         people.append({"id": tid, "box": [x, y, w, h], "map": xy, "name": person.get("name"),
                        "student_id": person.get("sid")})
     for f in ctx.faces:

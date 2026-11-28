@@ -47,6 +47,12 @@ def to_box(cx, cy, w, h, frame_w, frame_h):
 # changes size <= 0.041; the stillest real people (P2 seated for all of take 4 in cam_2, P1 seated behind
 # the glass in take 1) move >= 0.024 sideways or change width/height by >= 0.062.
 STATIC_MAX_MOVE_X, STATIC_MAX_MOVE_Y, STATIC_MAX_SIZE = 0.022, 0.035, 0.05
+# At --imgsz 1280 that poster's box jitters more (and people sit in front of it), so the static test alone no longer
+# catches it, and motion cannot tell it from a seated student (who can be stiller). Known false positives at a fixed
+# place in the recorded camera pose are listed here ([x, y, w, h] fractions); a track that sits on one (IoU >=
+# IGNORE_IOU) for IGNORE_SHARE of its keyframes is dropped. People passing or sitting in front of it are kept.
+IGNORE_BOXES = {"cam_1": [[0.027, 0.356, 0.058, 0.124]]}   # poster of a man on the classroom wall, take 1 at 1280
+IGNORE_IOU, IGNORE_SHARE = 0.5, 0.8
 
 # Box smoothing: YOLO's boxes jitter a few pixels from frame to frame, so each saved box is replaced by the mean of the
 # keyframes around it (SMOOTH_HALF on each side, centred, so no lag). Only keyframes no more than SMOOTH_MAX_GAP_S apart
@@ -81,8 +87,24 @@ def is_static(track):
             and spread(b[:, 3]) / h < STATIC_MAX_SIZE)
 
 
+def _iou(a, b):
+    ix = max(0.0, min(a[0] + a[2], b[0] + b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[1] + a[3], b[1] + b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    return inter / (a[2] * a[3] + b[2] * b[3] - inter) if inter else 0.0
+
+
+def on_ignore_box(track, cam_id):
+    """True for a track that sits on a known false positive of this camera (IGNORE_BOXES)."""
+    for box in IGNORE_BOXES.get(cam_id, []):
+        if np.mean([_iou(k["box"], box) >= IGNORE_IOU for k in track["keyframes"]]) >= IGNORE_SHARE:
+            return True
+    return False
+
+
 def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_keyframes=5,
-        tracker="bytetrack.yaml", out_dir=REPO / "data" / "tracks", device=None, drop_static=True, smooth=True):
+        tracker="bytetrack.yaml", out_dir=REPO / "data" / "tracks", device=None, drop_static=True, smooth=True,
+        imgsz=640):
     tracks = {}  # track_id -> {"global_id": ..., "name": None, "keyframes": [...]}
 
     # TODO 1: load a small person detector.
@@ -104,7 +126,7 @@ def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_ke
     t0 = time.perf_counter()
     for frame_index, result in enumerate(model.track(source=str(video_path), stream=True, tracker=str(tracker),
                                                      classes=[0], persist=True, conf=conf, device=device,
-                                                     verbose=False)):
+                                                     imgsz=imgsz, verbose=False)):
         if result.boxes.id is None:  # detections without a track ID are skipped
             continue
         ids = [int(i) for i in result.boxes.id.tolist()]
@@ -123,7 +145,7 @@ def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_ke
     frames = frame_index + 1
 
     kept = [tr for tr in tracks.values() if len(tr["keyframes"]) >= min_keyframes]
-    static = [tr["global_id"] for tr in kept if is_static(tr)] if drop_static else []
+    static = [tr["global_id"] for tr in kept if is_static(tr) or on_ignore_box(tr, cam_id)] if drop_static else []
     kept = [tr for tr in kept if tr["global_id"] not in static]
     if smooth:                                   # after the static check, which needs the raw boxes
         for tr in kept:
@@ -138,7 +160,8 @@ def run(cam_id, video_path, every_n=3, model_name="yolo11n.pt", conf=0.4, min_ke
     out_path.write_text(json.dumps(out, indent=1), encoding="utf-8")
 
     stats = {
-        "cam_id": cam_id, "tracker": Path(tracker).stem + ("+static_filter" if drop_static else "") + ("+smooth" if smooth else ""),
+        "cam_id": cam_id, "tracker": Path(tracker).stem + ("+static_filter" if drop_static else "") + ("+smooth" if smooth else "")
+                   + (f"+imgsz{imgsz}" if imgsz != 640 else ""),
         "ids_static": len(static), "static_ids": static, "video": Path(video_path).name, "device": device,
         "frames": frames, "fps_video": fps, "ids_raw": len(raw_ids),
         "ids_with_keyframes": len(tracks), "ids_kept": len(kept), "ids_dropped": len(raw_ids) - len(kept),
@@ -183,15 +206,19 @@ if __name__ == "__main__":
     p.add_argument("--real-people", nargs="*", default=[], metavar="CAM=N",
                    help="human-counted people per camera for --eval-csv, e.g. cam_1=4")
     p.add_argument("--no-smooth", action="store_true", help="save YOLO's raw boxes (no moving average)")
+    p.add_argument("--imgsz", type=int, default=640,
+                   help="YOLO input size. 1280 = full resolution of the 1280x720 recordings: people seen through the "
+                        "corridor glass on cam_1 are ~30 px tall and mostly vanish at the default 640 (take 1: "
+                        "recall 0.29 at 640 vs 0.81 at 1280, conf 0.4)")
     a = p.parse_args()
 
     take = configured_take() if a.take is None else a.take
     cams = camera_ids() if a.cam == "all" else [a.cam]
-    print(f"take {take}, tracker {a.tracker}, model {a.model}, conf {a.conf}, every_n {a.every_n}, "
+    print(f"take {take}, tracker {a.tracker}, model {a.model}, imgsz {a.imgsz}, conf {a.conf}, every_n {a.every_n}, "
           f"min_keyframes {a.min_keyframes}, drop_static {not a.keep_static}, smooth {not a.no_smooth}")
     out_dir = a.out_dir or REPO / "data" / "tracks" / f"take{take}"
     all_stats = [run(cam, video_path(cam, take), a.every_n, a.model, a.conf, a.min_keyframes, a.tracker, out_dir,
-                     drop_static=not a.keep_static, smooth=not a.no_smooth)
+                     drop_static=not a.keep_static, smooth=not a.no_smooth, imgsz=a.imgsz)
                  for cam in cams]
     if a.eval_csv:
         real = {k: int(v) for k, v in (x.split("=", 1) for x in a.real_people)}

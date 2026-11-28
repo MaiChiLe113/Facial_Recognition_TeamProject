@@ -1,6 +1,6 @@
 {
   "_note": "Which recording each camera plays in the demo. Files sit in HAWKEYE_VIDEO_ROOT/<folder>/. Takes are matched across cameras by take number (recorded together). The CAM 2 device clock is ~23.4 s ahead in every take, so do not sync by the filename timestamp; use offset_s to fine-tune (positive = skip that many seconds at the start).",
-  "take": 3,
+  "take": 1,
   "cameras": [
     { "cam_id": "cam_1",          "label": "CAM 1",             "place": "Corridor",  "folder": "cam_1",          "stream_id": "sCi8Jvd", "offset_s": 0 },
     { "cam_id": "cam_2",          "label": "CAM 2",             "place": "Classroom", "folder": "cam_2",          "stream_id": "pDHjQPf", "offset_s": 0 },

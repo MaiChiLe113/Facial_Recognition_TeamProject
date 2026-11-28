@@ -3,9 +3,9 @@
 //   Live          phones / laptops used as cameras (/camera page). Each tile shows that camera's MJPEG stream
 //                 (GET /api/live/<cam_id>/stream, boxes drawn by the backend) and the doorway tile lists the real
 //                 per-face results from GET /api/live, polled every second. "+" on an idle tile opens /camera?cam=<id>.
-//   Recorded      one of the recorded takes played in sync, with its precomputed track boxes (/api/tracks), the take's
-//                 event log, presence verification + door audit and the map trails. (This was the MultiCam page, /demo,
-//                 which now redirects here: /?source=recorded&take=N.)
+//   Recorded      the demo recording (one take, "take" in data/video_config.json) played in sync, with its precomputed
+//                 track boxes (/api/tracks), event log, presence verification + door audit and the map trails. (This was
+//                 the MultiCam page, /demo, which now redirects here: /?source=recorded.)
 // Class roster and room map are shown in both modes. In Live, the event log, the map trails and the roster only run
 // after Start (a session); before it they stay empty, and Stop freezes them.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -25,12 +25,10 @@ const POLL_MS = 1000
 
 const route = useRoute()
 const router = useRouter()
-const { take: defaultTake, takes } = demoTakes()
-
-const takeFromUrl = () => {
-  const n = Number(route.query.take)
-  return takes.some((t) => t.take === n) ? n : defaultTake
-}
+// Recorded mode plays one demo video: the take set in data/video_config.json ("take"). The other takes stay on the
+// Drive (and in video_config.json for the ML scripts) but are not offered here.
+const { take: defaultTake } = demoTakes()
+const takeFromUrl = () => defaultTake
 const recorded = computed(() => route.query.source === 'recorded')
 const selected = ref(takeFromUrl())
 
@@ -38,14 +36,13 @@ const dash = ref(null)       // course, roster, map and the live-mode event log 
 const demo = ref(null)       // camera list (labels, places) and, in Recorded mode, the take's video URLs
 
 // ---------------- source switch ----------------
-function setSource(source, take = selected.value) {
-  const query = source === 'recorded' ? { source, take: String(take) } : {}
+function setSource(source) {
+  const query = source === 'recorded' ? { source } : {}
   router.replace({ query })
 }
 watch(recorded, (on) => {
   if (on) { startRecorded() } else { stop(); message.value = '' }
 })
-watch(() => route.query.take, () => { if (recorded.value) choose(takeFromUrl()) })
 
 // ---------------- live ----------------
 const live = ref(null)
@@ -186,16 +183,6 @@ const streamable = computed(() => demo.value && !demo.value.offline && demo.valu
 const takeTracks = (camId) => tracks.value[camId] ?? null
 const hasVideo = computed(() => Object.keys(srcs.value).length > 0)
 
-function choose(n) {
-  if (n === selected.value && demo.value?.take === n) return
-  stop()
-  selected.value = n
-  message.value = ''
-  if (Number(route.query.take) !== n) setSource('recorded', n)
-  loadTake(n)
-  window.scrollTo({ top: 0, behavior: 'smooth' })   // back to the cameras to play the chosen take
-}
-
 function playTake() {
   if (!streamable.value) {
     message.value = demo.value?.offline
@@ -270,9 +257,6 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
       <div class="demo-controls bar-right">
         <template v-if="recorded">
           <!-- One button: loads and plays the take the first time, then pauses / resumes it. -->
-          <select class="input compact" aria-label="Recorded take" :value="selected" @change="choose(Number($event.target.value))">
-            <option v-for="t in takes" :key="t.take" :value="t.take">Take {{ t.take }}</option>
-          </select>
           <button class="btn" :disabled="!hasVideo" @click="restart">Restart</button>
           <button class="btn primary" @click="hasVideo ? togglePause() : playTake()">{{ playing ? '❚❚ Pause' : '▶ Play' }}</button>
         </template>
@@ -332,29 +316,6 @@ const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
     <template v-if="recorded">
       <PresencePanel :result="presence" :position="position" :live="hasVideo" />
 
-      <section class="card roster">
-        <header class="card-head">
-          <h2>Recorded takes</h2>
-          <span class="muted">{{ takes.length }} takes · click one, then Play</span>
-        </header>
-        <div class="table-scroll">
-        <table>
-          <thead>
-            <tr><th>Take</th><th>Length</th><th>Scenario</th><th>Files</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="t in takes" :key="t.take" class="clickable" :class="{ selected: t.take === selected }" @click="choose(t.take)">
-              <td><strong>Take {{ t.take }}</strong></td>
-              <td>~{{ t.approx_seconds }} s</td>
-              <td>{{ t.scenario }}</td>
-              <td class="files">
-                <span v-for="c in ORDER" :key="c" class="mono">{{ t.files[c] }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        </div>
-      </section>
     </template>
   </div>
 </template>

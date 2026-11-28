@@ -51,7 +51,9 @@ function boxAt(track, t) {
 // Name shown once the track is recognised (name_from = check-in time, if given); "Le Mai Chi" -> "Mai Chi".
 const nameAt = (tr, t) => (tr.name && (tr.name_from == null || t >= tr.name_from) ? tr.name : null)
 const shortName = (name) => (name.split(' ').length > 2 ? name.split(' ').slice(1).join(' ') : name)
-const labelOf = (tr, t) => { const n = nameAt(tr, t); return `ID ${tr.global_id} · ${n ? shortName(n) : 'Unknown'}` }
+// The label shows only who it is. The per-camera tracking ID (tr.global_id) is not shown: until cross-camera Re-ID
+// assigns one shared ID, the same person has different numbers on different cameras, which read as different people.
+const labelOf = (tr, t) => { const n = nameAt(tr, t); return n ? shortName(n) : 'Unknown' }
 
 // Draws the track boxes on the canvas laid over the <video>, once per animation frame.
 // The video uses object-fit: contain, so we compute where the picture actually sits.

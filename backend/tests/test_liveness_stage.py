@@ -85,3 +85,18 @@ def test_spoof_gets_no_emotion(monkeypatch):
     ctx.t = 0.0
     stage.process(ctx)
     assert "emotion" in real and "emotion" not in phone and len(seen) == 1
+
+
+def test_several_faces_with_different_crop_sizes(monkeypatch):
+    """Regression: buffers were removed from the free list with list.remove(), which compares the buffers' numpy
+    crops with == and raised "operands could not be broadcast" once two faces of different sizes were followed
+    (three students at the doorway in take 3 made the stage fail on every frame)."""
+    stage, _ = make_stage(monkeypatch)
+    small = lambda: {"box": (250, 50, 60, 60), "crops": {"anti_spoofing": np.full((6, 6, 3), 10, np.uint8)}}
+    big = lambda: {"box": (0, 0, 200, 200), "crops": {"anti_spoofing": np.full((9, 9, 3), 250, np.uint8)}}
+    stage.process(ctx_with(small()))                 # the small face gets the first buffer
+    for _ in range(12):                              # both buffers full (10 crops): deques of equal length compare
+        b, s = big(), small()
+        stage.process(ctx_with(s, b))
+        assert b["live"] is True and s["live"] is False
+    assert len(stage.tracks) == 2

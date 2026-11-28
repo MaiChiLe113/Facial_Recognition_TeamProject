@@ -2346,7 +2346,8 @@
       0.1774
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 4,
@@ -2415,7 +2416,8 @@
       0.1386
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 6,
@@ -2475,7 +2477,8 @@
       0.153
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 11,
@@ -2895,7 +2898,8 @@
       0.4122
      ]
     }
-   ]
+   ],
+   "ends_at_door": true
   },
   {
    "global_id": 12,
@@ -3675,11 +3679,12 @@
       0.3069
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 13,
-   "name": null,
+   "name": "Do Trinh Thuan Minh",
    "keyframes": [
     {
      "t": 11.1,
@@ -4842,7 +4847,10 @@
       0.443
      ]
     }
-   ]
+   ],
+   "name_from": 11.3,
+   "name_source": "attendance_cam ID 2 (door handoff, crowded: colour + time)",
+   "ends_at_door": true
   },
   {
    "global_id": 15,
@@ -4893,7 +4901,8 @@
       0.3199
      ]
     }
-   ]
+   ],
+   "ends_at_door": true
   },
   {
    "global_id": 16,
@@ -6465,7 +6474,8 @@
       0.51
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 20,
@@ -6660,7 +6670,8 @@
       0.2483
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 21,
@@ -6999,7 +7010,8 @@
       0.188
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 22,
@@ -7437,7 +7449,8 @@
       0.1767
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 23,
@@ -7488,7 +7501,8 @@
       0.3263
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 26,
@@ -7728,7 +7742,8 @@
       0.3945
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   }
  ]
 }

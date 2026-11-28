@@ -3923,7 +3923,8 @@
     }
    ],
    "name_from": 6.4,
-   "name_source": "attendance_cam ID 1 (door handoff)"
+   "name_source": "attendance_cam ID 1 (door handoff)",
+   "ends_at_door": false
   },
   {
    "global_id": 6,
@@ -4534,7 +4535,8 @@
     }
    ],
    "name_from": 20.9,
-   "name_source": "attendance_cam ID 2 (door handoff)"
+   "name_source": "attendance_cam ID 2 (door handoff)",
+   "ends_at_door": false
   },
   {
    "global_id": 14,
@@ -4965,11 +4967,12 @@
     }
    ],
    "name_from": 31.8,
-   "name_source": "attendance_cam ID 3 (door handoff)"
+   "name_source": "attendance_cam ID 3 (door handoff)",
+   "ends_at_door": true
   },
   {
    "global_id": 15,
-   "name": null,
+   "name": "Nguyen Duc Manh",
    "keyframes": [
     {
      "t": 35.8,
@@ -6042,11 +6045,14 @@
       0.1501
      ]
     }
-   ]
+   ],
+   "name_from": 35.8,
+   "name_source": "room occupancy: same place as its last box on cam_2 (ID 14)",
+   "ends_at_door": false
   },
   {
    "global_id": 16,
-   "name": null,
+   "name": "Do Trinh Thuan Minh",
    "keyframes": [
     {
      "t": 37.6,
@@ -7092,7 +7098,10 @@
       0.1657
      ]
     }
-   ]
+   ],
+   "name_from": 37.6,
+   "name_source": "room occupancy: the only person in the room not visible on this view",
+   "ends_at_door": false
   },
   {
    "global_id": 19,
@@ -7179,7 +7188,8 @@
       0.3461
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 22,
@@ -7736,7 +7746,8 @@
     }
    ],
    "name_from": 42.5,
-   "name_source": "attendance_cam ID 4 (door handoff)"
+   "name_source": "attendance_cam ID 4 (door handoff)",
+   "ends_at_door": false
   }
  ]
 }

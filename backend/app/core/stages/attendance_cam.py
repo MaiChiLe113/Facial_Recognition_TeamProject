@@ -66,7 +66,9 @@ class Liveness(Stage):
                 continue
             best = max(free, key=lambda t: self._iou(t["box"], face["box"]), default=None)
             if best is not None and self._iou(best["box"], face["box"]) >= self.MIN_IOU:
-                free.remove(best)
+                # by identity: list.remove() compares with ==, and comparing two buffers' numpy crops raises
+                # "operands could not be broadcast" as soon as two or more faces are followed (multi-face frames)
+                free = [t for t in free if t is not best]
                 track = best
             else:
                 track = {"recent": deque(maxlen=self.frames)}

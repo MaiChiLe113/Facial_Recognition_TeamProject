@@ -2328,7 +2328,8 @@
       0.1822
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 2,
@@ -2379,7 +2380,8 @@
       0.3552
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 3,
@@ -5148,7 +5150,8 @@
       0.3781
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 4,
@@ -7359,7 +7362,8 @@
       0.1393
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 5,
@@ -7851,7 +7855,8 @@
       0.445
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 11,
@@ -9686,7 +9691,8 @@
     }
    ],
    "name_from": 9.4,
-   "name_source": "attendance_cam ID 1 (door handoff)"
+   "name_source": "attendance_cam ID 1 (door handoff)",
+   "ends_at_door": false
   },
   {
    "global_id": 15,
@@ -10133,7 +10139,8 @@
       0.1818
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 17,
@@ -10301,11 +10308,12 @@
       0.3548
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 19,
-   "name": null,
+   "name": "Nguyen Hong Minh",
    "keyframes": [
     {
      "t": 28.5,
@@ -10568,7 +10576,10 @@
       0.5115
      ]
     }
-   ]
+   ],
+   "name_from": 28.5,
+   "name_source": "room occupancy: same place as its last box on cam_2 (ID 11)",
+   "ends_at_door": false
   }
  ]
 }

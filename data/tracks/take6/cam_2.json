@@ -1095,7 +1095,8 @@
       0.5144
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 2,
@@ -2190,7 +2191,8 @@
       0.1784
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 3,
@@ -3285,7 +3287,8 @@
       0.494
      ]
     }
-   ]
+   ],
+   "ends_at_door": false
   },
   {
    "global_id": 4,
@@ -4020,7 +4023,8 @@
       0.3835
      ]
     }
-   ]
+   ],
+   "ends_at_door": true
   }
  ]
 }

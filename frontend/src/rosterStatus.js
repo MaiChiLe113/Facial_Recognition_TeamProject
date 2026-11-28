@@ -1,8 +1,9 @@
 // Class roster status driven by the cameras (Home page), in both sources. Everyone starts as "Not seen".
 //   Checked in  the attendance camera recognised the face (recorded: the track's name_from; live: a live, named face)
 //   In class    seen by the classroom camera (cam_2) after that
-//   Left        no longer seen by the classroom camera (recorded: its track ended before the clip did;
-//               live: not recognised on cam_2 for LEFT_AFTER_S)
+//   Left        no longer seen by the classroom camera (recorded: its track ended before the clip did, at the door
+//               when the track says so (ends_at_door from ml/tracking/link_names.py): a track that ends inside the
+//               room lost the person, who is still in class; live: not recognised on cam_2 for LEFT_AFTER_S)
 // Roster rows are matched by student_id (live) or by full name (recorded tracks carry names only).
 import { reactive } from 'vue'
 import { clockOf } from './takeEvents.js'
@@ -31,7 +32,8 @@ export function recordedRoster(roster, tracksByCam, offsets, position, playing) 
   const clipEnd = Math.max(0, ...room.map((tr) => tr.keyframes?.at(-1)?.t ?? 0))
   for (const r of rows) {
     const seen = room.filter((tr) => tr.name === r.name && tr.keyframes?.length)
-      .map((tr) => ({ start: tr.keyframes[0].t - off, end: tr.keyframes.at(-1).t - off, open: tr.keyframes.at(-1).t >= clipEnd - END_SLACK_S }))
+      .map((tr) => ({ start: tr.keyframes[0].t - off, end: tr.keyframes.at(-1).t - off,
+        open: tr.keyframes.at(-1).t >= clipEnd - END_SLACK_S || tr.ends_at_door === false }))
       .filter((s) => s.start <= position)
     if (!seen.length) continue
     const entry = Math.min(...seen.map((s) => s.start))

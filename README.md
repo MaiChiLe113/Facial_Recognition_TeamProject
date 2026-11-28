@@ -73,7 +73,7 @@ The recordings live in the team Google Drive folder `AppliedML/video data/` (one
 | Classroom | `cam_2` | `pDHjQPf` | CAM 2 |
 | Doorway | `attendance_cam` | `2SiEwN8` | Attendance camera |
 
-`data/video_config.json` lists all 8 synced takes and which take the Home page plays (`"take"`, currently 3). Home in Recorded mode (`/?source=recorded&take=N`; the old `/demo` route redirects there) plays any take: pick it in the take menu or the table and press Play. Files are matched across cameras by take number, not by the timestamp in the filename: the CAM 2 device clock runs about 23.4 s ahead of the others in every take. Use `offset_s` per camera to fine-tune sync.
+`data/video_config.json` lists all 8 synced takes and which take the Home page plays (`"take"`, currently 1). Home in Recorded mode (`/?source=recorded`; the old `/demo` route redirects there) plays only that take, the demo video; the other takes stay on the Drive and in the config for the ML scripts. Files are matched across cameras by take number, not by the timestamp in the filename: the CAM 2 device clock runs about 23.4 s ahead of the others in every take. Use `offset_s` per camera to fine-tune sync.
 
 ## Tracking and naming (Mai Chi)
 
@@ -84,6 +84,8 @@ python3.12 -m venv ml/.venv && ml/.venv/bin/pip install -r ml/tracking/requireme
 for t in 1 2 3 4 5 6 7 8; do
   ml/.venv/bin/python ml/tracking/precompute_tracks.py --cam all --take $t --tracker ml/tracking/configs/bytetrack_long.yaml
 done
+# demo take 1, cam_1 at full resolution: people seen through the corridor glass are ~30 px tall (recall 0.29 -> 0.81)
+ml/.venv/bin/python ml/tracking/precompute_tracks.py --cam cam_1 --take 1 --tracker ml/tracking/configs/bytetrack_long.yaml --imgsz 1280
 ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all     # always after precompute: it resets names
 ```
 
@@ -91,7 +93,7 @@ ml/.venv/bin/python ml/face_recognition/name_tracks.py --take all     # always a
 
 1. **Tracking** (`precompute_tracks.py`): YOLO11n (pre-trained) + ByteTrack with a 3 s buffer, people only, every 3rd frame kept, short tracks and objects that never move (a poster on the classroom wall) dropped. Output: `data/tracks/take<N>/<cam_id>.json`.
 2. **Naming at check-in** (`ml/face_recognition/name_tracks.py`): a baseline until Thuận Minh's model is trained. OpenCV YuNet + SFace compare faces on the attendance camera with each student's enrolment photos (`photo_folder`) and student card (`student_card`) of every student in the backend's database. All five members have photos in their Drive folders (`AppliedML/<your name>/`). New students are registered on the **Add person** page (`POST /api/students`, photos saved to `data/photos/`); rerun after registering someone.
-3. **Name on every camera** (`ml/tracking/link_names.py`, run by step 2): the cam_1 / cam_2 track standing at the classroom door while that person checks in gets the same name, from the check-in time on.
+3. **Name on every camera** (`ml/tracking/link_names.py`, run by step 2): the cam_1 / cam_2 track standing at the classroom door while that person checks in gets the same name, from the check-in time on. When that track later breaks (occlusion, sitting down, ID switch), `ml/tracking/room_tracker.py` (also run by step 2) passes the name on to the new track: the room is entered only through the door, so a track that appears inside it is someone already there (same place as their last box, or the only checked-in person the camera cannot see). With more than one candidate it stays Unknown. This also names cam_1's boxes of people seen through the glass.
 
 Takes: the old take 1 was a failed recording and was deleted from the Drive folder on 2026-11-17; the other takes were renumbered (old 2–9 → 1–8, the old demo take 4 is now **take 3**). `data/video_config.json` already uses the new numbers.
 
@@ -126,7 +128,7 @@ Real output has `"source": "yolo11n+bytetrack"`. Optional track fields, added fo
 
 | field | meaning |
 | --- | --- |
-| `name_from` | seconds; show `name` only from this time on (the check-in moment). Before it the box reads `ID n · Unknown` |
+| `name_from` | seconds; show `name` only from this time on (the check-in moment). Before it the box reads `Unknown` (tracking IDs are not drawn on the boxes) |
 | `name_source` | where the name came from, e.g. `attendance_cam ID 1 (door handoff)` |
 
 `global_id` is still the per-camera ByteTrack ID: the same person can have different numbers on different cameras until the Re-ID matcher (Phase B) assigns one shared ID.
