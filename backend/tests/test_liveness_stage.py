@@ -65,3 +65,23 @@ def test_buffer_is_dropped_after_the_face_leaves(monkeypatch):
     for _ in range(stage.max_missed + 1):
         stage.process(ctx_with())
     assert stage.tracks == []
+
+
+def test_spoof_gets_no_emotion(monkeypatch):
+    from app.core.stages.attendance_cam import Emotion
+    seen = []
+
+    class Feel:
+        def predict(self, crop, smooth=False):
+            seen.append(crop)
+            return {"scores": {"sad": 1.0}}
+
+    monkeypatch.setattr(attendance_cam, "load_infer", lambda name: Feel())
+    stage = Emotion("cam", "attendance", {}, {})
+    stage.setup()
+    real = {"box": (0, 0, 100, 100), "live": True, "crops": {"emotion": np.zeros((8, 8, 3), np.uint8)}}
+    phone = {"box": (200, 0, 150, 150), "live": False, "crops": {"emotion": np.zeros((8, 8, 3), np.uint8)}}
+    ctx = ctx_with(real, phone)
+    ctx.t = 0.0
+    stage.process(ctx)
+    assert "emotion" in real and "emotion" not in phone and len(seen) == 1
