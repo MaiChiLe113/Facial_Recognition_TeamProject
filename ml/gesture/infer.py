@@ -66,7 +66,9 @@ def _load():
 
 
 def predict(frame):
-    """One BGR uint8 frame -> a list with one {"label", "score", "box": [x, y, w, h] in pixels} per hand (empty if none)."""
+    """One BGR uint8 frame -> a list with one {"label", "score", "box": [x, y, w, h], "points": 21 x [x, y]} per hand
+    (empty if none). Box and points are in pixels; the points are MediaPipe's hand landmarks (0 = wrist, 4 = thumb tip,
+    8 = index tip, 12 = middle tip, 16 = ring tip, 20 = little-finger tip), for drawing the hand skeleton."""
     import mediapipe as mp
     import torch
 
@@ -87,5 +89,6 @@ def predict(frame):
             probs = torch.softmax(st["model"].net(torch.from_numpy(q)[None]), dim=1)[0].numpy()
         best = int(probs.argmax())
         results.append({"label": st["classes"][best], "score": float(probs[best]),
-                        "box": [float(p[:, 0].min()), float(p[:, 1].min()), float(np.ptp(p[:, 0])), float(np.ptp(p[:, 1]))]})
+                        "box": [float(p[:, 0].min()), float(p[:, 1].min()), float(np.ptp(p[:, 0])), float(np.ptp(p[:, 1]))],
+                        "points": p[:, :2].round(1).tolist()})
     return results

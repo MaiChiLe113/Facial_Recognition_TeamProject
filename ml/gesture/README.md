@@ -37,9 +37,9 @@ Plots and table: `results/gesture/` at the repo root (git-ignored): `confusion_m
 
 ## Used by the app
 
-`predict(frame)` takes a BGR frame and returns one `{"label", "score", "box": [x, y, w, h]}` per hand (up to 2), or `[]`.
+`predict(frame)` takes a BGR frame and returns one `{"label", "score", "box": [x, y, w, h], "points": 21 x [x, y]}` per hand (up to 2), or `[]`.
 MediaPipe hand confidence is raised from 0.5 to 0.7 (`HAND_CONFIDENCE`): at 0.5 faces were sometimes taken for hands; on 600
 HaGRID photos 0.7 gave no false hands and found 489 of 599 gesture hands (0.5: 515, with 3 false hands).
-In the app: tick **Gesture** on the Features demo page (`/features-demo`): every hand gets an orange box with its gesture.
+In the app: tick **Gesture** on the Features demo page (`/features-demo`): every hand is drawn as a skeleton (its 21 points joined along the fingers, like MediaPipe's hand diagram) with its gesture above it; `predict()` returns the points as `points`.
 The backend finds this folder through `backend/app/core/ml_models.py` (`DEMO_FEATURES` includes `gesture`, next to `glasses_detection`) and returns the hands
 as `hands` in `POST /api/features-demo/infer`.
